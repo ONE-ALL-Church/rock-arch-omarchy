@@ -16,7 +16,7 @@ Panel {
   readonly property string socketPath: runtimeDir + "/broker.sock"
   property string contextName: "DEV"
   property string viewMode: "search"
-  property string query: ""
+  property alias query: searchField.text
   property var results: []
   property var personalLinks: []
   property var quickReturns: []
@@ -71,6 +71,7 @@ Panel {
       Qt.callLater(function() {
         root.refreshSearch()
         root.refreshNavigation()
+        searchField.forceActiveFocus()
       })
     }
     if (Array.isArray(response.unavailable) && response.unavailable.length)
@@ -122,7 +123,7 @@ Panel {
     request({op: "status"})
     refreshSearch()
     refreshNavigation()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function() { searchField.forceActiveFocus() })
   }
 
   onOpenedChanged: if (opened) resetPanel()
@@ -185,33 +186,15 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
+    focusTarget: searchField
     contentWidth: panel.fittedContentWidth(Style.space(560))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus
       onCloseRequested: root.close()
-      onActivateRequested: {
-        if (root.viewMode === "search" && root.results.length && root.results[0].category === "People")
-          root.request({op: "person_quick_look", safeId: root.results[0].safeId})
-      }
-      onTextKey: function(t) {
-        root.viewMode = "search"
-        root.query = (root.query + t).slice(0, 120)
-        root.quickLook = null
-        root.scheduleSearch()
-      }
-      Keys.onPressed: function(event) {
-        if (event.key === Qt.Key_Backspace) {
-          root.viewMode = "search"
-          root.query = root.query.slice(0, -1)
-          root.quickLook = null
-          root.scheduleSearch()
-          event.accepted = true
-        }
-      }
 
       Column {
         id: content
@@ -255,17 +238,49 @@ Panel {
                 onClicked: {
                   root.viewMode = modelData
                   if (modelData === "links") root.refreshNavigation()
+                  Qt.callLater(function() {
+                    if (modelData === "search") searchField.forceActiveFocus()
+                    else keyCatcher.forceActiveFocus()
+                  })
                 }
               }
             }
           }
         }
 
-        Text {
+        TextField {
+          id: searchField
+          visible: root.viewMode === "search"
           width: parent.width
-          text: root.viewMode === "search" ? (root.query || "Search People, Groups, Workflows, Jobs, Pages, Content…") : "Personal Links and launcher Quick Returns"
+          maximumLength: 120
+          placeholderText: "Search People, Groups, Workflows, Jobs, Pages, Content…"
+          selectByMouse: true
+          inputMethodHints: Qt.ImhNoPredictiveText
+          onTextEdited: {
+            root.quickLook = null
+            root.scheduleSearch()
+          }
+          Keys.onEscapePressed: function(event) {
+            root.close()
+            event.accepted = true
+          }
+          Keys.onReturnPressed: function(event) {
+            if (root.results.length && root.results[0].category === "People")
+              root.request({op: "person_quick_look", safeId: root.results[0].safeId})
+            event.accepted = true
+          }
+          Keys.onEnterPressed: function(event) {
+            if (root.results.length && root.results[0].category === "People")
+              root.request({op: "person_quick_look", safeId: root.results[0].safeId})
+            event.accepted = true
+          }
+        }
+        Text {
+          visible: root.viewMode === "links"
+          width: parent.width
+          text: "Personal Links and launcher Quick Returns"
           color: Color.foreground
-          opacity: root.viewMode === "search" && !root.query ? 0.55 : 1
+          opacity: 0.75
           elide: Text.ElideRight
         }
         Text { width: parent.width; text: root.healthText; color: Color.foreground; opacity: 0.55; font.pixelSize: Style.font.bodySmall }

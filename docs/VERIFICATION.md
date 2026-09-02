@@ -36,9 +36,11 @@
 - Broker/OAuth/Magnus/REST/navigation/instance tests: 41 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
-- QML validation: `qmllint` is unavailable. The installed plugin hot-reloaded,
-  re-registered, started a replacement broker, and opened in the running shell
-  with no Rock Lens QML errors in the bounded log inspection.
+- QML validation: Qt's full-path `qmllint` parsed the plugin without errors
+  (standalone lint reports expected unresolved Omarchy import warnings). The
+  installed plugin hot-reloaded, re-registered, started a replacement broker,
+  and opened in the running shell with no Rock Lens QML errors in the bounded
+  log inspection.
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.
 - Restart persistence: broker PID changed across an Omarchy shell restart,
@@ -82,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.3.0` after shell restart, registered the
+- Omarchy loaded plugin version `0.3.1` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -90,6 +92,12 @@
   of the six categories), with zero unavailable categories. Only counts and
   category names were printed during verification; no record or link values
   were retained.
+- Search keyboard editing was verified against the installed panel after a
+  shell restart. The injected sequence `zzzz`, Space, `z`, Backspace,
+  Backspace produced `zzzz`, confirming that both Space insertion and
+  Backspace deletion reach the focused native search field. The test query was
+  cleared afterward, and the temporary capture was deleted because its crop
+  included desktop edges.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,
