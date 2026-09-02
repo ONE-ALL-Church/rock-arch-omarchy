@@ -6,6 +6,11 @@ Rock's OpenID Connect server. QML is only a view: search terms and sanitized
 authentication state travel over an owner-only local Unix socket, while
 credentials and tokens remain inside the Python broker and desktop keyring.
 
+For privileged Rock file inspection, Rock Lens also includes a hardened,
+read-only Magnus adapter. It is fixed to the ONE&ALL production origin, keeps
+credentials in Secret Service, and gives each command an ephemeral Magnus
+profile that is deleted immediately afterward.
+
 ![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
 
 ## Run the MVP
@@ -58,6 +63,19 @@ The client metadata file is owner-only at
 desktop Secret Service. The launcher receives only `configured`, state, and a
 fixed display label.
 
+## Configure Magnus
+
+Magnus is deliberately separate from end-user OpenID Connect login. Configure
+the privileged read-only adapter through a hidden terminal prompt:
+
+```bash
+python3 -m rock_lens_broker magnus configure
+python3 -m rock_lens_broker magnus status
+```
+
+The adapter exposes only bounded `ls`, `cat`, and `hash` operations. See
+[docs/MAGNUS.md](docs/MAGNUS.md) for its exact path and origin restrictions.
+
 ## Safety guarantees
 
 - Context is stored explicitly as `DEV` or `PROD`; it is never inferred from a
@@ -72,6 +90,8 @@ fixed display label.
   establishes the identity boundary but does not silently enable live reads.
 - Live adapters are capability-detected and fail closed.
 - There is no mutation transport, SQL execution, job trigger, or Run Now UI.
+- Magnus accepts only HTTPS on `rock.example.org`, rejects cross-origin
+  and traversal paths, uses Secret Service, and exposes no mutation operation.
 - Broker errors are reduced to stable public codes. Response bodies, tokens,
   cookies, SQL, PII, and exceptions are not logged or forwarded to QML.
 

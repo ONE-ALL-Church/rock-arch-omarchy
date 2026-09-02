@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import json
 import os
 import sys
 from pathlib import Path
@@ -16,6 +17,11 @@ from .auth import (
     default_config_path,
 )
 from .contracts import Context
+from .magnus_adapter import (
+    DEFAULT_TREE_PATH,
+    MagnusError,
+    MagnusReadOnlyAdapter,
+)
 from .server import BrokerServer
 
 
@@ -65,7 +71,61 @@ def configure(argv: list[str]) -> None:
     )
 
 
+def magnus(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        description="Secure read-only Rock Magnus operations"
+    )
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("status")
+    commands.add_parser("configure")
+    list_parser = commands.add_parser("ls")
+    list_parser.add_argument("path", nargs="?", default=DEFAULT_TREE_PATH)
+    cat_parser = commands.add_parser("cat")
+    cat_parser.add_argument("path")
+    cat_parser.add_argument("--output", type=Path)
+    hash_parser = commands.add_parser("hash")
+    hash_parser.add_argument("path")
+    args = parser.parse_args(argv)
+    adapter = MagnusReadOnlyAdapter()
+
+    try:
+        if args.command == "status":
+            print(json.dumps(adapter.status(), sort_keys=True))
+            return
+        if args.command == "configure":
+            try:
+                username = input("Rock username: ")
+                password = getpass.getpass("Rock password: ")
+            except (EOFError, KeyboardInterrupt):
+                raise SystemExit("\nMagnus configuration cancelled.") from None
+            adapter.configure(username, password)
+            print("Magnus credentials saved in Secret Service for read-only use.")
+            return
+        if args.command == "ls":
+            print(json.dumps(adapter.list_tree(args.path), indent=2, sort_keys=True))
+            return
+        if args.command == "hash":
+            print(adapter.hash_file(args.path))
+            return
+        content = adapter.read_file(args.path)
+        if args.output:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            descriptor = os.open(args.output, flags, 0o600)
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(content)
+            print(f"Saved {len(content)} bytes with owner-only permissions.")
+        else:
+            sys.stdout.buffer.write(content)
+    except MagnusError as error:
+        raise SystemExit(str(error)) from error
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "magnus":
+        magnus(sys.argv[2:])
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "configure":
         configure(sys.argv[2:])
         return

@@ -98,6 +98,28 @@ class BrokerContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, serialized)
 
+    def test_magnus_contract_is_read_only_and_private(self):
+        response = self.broker.handle({"op": "magnus_status"})
+        self.assertEqual(response["magnus"]["mode"], "read_only")
+        self.assertEqual(
+            self.broker.handle({"op": "status"})["magnus"]["mode"],
+            "read_only",
+        )
+        serialized = json.dumps(response).lower()
+        for forbidden in ("username", "password", "cookie", "credential"):
+            self.assertNotIn(forbidden, serialized)
+        for op in (
+            "magnus_write",
+            "magnus_build",
+            "magnus_rm",
+            "magnus_mkdir",
+            "magnus_touch",
+            "magnus_upload",
+        ):
+            self.assertEqual(
+                self.broker.handle({"op": op})["error"], "unsupported_operation"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

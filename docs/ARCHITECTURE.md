@@ -9,7 +9,10 @@
    a loopback callback, refresh-token renewal, and Secret Service persistence.
 4. `MockAdapter`: deterministic, synthetic records for People, Groups,
    Workflows, Jobs, Pages, and Content Channel Items.
-5. Future live adapters: disabled until tenant identity, authenticated actor,
+5. `MagnusReadOnlyAdapter`: privileged, bounded file inspection against the
+   exact ONE&ALL production origin, with credentials held in Secret Service
+   and raw Magnus state confined to an ephemeral owner-only directory.
+6. Future live adapters: disabled until tenant identity, authenticated actor,
    version, and read capability are proven. Their status is one of `unknown`,
    `stale`, `failed`, or `healthy`.
 
@@ -60,3 +63,23 @@ authenticated actor, Rock version, access health, and read-only capability.
 Any missing or ambiguous gate returns `unknown` or `failed`; there is no fallback
 to unguarded REST, SQL, or credentials. Job history is read-only. Job execution
 is intentionally absent at every layer.
+
+## Magnus boundary
+
+Magnus is not an identity provider and does not replace Rock OpenID Connect for
+end users. The adapter accepts only `https://rock.example.org`, permits
+only Magnus tree paths under `api/TriumphTech/Magnus/GetTreeItems/` and content
+paths under `/FileContent/`, and rejects alternate origins, query strings,
+fragments, control characters, backslashes, and traversal segments.
+
+Credentials are retrieved from Secret Service and the password is sent to the
+Magnus login process over stdin. Magnus receives an ephemeral `XDG_CONFIG_HOME`
+with owner-only permissions; its plaintext cookie/config artifacts are removed
+when the command exits. Output is size-bounded and sanitized. The public broker
+socket exposes Magnus status only. There are no write, remove, upload, create,
+build, or deployment operations in the adapter or CLI.
+
+Although Rock's `.ROCK` session cookie may authenticate other same-origin API
+routes, the adapter never exposes the cookie or a generic HTTP/URL operation.
+Every non-Magnus API surface requires its own read-only capability and
+authorization gate.

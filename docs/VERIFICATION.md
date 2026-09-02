@@ -18,11 +18,18 @@
   time.
 - Production SQL: not attempted because V3 `/v3/sql/health` was unavailable and
   no guarded `sqlread` identity was proven.
-- Magnus: requested npm metadata check for `rock-magnus-cli` returned registry
-  `E404 Not Found`, so package identity could not be verified and installation
-  was not attempted. `magnus` remains unavailable; authentication is gated.
+- Magnus: upstream package `rock-magnus-cli` version `0.1.0` is installed. Its
+  raw credential/cookie persistence and URL handling were isolated behind the
+  HTTPS-only, exact-origin, same-origin, read-only adapter documented in
+  `docs/MAGNUS.md`; no production mutation path is exposed.
+- Magnus's three existing local config directories are owner-only (`0700`) and
+  its existing metadata file is `0600`. The hardened adapter reports available
+  but not configured; no live tenant request was made because credentials have
+  not yet been entered.
 - Live Rock reads: gated; no tenant, actor, or Rock version claimed.
-- Broker/OAuth tests: 12 passing via `python3 -m unittest discover -s tests -v`.
+- Broker/OAuth/Magnus tests: 18 passing via
+  `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
+  compilation, and `git diff --check` also pass.
 - QML validation: run `qmllint plugin/oneall.rock-lens/*.qml` when available.
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.

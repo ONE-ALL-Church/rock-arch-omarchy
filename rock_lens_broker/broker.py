@@ -5,6 +5,7 @@ from typing import Any
 
 from .auth import AuthState, ConfigStore, OAuthManager, default_config_path
 from .contracts import Capability, Context, HealthState, sanitize_text
+from .magnus_adapter import MagnusReadOnlyAdapter
 from .mock_adapter import MockAdapter
 
 
@@ -18,6 +19,7 @@ class Broker:
         self._state_file = state_file
         self._context = self._load_context()
         self._mock = MockAdapter()
+        self._magnus = MagnusReadOnlyAdapter()
         self._auth = auth or OAuthManager(
             ConfigStore(config_file or default_config_path())
         )
@@ -39,7 +41,11 @@ class Broker:
         self._state_file.write_text(self._context.value + "\n", encoding="utf-8")
         self._state_file.chmod(0o600)
 
-    def capabilities(self, auth: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    def capabilities(
+        self,
+        auth: dict[str, Any] | None = None,
+        magnus: dict[str, Any] | None = None,
+    ) -> list[dict[str, str]]:
         auth = auth or self._auth.public_status(self._context)
         oauth_state = AuthState(auth["state"])
         oauth_health = (
@@ -51,6 +57,12 @@ class Broker:
             oauth_health = HealthState.FAILED
         elif oauth_state is AuthState.EXPIRED:
             oauth_health = HealthState.STALE
+        magnus = magnus or self._magnus.status()
+        magnus_detail = (
+            "Secure read-only adapter configured"
+            if magnus["configured"]
+            else "Secure login required"
+        )
         return [
             Capability(
                 "mock", HealthState.HEALTHY, "Synthetic data enabled"
@@ -63,7 +75,7 @@ class Broker:
                 "sql", HealthState.UNKNOWN, "Read-only identity unproven"
             ).public_dict(),
             Capability(
-                "magnus", HealthState.UNKNOWN, "Capability unavailable"
+                "magnus", HealthState.UNKNOWN, magnus_detail
             ).public_dict(),
         ]
 
@@ -71,10 +83,12 @@ class Broker:
         op = sanitize_text(raw.get("op"), 40)
         if op == "status":
             auth = self._auth.public_status(self._context)
+            magnus = self._magnus.status()
             return self._ok(
                 context=self._context.value,
                 auth=auth,
-                capabilities=self.capabilities(auth),
+                magnus=magnus,
+                capabilities=self.capabilities(auth, magnus),
                 categories=list(self._mock.categories()),
             )
         if op == "set_context":
@@ -93,6 +107,8 @@ class Broker:
             return self._ok(auth=self._auth.begin_login(self._context))
         if op == "auth_disconnect":
             return self._ok(auth=self._auth.disconnect(self._context))
+        if op == "magnus_status":
+            return self._ok(magnus=self._magnus.status())
         if op == "search":
             query = sanitize_text(raw.get("query"), 120)
             return self._ok(
