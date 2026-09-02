@@ -20,5 +20,32 @@
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.
 
+## Final local integration verification
+
+- Restarted the real Omarchy shell, rescanned plugins, and confirmed shell IPC
+  recovered.
+- The broker restarted under a new process, recreated its owner-only runtime
+  boundary (`0700` directory and `0600` socket), and preserved explicit `DEV`
+  context in the owner-only state file.
+- `omarchy plugin list --json` reports `oneall.rock-lens` enabled, and
+  `shell.json` retains it immediately after `omarchy.tailscale` on the right
+  side of the bar.
+- Hyprland reports the `Super+R` Rock Lens binding. After the shell restart,
+  the binding's registered summon command returned `ok` and opened the panel.
+- `hyprctl reload` succeeded and `hyprctl configerrors` was empty.
+- The broker status contract returned exactly six mock categories, explicit
+  `DEV`, `mock: healthy`, and no healthy live capability.
+- The privacy-safe visual evidence is
+  [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
+  It is cropped to the Rock Lens panel and shows only synthetic records,
+  explicit `DEV`, fail-closed live health, all six categories, and read-only
+  wording. An earlier full-desktop capture was inspected, found to contain
+  private desktop content, and deleted without being committed.
+- A second bounded capture after shell restart matched the committed evidence
+  visually; the temporary verification captures were removed.
+- A full OS logout/login cycle was not performed. Shell restart, plugin rescan,
+  broker process replacement, state persistence, binding registration, and
+  post-restart panel opening were verified in the active session.
+
 No telemetry, feedback, production write, job trigger, deploy, or publication
 was performed.
