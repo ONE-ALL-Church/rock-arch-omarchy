@@ -68,16 +68,22 @@ domain and its Magnus credentials are configured. The bare domain is normalized
 to an HTTPS origin and rejected if it contains credentials, a path, query,
 fragment, or non-443 port. One Magnus login yields a validated `.ROCK` cookie in
 an ephemeral directory. The broker attaches it only to that exact-origin HTTPS
-GET and destroys the directory after the operation.
+GET and destroys the directory after the operation. The validated cookie may
+remain only in broker memory with a 15-minute idle timeout, avoiding a full
+Magnus login for each active search session without creating a persistent file.
 
 The client cannot choose an endpoint. These are Rock's established REST v1
 controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
 `WorkflowTypes`, `ServiceJobs`, `Pages`, and `ContentChannelItems`, with fixed
-`$select`, `$orderby`, `$top=3`, and generated `startswith` filters. Personal
-Links use only `PersonalLinks/GetPersonalLinksData`. Responses are capped at 2
-MiB and transformed immediately into display allowlists. A failed category is
-reported as unavailable; PROD never falls back to mock data. There is no raw
-HTTP, generic entity, SQL, mutation, job execution, or Run Now operation.
+`$select`, `$orderby`, `$top=3`, and generated `startswith` filters. The six
+fixed reads share one ephemeral Magnus-authenticated cookie and start in
+parallel; results are still transformed in a deterministic category order.
+The Groups projection also expands only `GroupType.Name` for its subtitle.
+Personal Links use only `PersonalLinks/GetPersonalLinksData`. Responses are
+capped at 2 MiB and transformed immediately into display allowlists. A failed
+category is reported as unavailable; PROD never falls back to mock data. There
+is no raw HTTP, generic entity, SQL, mutation, job execution, or Run Now
+operation.
 
 The cookie authenticates the actor but does not override Rock authorization.
 Rock controller/action permissions still apply; endpoints that enforce entity

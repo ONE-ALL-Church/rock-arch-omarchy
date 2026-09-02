@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "oneall.rock-lens",
   "name": "Rock Lens",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "author": "ONE&ALL",
   "license": "MIT",
   "description": "Read-only Magnus-backed Rock search, Personal Links, and Quick Returns",

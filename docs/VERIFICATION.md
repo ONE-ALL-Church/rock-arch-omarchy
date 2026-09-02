@@ -33,7 +33,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/OAuth/Magnus/REST/navigation/instance tests: 41 passing via
+- Broker/OAuth/Magnus/REST/navigation/instance tests: 43 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -84,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.4.1` after shell restart, registered the
+- Omarchy loaded plugin version `0.5.0` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -92,6 +92,18 @@
   of the six categories), with zero unavailable categories. After the all-route
   update, all 18 rows reported `canOpen: true`. Only counts and category names
   were printed during verification; no record or link values were retained.
+- The Group projection now uses the Rock Model Map relationship
+  `Group.GroupType` and requests only `GroupType.Name`. A live privacy-bounded
+  check returned three Group rows with three populated Group Type subtitles;
+  only counts were printed.
+- The six fixed REST reads now start concurrently while retaining deterministic
+  category ordering. A final clean-restart PROD socket measurement improved
+  from the prior 2.432/2.197-second samples to 1.843 seconds cold and 0.315
+  seconds warm. Cold timing remains dependent on Rock/Magnus login latency. The
+  validated cookie is reused only in broker memory with a 15-minute idle
+  timeout and is cleared by a timer, domain or credential change, total
+  authenticated request failure, or broker restart. No Magnus temporary profile
+  remained afterward.
 - Search keyboard editing was verified against the installed panel after a
   shell restart. The injected sequence `zzzz`, Space, `z`, Backspace,
   Backspace produced `zzzz`, confirming that both Space insertion and
@@ -108,9 +120,12 @@
   targets. Adapter coverage asserts the canonical Person, Group, Workflow Type,
   Scheduled Job, Page, and Content Channel Item routes and requires `canOpen`
   for every transformed live result.
-- The panel now uses a compact connection line, concise setup copy and footer,
-  a content-responsive list height, and a single selected row. DEV navigation
-  omits the per-origin PROD Quick Return history.
+- The panel now combines its title, environment badge, and Search/Links tabs in
+  one compact header; uses a shorter search prompt, tighter row spacing, a
+  concise connection line and footer, and shows the repeated Open control only
+  on the selected row. Personal Links load only when Links is selected, so that
+  network read cannot block the initial Search view. DEV navigation omits the
+  per-origin PROD Quick Return history.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,

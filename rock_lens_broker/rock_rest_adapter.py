@@ -8,6 +8,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -39,7 +40,9 @@ ALLOWED_ENDPOINTS = frozenset(
         "/api/PersonalLinks/GetPersonalLinksData",
     }
 )
-ALLOWED_ODATA_PARAMETERS = frozenset({"$filter", "$select", "$orderby", "$top"})
+ALLOWED_ODATA_PARAMETERS = frozenset(
+    {"$expand", "$filter", "$select", "$orderby", "$top"}
+)
 
 
 class RockRestError(Exception):
@@ -65,7 +68,10 @@ class RockRestHttpClient:
     def __init__(
         self, opener: Any | None = None, origin: str = DEFAULT_ROCK_ORIGIN
     ) -> None:
-        self._opener = opener or urllib.request.build_opener(_RejectRedirects())
+        # Injected openers are retained for deterministic tests. Production calls
+        # create one opener per request so fixed endpoint reads can run safely in
+        # parallel without sharing urllib handler state between threads.
+        self._opener = opener
         self.origin = validate_rock_origin(origin)
 
     def set_origin(self, origin: str) -> None:
@@ -105,7 +111,8 @@ class RockRestHttpClient:
             method="GET",
         )
         try:
-            with self._opener.open(request, timeout=20) as response:
+            opener = self._opener or urllib.request.build_opener(_RejectRedirects())
+            with opener.open(request, timeout=20) as response:
                 raw = response.read(MAX_RESPONSE_BYTES + 1)
         except (OSError, urllib.error.URLError, urllib.error.HTTPError) as error:
             raise RockRestError("rock_request_failed") from error
@@ -131,6 +138,7 @@ class _SearchSpec:
     route: str | None = None
     active_field: str | None = None
     status_field: str | None = None
+    expand: str | None = None
 
 
 @dataclass(frozen=True)
@@ -163,13 +171,14 @@ SEARCH_SPECS = (
         "Group",
         "/api/Groups",
         ("Name",),
-        "Id,Name,IsActive",
+        "Id,Name,IsActive,GroupType/Name",
         "Name",
         ("Name",),
         "Group",
         20,
         "/Group/{id}",
         active_field="IsActive",
+        expand="GroupType",
     ),
     _SearchSpec(
         "Workflows",
@@ -262,12 +271,27 @@ class RockRestReadOnlyAdapter:
         results: list[dict[str, Any]] = []
         unavailable: list[str] = []
         try:
-            with self._cookie_provider.authenticated_cookie() as cookie:
-                for spec in SEARCH_SPECS:
+            with (
+                self._cookie_provider.authenticated_cookie() as cookie,
+                ThreadPoolExecutor(
+                    max_workers=len(SEARCH_SPECS),
+                    thread_name_prefix="rock-lens-rest",
+                ) as executor,
+            ):
+                requests = [
+                    executor.submit(
+                        self._http.get_json,
+                        spec.path,
+                        self._params(spec, normalized),
+                        cookie,
+                    )
+                    for spec in SEARCH_SPECS
+                ]
+                # Consume in the fixed category order so presentation and
+                # partial-failure reporting remain deterministic.
+                for spec, request in zip(SEARCH_SPECS, requests, strict=True):
                     try:
-                        value = self._http.get_json(
-                            spec.path, self._params(spec, normalized), cookie
-                        )
+                        value = request.result()
                         results.extend(self._transform_rows(spec, value))
                     except RockRestError:
                         unavailable.append(spec.category)
@@ -275,6 +299,7 @@ class RockRestReadOnlyAdapter:
             raise RockRestError("rock_login_failed") from error
 
         if len(unavailable) == len(SEARCH_SPECS):
+            self._invalidate_cookie()
             raise RockRestError("rock_search_failed")
         return SearchBatch(results, tuple(unavailable))
 
@@ -287,6 +312,7 @@ class RockRestReadOnlyAdapter:
         except MagnusError as error:
             raise RockRestError("rock_login_failed") from error
         except RockRestError:
+            self._invalidate_cookie()
             raise
         if not isinstance(value, dict):
             raise RockRestError("invalid_rock_response")
@@ -359,12 +385,15 @@ class RockRestReadOnlyAdapter:
                 if len(alternatives) == 1
                 else "(" + " or ".join(alternatives) + ")"
             )
-        return {
+        params = {
             "$filter": " and ".join(clauses),
             "$select": spec.select,
             "$orderby": spec.order_by,
             "$top": str(ROWS_PER_CATEGORY),
         }
+        if spec.expand:
+            params["$expand"] = spec.expand
+        return params
 
     def _transform_rows(self, spec: _SearchSpec, value: Any) -> list[dict[str, Any]]:
         if not isinstance(value, list) or len(value) > 1_000:
@@ -386,6 +415,15 @@ class RockRestReadOnlyAdapter:
             if not raw_id or not title:
                 continue
             status = self._status(spec, row)
+            subtitle = spec.subtitle
+            if spec.category == "Groups":
+                group_type = self._field(row, "GroupType")
+                if isinstance(group_type, dict):
+                    group_type_name = sanitize_text(
+                        self._field(group_type, "Name"), 100
+                    )
+                    if group_type_name:
+                        subtitle = group_type_name
             target: NavigationTarget | None = None
             if spec.route:
                 try:
@@ -415,7 +453,7 @@ class RockRestReadOnlyAdapter:
                         "category": spec.category,
                         "safeId": safe_id,
                         "title": title,
-                        "subtitle": spec.subtitle,
+                        "subtitle": subtitle,
                         "status": status,
                         "canOpen": target is not None,
                     },
@@ -440,6 +478,13 @@ class RockRestReadOnlyAdapter:
         while len(self._registry) > MAX_TARGETS:
             self._registry.popitem(last=False)
         return safe_id
+
+    def _invalidate_cookie(self) -> None:
+        invalidator = getattr(
+            self._cookie_provider, "invalidate_authenticated_cookie", None
+        )
+        if callable(invalidator):
+            invalidator()
 
     @classmethod
     def _field(cls, record: dict[str, Any], name: str) -> Any:

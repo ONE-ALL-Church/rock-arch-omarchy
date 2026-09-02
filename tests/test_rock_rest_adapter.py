@@ -1,4 +1,5 @@
 import json
+import threading
 import unittest
 from contextlib import contextmanager
 
@@ -14,9 +15,15 @@ from rock_lens_broker.rock_rest_adapter import (
 
 
 class FakeCookieProvider:
+    def __init__(self):
+        self.invalidated = False
+
     @contextmanager
     def authenticated_cookie(self):
         yield ".ROCK=test-session"
+
+    def invalidate_authenticated_cookie(self):
+        self.invalidated = True
 
 
 class FakeHttp:
@@ -30,6 +37,15 @@ class FakeHttp:
         if path in self.failures:
             raise RockRestError("rock_request_failed")
         return self.responses.get(path, [])
+
+
+class ConcurrentHttp:
+    def __init__(self):
+        self.barrier = threading.Barrier(len(SEARCH_SPECS))
+
+    def get_json(self, path, params, cookie):
+        self.barrier.wait(timeout=2)
+        return []
 
 
 class FakeResponse:
@@ -105,7 +121,14 @@ class RockRestAdapterTests(unittest.TestCase):
                         "Email": "must-not-cross",
                     }
                 ],
-                "/api/Groups": [{"Id": 4, "Name": "Delta", "IsActive": True}],
+                "/api/Groups": [
+                    {
+                        "Id": 4,
+                        "Name": "Delta",
+                        "IsActive": True,
+                        "GroupType": {"Name": "Small Group"},
+                    }
+                ],
                 "/api/WorkflowTypes": [
                     {"Id": 6, "Name": "Follow-up", "IsActive": True}
                 ],
@@ -129,13 +152,17 @@ class RockRestAdapterTests(unittest.TestCase):
         batch = adapter.search("D'Angelo")
 
         self.assertEqual(
-            [call[0] for call in http.calls], [s.path for s in SEARCH_SPECS]
+            {call[0] for call in http.calls}, {s.path for s in SEARCH_SPECS}
         )
         self.assertTrue(all(call[2] == ".ROCK=test-session" for call in http.calls))
-        person_params = http.calls[0][1]
+        calls_by_path = {path: params for path, params, _ in http.calls}
+        person_params = calls_by_path["/api/People"]
         self.assertIn("D''Angelo", person_params["$filter"])
         self.assertEqual(person_params["$select"], "Id,NickName,LastName")
         self.assertEqual(person_params["$top"], "3")
+        group_params = calls_by_path["/api/Groups"]
+        self.assertEqual(group_params["$expand"], "GroupType")
+        self.assertIn("GroupType/Name", group_params["$select"])
         person = batch.results[0]
         self.assertTrue(person["safeId"].startswith("rock-"))
         self.assertEqual(len(person["safeId"]), 37)
@@ -145,6 +172,8 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertNotIn("must-not-cross", json.dumps(batch.results))
         page = next(row for row in batch.results if row["category"] == "Pages")
         self.assertEqual(page["title"], "Directory")
+        group = next(row for row in batch.results if row["category"] == "Groups")
+        self.assertEqual(group["subtitle"], "Small Group")
         self.assertTrue(all(row["canOpen"] for row in batch.results))
 
         expected_targets = {
@@ -190,6 +219,13 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertEqual(batch.results, [])
         self.assertEqual(batch.unavailable, ("Groups", "Jobs"))
 
+    def test_search_starts_all_fixed_category_reads_concurrently(self):
+        batch = RockRestReadOnlyAdapter(
+            FakeCookieProvider(), ConcurrentHttp()
+        ).search("Ada")
+        self.assertEqual(batch.results, [])
+        self.assertEqual(batch.unavailable, ())
+
     def test_personal_links_are_same_origin_and_never_expose_urls(self):
         http = FakeHttp(
             {
@@ -225,8 +261,10 @@ class RockRestAdapterTests(unittest.TestCase):
 
     def test_all_category_failures_are_stable(self):
         http = FakeHttp(failures={spec.path for spec in SEARCH_SPECS})
+        cookie_provider = FakeCookieProvider()
         with self.assertRaisesRegex(RockRestError, "rock_search_failed"):
-            RockRestReadOnlyAdapter(FakeCookieProvider(), http).search("Ada")
+            RockRestReadOnlyAdapter(cookie_provider, http).search("Ada")
+        self.assertTrue(cookie_provider.invalidated)
 
     def test_url_validation_is_exact_origin_https(self):
         self.assertEqual(

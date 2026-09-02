@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -31,18 +32,27 @@ Panel {
   property bool magnusConfigured: false
   property bool personalLinksAvailable: false
   property bool setupBusy: false
+  property bool searchInFlight: false
+  property bool searchPending: false
+  property string searchInFlightQuery: ""
   property int resultCursor: -1
   property int linkCursor: -1
   readonly property int navigationCount: personalLinks.length + quickReturns.length
-  readonly property string connectionText: contextName === "DEV" ? "Synthetic preview" :
-    magnusConfigured ? "Live via Magnus · " + instanceDomain :
+  readonly property string connectionText: contextName === "DEV" ? "Preview data" :
+    magnusConfigured ? "Magnus · " + instanceDomain :
     magnusAvailable ? "Rock login required" : "Magnus unavailable"
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
   function request(payload) {
-    requestQueue = requestQueue.concat([JSON.stringify(payload) + "\n"])
+    var next = []
+    var coalesce = payload.op === "search" || payload.op === "status" || payload.op === "navigation_status"
+    for (var index = 0; index < requestQueue.length; index++) {
+      var queued = requestQueue[index]
+      if (!coalesce || queued.op !== payload.op) next.push(queued)
+    }
+    requestQueue = next.concat([payload])
     if (!brokerSocket.connected) brokerSocket.connected = true
     sendTimer.restart()
   }
@@ -55,14 +65,23 @@ Panel {
       feedbackText = response && response.error ? String(response.error).split("_").join(" ") : "Request failed"
       return
     }
-    if (response.context) contextName = response.context === "PROD" ? "PROD" : "DEV"
+    var isSearchResponse = Array.isArray(response.results)
+    var staleSearch = isSearchResponse && searchInFlight &&
+      (searchPending || query !== searchInFlightQuery)
+    if (isSearchResponse) {
+      searchInFlight = false
+      searchPending = false
+      searchInFlightQuery = ""
+    }
+    if (response.context && !staleSearch)
+      contextName = response.context === "PROD" ? "PROD" : "DEV"
     if (response.instance)
       instanceDomain = String(response.instance.origin || "").replace("https://", "")
     if (response.magnus) {
       magnusAvailable = response.magnus.available === true
       magnusConfigured = response.magnus.configured === true
     }
-    if (Array.isArray(response.results)) {
+    if (isSearchResponse && !staleSearch) {
       results = response.results
       if (resultCursor >= results.length) resultCursor = results.length - 1
     }
@@ -73,28 +92,38 @@ Panel {
     if (response.personalLinksAvailable !== undefined)
       personalLinksAvailable = response.personalLinksAvailable === true
     if (response.person) quickLook = response.person
-    if (response.source) searchSource = String(response.source)
+    if (response.source && !staleSearch) searchSource = String(response.source)
     if (response.refreshLive === true) {
       setupBusy = false
       setupPassword = ""
       feedbackText = "Magnus credentials saved securely"
       Qt.callLater(function() {
         root.refreshSearch()
-        root.refreshNavigation()
+        if (root.viewMode === "links") root.refreshNavigation()
         searchField.forceActiveFocus()
       })
     }
-    if (Array.isArray(response.unavailable) && response.unavailable.length)
+    if (!staleSearch && Array.isArray(response.unavailable) && response.unavailable.length)
       feedbackText = "Unavailable: " + response.unavailable.join(", ")
     else if (response.opened === true)
       feedbackText = "Opened in Rock and added to Quick Returns"
-    else if (response.source === "unavailable")
+    else if (response.source === "unavailable" && !staleSearch)
       feedbackText = "Live Rock search needs Magnus setup"
-    else if (response.source)
+    else if (response.source && !staleSearch)
       feedbackText = ""
+    if (staleSearch) Qt.callLater(function() { root.refreshSearch() })
   }
 
-  function refreshSearch() { request({op: "search", query: query}) }
+  function refreshSearch() {
+    if (searchInFlight) {
+      searchPending = true
+      return
+    }
+    searchInFlight = true
+    searchPending = false
+    searchInFlightQuery = query
+    request({op: "search", query: query})
+  }
   function scheduleSearch() { searchTimer.restart() }
   function refreshNavigation() { request({op: "navigation_status"}) }
   function revealItem(item) {
@@ -236,7 +265,7 @@ Panel {
     request({op: "set_context", context: contextName})
     request({op: "status"})
     refreshSearch()
-    refreshNavigation()
+    if (viewMode === "links") refreshNavigation()
   }
   function resetPanel() {
     query = ""
@@ -245,7 +274,6 @@ Panel {
     feedbackText = ""
     request({op: "status"})
     refreshSearch()
-    refreshNavigation()
   }
 
   onOpenedChanged: if (opened) resetPanel()
@@ -269,7 +297,7 @@ Panel {
       if (!root.requestQueue.length) return
       var payload = root.requestQueue[0]
       root.requestQueue = root.requestQueue.slice(1)
-      brokerSocket.write(payload)
+      brokerSocket.write(JSON.stringify(payload) + "\n")
       brokerSocket.flush()
       if (root.requestQueue.length) sendTimer.restart()
     }
@@ -309,7 +337,7 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: searchField
-    contentWidth: panel.fittedContentWidth(Style.space(560))
+    contentWidth: panel.fittedContentWidth(Style.space(520))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
 
     PanelKeyCatcher {
@@ -324,30 +352,27 @@ Panel {
       Column {
         id: content
         width: parent.width
-        spacing: Style.spacing.md
+        spacing: Style.spacing.sm
 
-        Row {
+        RowLayout {
           width: parent.width
-          spacing: Style.spacing.md
+          spacing: Style.spacing.sm
           Text { text: "Rock Lens"; color: Color.foreground; font.pixelSize: Style.font.title; font.bold: true }
           Rectangle {
-            width: contextLabel.implicitWidth + 16
-            height: contextLabel.implicitHeight + 8
+            Layout.preferredWidth: contextLabel.implicitWidth + 16
+            Layout.preferredHeight: contextLabel.implicitHeight + 8
             radius: 6
             color: root.contextName === "PROD" ? "#7f1d1d" : "#14532d"
             Text { id: contextLabel; anchors.centerIn: parent; text: root.contextName; color: "white"; font.bold: true }
             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.switchContext() }
           }
-        }
-
-        Row {
-          spacing: Style.spacing.sm
+          Item { Layout.fillWidth: true }
           Repeater {
             model: ["search", "links"]
             delegate: Rectangle {
               required property var modelData
-              width: tabText.implicitWidth + 24
-              height: Style.space(34)
+              Layout.preferredWidth: tabText.implicitWidth + 20
+              Layout.preferredHeight: Style.space(32)
               radius: 7
               color: root.viewMode === modelData ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
               Text {
@@ -374,12 +399,13 @@ Panel {
           visible: root.viewMode === "search"
           width: parent.width
           maximumLength: 120
-          placeholderText: "Search People, Groups, Workflows, Jobs, Pages, Content…"
+          placeholderText: "Search Rock…"
           selectByMouse: true
           inputMethodHints: Qt.ImhNoPredictiveText
           onTextEdited: {
             root.resultCursor = -1
             root.quickLook = null
+            root.feedbackText = ""
             root.scheduleSearch()
           }
           Keys.priority: Keys.BeforeItem
@@ -400,14 +426,6 @@ Panel {
               event.accepted = true
             }
           }
-        }
-        Text {
-          visible: root.viewMode === "links"
-          width: parent.width
-          text: "Personal Links and launcher Quick Returns"
-          color: Color.foreground
-          opacity: 0.75
-          elide: Text.ElideRight
         }
         Text {
           width: parent.width
@@ -499,7 +517,7 @@ Panel {
                   required property var modelData
                   required property int index
                   width: body.width
-                  height: Style.space(54)
+                  height: Style.space(50)
                   radius: 7
                   color: index === root.resultCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
                   Column {
@@ -521,7 +539,7 @@ Panel {
                   }
                   Rectangle {
                     id: openButton
-                    visible: modelData.canOpen === true && root.contextName === "PROD"
+                    visible: modelData.canOpen === true && root.contextName === "PROD" && index === root.resultCursor
                     width: visible ? Style.space(54) : 0
                     height: Style.space(32)
                     anchors.right: parent.right
@@ -592,7 +610,7 @@ Panel {
                   required property var modelData
                   required property int index
                   width: body.width
-                  height: Style.space(46)
+                  height: Style.space(42)
                   radius: 7
                   color: index === root.linkCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
                   Column {
@@ -621,7 +639,7 @@ Panel {
                   required property var modelData
                   required property int index
                   width: body.width
-                  height: Style.space(46)
+                  height: Style.space(42)
                   radius: 7
                   color: root.personalLinks.length + index === root.linkCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
                   Column {
@@ -646,7 +664,7 @@ Panel {
 
         Text {
           width: parent.width
-          text: root.feedbackText || "↑/↓ move · Tab next · Enter/Space open"
+          text: root.feedbackText || (root.searchInFlight ? "Searching…" : "↑↓ navigate · Tab switch · Enter open")
           color: Color.foreground
           opacity: 0.55
           wrapMode: Text.WordWrap

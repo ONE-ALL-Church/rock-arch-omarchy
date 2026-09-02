@@ -3,7 +3,10 @@
 Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. DEV
 uses public-safe synthetic data. PROD uses the `.ROCK` session created by
 Magnus to search six fixed Rock REST v1 resources and load the current person's
-Personal Links. QML is only a view: search terms and opaque navigation IDs
+Personal Links. Group results include their Rock Group Type. The six category
+reads run concurrently, and a brief memory-only Magnus session cache keeps
+successive searches responsive without persisting the cookie. QML is only a
+view: search terms and opaque navigation IDs
 travel over an owner-only local Unix socket, while credentials, cookies, raw
 record IDs, URLs, and response bodies remain inside the Python broker.
 
@@ -88,7 +91,9 @@ python3 -m rock_lens_broker magnus status
 ```
 
 The same ephemeral session can then perform the fixed, bounded search and
-Personal Links reads. The adapter still exposes only bounded `ls`, `cat`, and
+Personal Links reads. Its temporary profile is removed immediately; only the
+validated cookie is retained in broker memory with a 15-minute idle timeout.
+The adapter still exposes only bounded `ls`, `cat`, and
 `hash` file operations; it does not expose a generic REST client. See
 [docs/MAGNUS.md](docs/MAGNUS.md) for its exact restrictions.
 
@@ -97,7 +102,8 @@ The **Links** tab loads Personal Links and local Quick Returns. **Open** is
 offered for every search category: People, Groups, Workflow Types, Scheduled
 Jobs, Pages, and Content Channel Items. Each target uses a fixed Rock route and
 must resolve to the exact configured Rock origin; Personal Links have the same
-origin restriction.
+origin restriction. Personal Links are fetched only when the Links tab is
+opened, so they cannot delay the initial Search view.
 
 The search field keeps native editing behavior. Up and Down move through results
 and across the Search/Links boundary, Tab cycles search input, results, and

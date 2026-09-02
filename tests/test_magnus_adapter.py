@@ -185,7 +185,7 @@ class MagnusAdapterTests(unittest.TestCase):
             self.adapter.read_file("/FileContent/block-handler/5350/content.lava")
 
     @patch("rock_lens_broker.magnus_adapter.subprocess.run")
-    def test_cookie_is_available_only_inside_ephemeral_session(self, run):
+    def test_cookie_profile_is_removed_after_session(self, run):
         self.adapter.configure("rock-user", "private-password")
         temporary = None
 
@@ -205,6 +205,23 @@ class MagnusAdapterTests(unittest.TestCase):
             self.assertTrue(temporary.exists())
         assert temporary is not None
         self.assertFalse(temporary.exists())
+
+    @patch("rock_lens_broker.magnus_adapter.subprocess.run")
+    def test_cookie_is_reused_briefly_in_memory_without_a_second_login(self, run):
+        self.adapter.configure("rock-user", "private-password")
+
+        def login(environment, username, password):
+            self._write_cookie(environment)
+            return 0
+
+        with patch.object(
+            self.adapter, "_interactive_login", side_effect=login
+        ) as interactive_login:
+            with self.adapter.authenticated_cookie() as first:
+                self.assertEqual(first, ".ROCK=test-session")
+            with self.adapter.authenticated_cookie() as second:
+                self.assertEqual(second, ".ROCK=test-session")
+        self.assertEqual(interactive_login.call_count, 1)
 
     @patch("rock_lens_broker.magnus_adapter.subprocess.run")
     def test_cookie_parser_accepts_conf_dot_notation_layout(self, run):

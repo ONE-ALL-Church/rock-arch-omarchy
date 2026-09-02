@@ -15,15 +15,19 @@ Rock Lens uses the installed `rock-magnus-cli` only through
 - only `status`, `ls`, `cat`, and SHA-256 `hash` operations are exposed;
 - Rock credentials are stored in Secret Service under a hash of the configured
   origin, so different Rock instances do not share credentials;
-- each invocation creates an isolated mode-`0700` temporary configuration,
-  hardens temporary files to `0600`, and destroys it afterward;
+- each login creates an isolated mode-`0700` temporary configuration, hardens
+  temporary files to `0600`, and destroys it afterward;
+- the validated cookie may be reused from broker memory with a 15-minute idle
+  timeout and is cleared on a timer, domain or credential change, authentication
+  failure, or broker restart;
 - raw stderr and Rock response bodies do not cross the adapter boundary.
 
 Rock's `/api/Auth/Login` returns a tenant session cookie that may be accepted by
 other same-origin Rock endpoints when the account is authorized. Rock Lens
 validates the `.ROCK` value from the ephemeral Magnus profile and can yield it
 in memory to the separate `RockRestReadOnlyAdapter`. It cannot be supplied with
-a raw URL and is destroyed with the temporary profile.
+a raw URL. The profile is destroyed immediately, while the validated cookie may
+remain only in broker memory with a 15-minute idle timeout.
 
 The REST adapter permits only fixed REST v1 GETs for People, Groups, Workflow
 Types, Service Jobs, Pages, Content Channel Items, and current-user Personal

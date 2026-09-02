@@ -8,6 +8,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -31,6 +32,7 @@ MAX_COOKIE_CONFIG_DEPTH = 16
 MAX_PASSWORD_BYTES = 1_024
 PASSWORD_PROMPT_TIMEOUT_SECONDS = 5
 PASSWORD_KEYSTROKE_DELAY_SECONDS = 0.01
+AUTH_COOKIE_IDLE_SECONDS = 15 * 60
 
 
 class MagnusError(Exception):
@@ -94,10 +96,19 @@ class MagnusReadOnlyAdapter:
         self.executable = executable or shutil.which("magnus") or ""
         self.secret_store = secret_store or SecretToolStore()
         self.context = context
+        self._cached_cookie = ""
+        self._cached_cookie_deadline = 0.0
+        self._cache_generation = 0
+        self._cache_lock = threading.Lock()
+        self._cache_timer: threading.Timer | None = None
 
     def status(self) -> dict[str, Any]:
         available = bool(self.executable) and self.secret_store.available()
-        configured = available and bool(self.server) and bool(self._credentials())
+        configured = (
+            available
+            and bool(self.server)
+            and (self._has_cached_cookie() or bool(self._credentials()))
+        )
         return {
             "available": available,
             "configured": configured,
@@ -106,7 +117,10 @@ class MagnusReadOnlyAdapter:
         }
 
     def set_server(self, value: str) -> None:
-        self.server = validate_magnus_server(value)
+        server = validate_magnus_server(value)
+        if server != self.server:
+            self._clear_cached_cookie()
+        self.server = server
 
     def configure(self, username: str, password: str) -> None:
         if not self.server:
@@ -139,6 +153,7 @@ class MagnusReadOnlyAdapter:
             self.secret_store.clear(self.context, self._secret_kind("magnus_username"))
             self.secret_store.clear(self.context, self._secret_kind("magnus_password"))
             raise MagnusError("secure_storage_failed") from error
+        self._clear_cached_cookie()
 
     def list_tree(self, path: str = DEFAULT_TREE_PATH) -> list[dict[str, Any]]:
         safe_path = validate_tree_path(path)
@@ -160,10 +175,72 @@ class MagnusReadOnlyAdapter:
 
     @contextmanager
     def authenticated_cookie(self) -> Iterator[str]:
-        """Yield one validated .ROCK cookie and destroy it after use."""
+        """Yield a validated .ROCK cookie from a brief, memory-only cache."""
 
+        now = time.monotonic()
+        with self._cache_lock:
+            cached_cookie = (
+                self._cached_cookie
+                if self._cached_cookie and now < self._cached_cookie_deadline
+                else ""
+            )
+        if cached_cookie:
+            self._store_cached_cookie(cached_cookie)
+            yield cached_cookie
+            return
+
+        self._clear_cached_cookie()
         with self._session() as (_, cookie):
+            self._store_cached_cookie(cookie)
             yield cookie
+
+    def invalidate_authenticated_cookie(self) -> None:
+        """Discard the reusable cookie after a failed authenticated request."""
+
+        self._clear_cached_cookie()
+
+    def _has_cached_cookie(self) -> bool:
+        now = time.monotonic()
+        with self._cache_lock:
+            return bool(
+                self._cached_cookie and now < self._cached_cookie_deadline
+            )
+
+    def _store_cached_cookie(self, cookie: str) -> None:
+        with self._cache_lock:
+            self._cache_generation += 1
+            generation = self._cache_generation
+            if self._cache_timer is not None:
+                self._cache_timer.cancel()
+            self._cached_cookie = cookie
+            self._cached_cookie_deadline = (
+                time.monotonic() + AUTH_COOKIE_IDLE_SECONDS
+            )
+            timer = threading.Timer(
+                AUTH_COOKIE_IDLE_SECONDS,
+                self._expire_cached_cookie,
+                args=(generation,),
+            )
+            timer.daemon = True
+            self._cache_timer = timer
+            timer.start()
+
+    def _expire_cached_cookie(self, generation: int) -> None:
+        with self._cache_lock:
+            if generation != self._cache_generation:
+                return
+            self._cached_cookie = ""
+            self._cached_cookie_deadline = 0.0
+            self._cache_timer = None
+
+    def _clear_cached_cookie(self) -> None:
+        with self._cache_lock:
+            self._cache_generation += 1
+            if self._cache_timer is not None:
+                self._cache_timer.cancel()
+            self._cache_timer = None
+            self._cached_cookie = ""
+            self._cached_cookie_deadline = 0.0
 
     def _credentials(self) -> tuple[str, str] | None:
         if not self.server:
