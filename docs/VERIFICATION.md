@@ -23,14 +23,22 @@
   HTTPS-only, exact-origin, same-origin, read-only adapter documented in
   `docs/MAGNUS.md`; no production mutation path is exposed.
 - Magnus's three existing local config directories are owner-only (`0700`) and
-  its existing metadata file is `0600`. The hardened adapter reports available
-  but not configured; no live tenant request was made because credentials have
-  not yet been entered.
-- Live Rock reads: gated; no tenant, actor, or Rock version claimed.
-- Broker/OAuth/Magnus tests: 18 passing via
+  its existing metadata file is `0600`. Credentials are now configured in
+  Secret Service for the selected origin. A live bounded `magnus ls` completed
+  successfully; no Magnus mutation command was exposed or attempted.
+- Live Rock reads: the six fixed REST v1 endpoint/OData requests and the
+  Personal Links action all returned successfully with the Magnus-backed
+  cookie. A privacy-safe no-match query returned no records and no unavailable
+  categories; Personal Links returned 15 same-origin entries, recorded only as
+  a count during verification. The tenant edge returned 403 for Python's
+  default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
+  which is now fixed in the client.
+- Broker/OAuth/Magnus/REST/navigation/instance tests: 41 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
-- QML validation: run `qmllint plugin/oneall.rock-lens/*.qml` when available.
+- QML validation: `qmllint` is unavailable. The installed plugin hot-reloaded,
+  re-registered, started a replacement broker, and opened in the running shell
+  with no Rock Lens QML errors in the bounded log inspection.
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.
 - Restart persistence: broker PID changed across an Omarchy shell restart,
@@ -60,13 +68,28 @@
 - Hyprland reports the `Super+R` Rock Lens binding. After the shell restart,
   the binding's registered summon command returned `ok` and opened the panel.
 - `hyprctl reload` succeeded and `hyprctl configerrors` was empty.
-- The broker status contract returned exactly six mock categories, explicit
-  `DEV`, `mock: healthy`, a sanitized `OAuth setup needed` state, and no
-  healthy live capability. Calling login while unconfigured failed closed and
-  did not open a browser.
-- Omarchy loaded plugin version `0.2.0` after shell restart, registered the
+- The broker status contract returns exactly six categories and an explicit
+  context. PROD is active after setup; it uses only live Rock responses and has
+  no synthetic fallback.
+- The installed Links view exposes no raw URL transport. Current-user Personal
+  Links now load through the authenticated same-origin action; local Quick
+  Returns are owner-only, per-origin, deduplicated, and limited to 20.
+- Magnus setup is available inside the PROD panel with the Rock domain first,
+  followed by username and masked password fields. The origin is HTTPS-only and
+  owner-only; credentials are stored per origin by the broker in Secret Service,
+  the password is cleared after submission, and neither credential is echoed in
+  the response contract.
+- Magnus 0.1.0's password prompt and nested cookie cache were verified against
+  the installed CLI. Rock Lens handles both without persisting its ephemeral
+  plaintext Magnus profile or exposing the password/cookie.
+- Omarchy loaded plugin version `0.3.0` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
+- The final installed broker was exercised through its real Unix socket in
+  PROD. It returned 15 Personal Links and 18 live search rows (three from each
+  of the six categories), with zero unavailable categories. Only counts and
+  category names were printed during verification; no record or link values
+  were retained.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,

@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 
 from rock_lens_broker.broker import Broker
@@ -9,6 +10,97 @@ from rock_lens_broker.contracts import (
     ALLOWED_RESULT_KEYS,
     CATEGORIES,
 )
+from rock_lens_broker.instance import InstanceStore
+from rock_lens_broker.navigation import NavigationTarget
+from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_lens_broker.rock_rest_adapter import SearchBatch
+
+
+class FakeMagnus:
+    def __init__(self, configured):
+        self.configured = configured
+        self.saved = None
+        self.server = DEFAULT_ROCK_ORIGIN
+
+    def status(self):
+        return {
+            "available": True,
+            "configured": self.configured,
+            "mode": "read_only",
+            "server": self.server.removeprefix("https://"),
+        }
+
+    @contextmanager
+    def authenticated_cookie(self):
+        yield ".ROCK=test-session"
+
+    def configure(self, username, password):
+        self.saved = (username, password)
+        self.configured = True
+
+    def set_server(self, value):
+        self.server = value
+
+
+class FakeLive:
+    def __init__(self):
+        self.search_calls = []
+        self.cleared = False
+        self.target = NavigationTarget(
+            "Ada Rivera",
+            "Person",
+            10,
+            "https://rock.example.org/Person/17",
+        )
+
+    def set_origin(self, origin):
+        self.target = NavigationTarget(
+            "Ada Rivera", "Person", 10, origin + "/Person/17"
+        )
+
+    def clear(self):
+        self.cleared = True
+
+    def search(self, query):
+        self.search_calls.append(query)
+        return SearchBatch(
+            [
+                {
+                    "category": "People",
+                    "safeId": "rock-safe-person",
+                    "title": "Ada Rivera",
+                    "subtitle": "Person · live Rock record",
+                    "status": "Live",
+                    "canOpen": True,
+                }
+            ],
+            (),
+        )
+
+    def person_quick_look(self, safe_id):
+        if safe_id != "rock-safe-person":
+            return None
+        return {
+            "safeId": safe_id,
+            "displayName": "Ada Rivera",
+            "subtitle": "Live Rock record · read-only",
+            "campus": "Not requested",
+        }
+
+    def personal_links(self):
+        return [
+            {
+                "safeId": "rock-safe-link",
+                "title": "People",
+                "section": "My tools",
+                "isShared": False,
+            }
+        ]
+
+    def resolve(self, safe_id):
+        return (
+            self.target if safe_id in {"rock-safe-person", "rock-safe-link"} else None
+        )
 
 
 class BrokerContractTests(unittest.TestCase):
@@ -16,6 +108,7 @@ class BrokerContractTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.state = Path(self.tmp.name) / "context"
         self.config = Path(self.tmp.name) / "oidc.json"
+        self.instance = Path(self.tmp.name) / "instance.json"
         self.broker = Broker(self.state, config_file=self.config)
 
     def tearDown(self):
@@ -74,7 +167,7 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(
             all(
                 states[name] != "healthy"
-                for name in ("rock_oauth", "rock_v3", "sql", "magnus")
+                for name in ("rock_oauth", "rock_rest", "sql", "magnus")
             )
         )
 
@@ -119,6 +212,98 @@ class BrokerContractTests(unittest.TestCase):
             self.assertEqual(
                 self.broker.handle({"op": op})["error"], "unsupported_operation"
             )
+
+    def test_prod_search_uses_live_adapter_and_never_synthetic_fallback(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            magnus=FakeMagnus(True),
+            live=live,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+        response = broker.handle({"op": "search", "query": "Ada"})
+        self.assertEqual(response["source"], "live")
+        self.assertEqual(live.search_calls, ["Ada"])
+        self.assertEqual(response["results"][0]["safeId"], "rock-safe-person")
+
+    def test_prod_without_magnus_fails_closed_without_live_call(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            magnus=FakeMagnus(False),
+            live=live,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+        response = broker.handle({"op": "search", "query": "Ada"})
+        self.assertEqual(response["source"], "unavailable")
+        self.assertEqual(response["results"], [])
+        self.assertEqual(live.search_calls, [])
+
+    def test_plugin_can_configure_magnus_without_echoing_credentials(self):
+        magnus = FakeMagnus(False)
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            magnus=magnus,
+            live=live,
+        )
+        response = broker.handle(
+            {
+                "op": "magnus_configure",
+                "domain": "rock.example.org",
+                "username": "rock-user",
+                "password": "private-password",
+            }
+        )
+        self.assertTrue(response["ok"])
+        self.assertTrue(response["refreshLive"])
+        self.assertEqual(magnus.saved, ("rock-user", "private-password"))
+        self.assertEqual(magnus.server, DEFAULT_ROCK_ORIGIN)
+        self.assertEqual(InstanceStore(self.instance).get(), DEFAULT_ROCK_ORIGIN)
+        serialized = json.dumps(response)
+        self.assertNotIn("rock-user", serialized)
+        self.assertNotIn("private-password", serialized)
+
+    def test_personal_links_and_quick_returns_open_only_by_safe_id(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        opened = []
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            magnus=FakeMagnus(True),
+            live=live,
+            url_opener=lambda url: opened.append(url) is None,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+        navigation = broker.handle({"op": "navigation_status"})
+        self.assertTrue(navigation["personalLinksAvailable"])
+        self.assertEqual(navigation["personalLinks"][0]["safeId"], "rock-safe-link")
+        self.assertEqual(
+            broker.handle(
+                {
+                    "op": "open_navigation",
+                    "safeId": "https://attacker.example/",
+                }
+            )["error"],
+            "not_found",
+        )
+        response = broker.handle({"op": "open_navigation", "safeId": "rock-safe-link"})
+        self.assertTrue(response["opened"])
+        self.assertEqual(opened, ["https://rock.example.org/Person/17"])
+        self.assertEqual(len(response["quickReturns"]), 1)
+        quick_id = response["quickReturns"][0]["safeId"]
+        self.assertTrue(
+            broker.handle({"op": "open_navigation", "safeId": quick_id})["opened"]
+        )
 
 
 if __name__ == "__main__":

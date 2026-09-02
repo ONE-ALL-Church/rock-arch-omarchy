@@ -3,29 +3,47 @@
 Rock Lens uses the installed `rock-magnus-cli` only through
 `MagnusReadOnlyAdapter`. The adapter is intentionally smaller than the raw CLI:
 
-- the only allowed server is `https://rock.example.org`;
-- HTTP, alternate hosts, URL credentials, queries, fragments, and cross-origin
-  action URLs are rejected;
+- setup requires the Rock instance domain before credentials;
+- the domain is normalized to an HTTPS origin; HTTP, non-443 ports, URL
+  credentials, paths, queries, fragments, and cross-origin action URLs are
+  rejected;
 - tree paths must begin with
   `api/TriumphTech/Magnus/GetTreeItems/`;
 - file paths must begin with `/FileContent/`;
 - traversal, URL-shaped paths, control characters, and oversized responses are
   rejected;
 - only `status`, `ls`, `cat`, and SHA-256 `hash` operations are exposed;
-- Rock credentials are stored in Secret Service, never the Magnus plaintext
-  configuration;
+- Rock credentials are stored in Secret Service under a hash of the configured
+  origin, so different Rock instances do not share credentials;
 - each invocation creates an isolated mode-`0700` temporary configuration,
   hardens temporary files to `0600`, and destroys it afterward;
 - raw stderr and Rock response bodies do not cross the adapter boundary.
 
 Rock's `/api/Auth/Login` returns a tenant session cookie that may be accepted by
-other same-origin Rock endpoints when the account is authorized. Rock Lens does
-not treat that as permission to expose arbitrary REST calls: the cookie exists
-only inside one ephemeral Magnus invocation and cannot be supplied with a raw
-URL. General entity/API reads remain a separate, explicitly allowlisted V3/MCP
-capability.
+other same-origin Rock endpoints when the account is authorized. Rock Lens
+validates the `.ROCK` value from the ephemeral Magnus profile and can yield it
+in memory to the separate `RockRestReadOnlyAdapter`. It cannot be supplied with
+a raw URL and is destroyed with the temporary profile.
 
-Configure credentials through a hidden local prompt:
+The REST adapter permits only fixed REST v1 GETs for People, Groups, Workflow
+Types, Service Jobs, Pages, Content Channel Items, and current-user Personal
+Links. It does not call `/api/v2`. Filters, selects, ordering, and row limits
+are generated in code; QML supplies only a sanitized search string. Rock's own
+controller/action and entity authorization still determine what the logged-in
+account can see.
+
+Magnus 0.1.0 reads its password prompt character by character. Rock Lens waits
+for that prompt and writes one character at a time over stdin; the password is
+never placed in argv. Cookie records are then selected by their exact
+`serverUrl`, independent of the nested JSON layout produced by Magnus's `Conf`
+dependency.
+
+Configure credentials through the masked form shown in Rock Lens **PROD**.
+The domain field comes first. The QML form clears its password immediately
+after serializing the owner-local request, the broker stores the origin in an
+owner-only configuration and both credentials in Secret Service, and neither
+credential is returned over the socket. The equivalent hidden terminal prompt
+is:
 
 ```bash
 python3 -m rock_lens_broker magnus configure
@@ -64,5 +82,6 @@ CLI as a separate, reviewed operation:
 6. Wait for explicit production-promotion approval.
 7. Write production, read it back, and verify again.
 
-Never use Magnus for Rock entity, relationship, REST, or SQL reads. Those
-belong to the read-only Rock RMS MCP V3 surface.
+Do not use the raw Magnus file commands for Rock entities, relationships, REST,
+or SQL. Entity and Personal Link reads belong to the fixed read-only REST
+adapter; broader API access still requires a separately reviewed allowlist.

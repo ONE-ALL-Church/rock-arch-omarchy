@@ -1,0 +1,212 @@
+import json
+import unittest
+from contextlib import contextmanager
+
+from rock_lens_broker.navigation import NavigationError, validate_rock_url
+from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_lens_broker.rock_rest_adapter import (
+    MAX_RESPONSE_BYTES,
+    SEARCH_SPECS,
+    RockRestError,
+    RockRestHttpClient,
+    RockRestReadOnlyAdapter,
+)
+
+
+class FakeCookieProvider:
+    @contextmanager
+    def authenticated_cookie(self):
+        yield ".ROCK=test-session"
+
+
+class FakeHttp:
+    def __init__(self, responses=None, failures=()):
+        self.responses = responses or {}
+        self.failures = set(failures)
+        self.calls = []
+
+    def get_json(self, path, params, cookie):
+        self.calls.append((path, params, cookie))
+        if path in self.failures:
+            raise RockRestError("rock_request_failed")
+        return self.responses.get(path, [])
+
+
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def read(self, maximum):
+        return self.payload[:maximum]
+
+
+class FakeOpener:
+    def __init__(self, payload=b"[]"):
+        self.payload = payload
+        self.calls = []
+
+    def open(self, request, timeout):
+        self.calls.append((request, timeout))
+        return FakeResponse(self.payload)
+
+
+class RockRestAdapterTests(unittest.TestCase):
+    def test_http_client_is_get_only_exact_origin_and_forwards_cookie_in_header(self):
+        opener = FakeOpener(b'[{"Id":1}]')
+        client = RockRestHttpClient(opener, origin="https://rock.example.org")
+        value = client.get_json(
+            "/api/People",
+            {"$select": "Id", "$top": "3"},
+            ".ROCK=test-session",
+        )
+        self.assertEqual(value, [{"Id": 1}])
+        request, timeout = opener.calls[0]
+        self.assertEqual(request.get_method(), "GET")
+        self.assertEqual(request.get_header("Cookie"), ".ROCK=test-session")
+        self.assertEqual(request.get_header("User-agent"), "Rock-Lens/0.1")
+        self.assertTrue(
+            request.full_url.startswith("https://rock.example.org/api/People?")
+        )
+        self.assertEqual(timeout, 20)
+
+    def test_http_client_rejects_generic_endpoints_and_oversized_responses(self):
+        opener = FakeOpener()
+        client = RockRestHttpClient(opener)
+        for path in (
+            "/api/People/1",
+            "/api/Auth/Login",
+            "https://attacker.example/api/People",
+        ):
+            with (
+                self.subTest(path=path),
+                self.assertRaisesRegex(RockRestError, "endpoint_not_allowed"),
+            ):
+                client.get_json(path, {}, ".ROCK=test-session")
+        self.assertEqual(opener.calls, [])
+
+        oversized = RockRestHttpClient(FakeOpener(b"x" * (MAX_RESPONSE_BYTES + 1)))
+        with self.assertRaisesRegex(RockRestError, "out_of_bounds"):
+            oversized.get_json("/api/People", {}, ".ROCK=test-session")
+
+    def test_search_uses_only_fixed_get_specs_and_opaque_results(self):
+        http = FakeHttp(
+            {
+                "/api/People": [
+                    {
+                        "Id": 17,
+                        "NickName": "D'Angelo",
+                        "LastName": "Stone",
+                        "Email": "must-not-cross",
+                    }
+                ],
+                "/api/Groups": [{"Id": 4, "Name": "Delta", "IsActive": True}],
+                "/api/WorkflowTypes": [],
+                "/api/ServiceJobs": [],
+                "/api/Pages": [
+                    {"Id": 9, "PageTitle": "Directory", "InternalName": "Dir"}
+                ],
+                "/api/ContentChannelItems": [],
+            }
+        )
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+        batch = adapter.search("D'Angelo")
+
+        self.assertEqual(
+            [call[0] for call in http.calls], [s.path for s in SEARCH_SPECS]
+        )
+        self.assertTrue(all(call[2] == ".ROCK=test-session" for call in http.calls))
+        person_params = http.calls[0][1]
+        self.assertIn("D''Angelo", person_params["$filter"])
+        self.assertEqual(person_params["$select"], "Id,NickName,LastName")
+        self.assertEqual(person_params["$top"], "3")
+        person = batch.results[0]
+        self.assertTrue(person["safeId"].startswith("rock-"))
+        self.assertEqual(len(person["safeId"]), 37)
+        self.assertNotEqual(person["safeId"], "17")
+        self.assertTrue(person["canOpen"])
+        self.assertNotIn("Email", person)
+        self.assertNotIn("must-not-cross", json.dumps(batch.results))
+        page = next(row for row in batch.results if row["category"] == "Pages")
+        self.assertEqual(page["title"], "Directory")
+
+        quick_look = adapter.person_quick_look(person["safeId"])
+        self.assertIsNotNone(quick_look)
+        assert quick_look is not None
+        self.assertEqual(quick_look["campus"], "Not requested")
+        target = adapter.resolve(person["safeId"])
+        self.assertIsNotNone(target)
+        assert target is not None
+        self.assertEqual(
+            target.url,
+            "https://rock.example.org/Person/17",
+        )
+
+    def test_search_returns_partial_results_without_falling_back(self):
+        failed = {"/api/Groups", "/api/ServiceJobs"}
+        http = FakeHttp({"/api/People": []}, failures=failed)
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+        batch = adapter.search("Ada")
+        self.assertEqual(batch.results, [])
+        self.assertEqual(batch.unavailable, ("Groups", "Jobs"))
+
+    def test_personal_links_are_same_origin_and_never_expose_urls(self):
+        http = FakeHttp(
+            {
+                "/api/PersonalLinks/GetPersonalLinksData": {
+                    "PersonLinksSectionList": [
+                        {
+                            "Name": "My tools",
+                            "Order": 2,
+                            "IsShared": False,
+                            "PersonalLinks": [
+                                {"Name": "People", "Url": "/page/12", "Order": 1},
+                                {
+                                    "Name": "External",
+                                    "Url": "https://attacker.example/",
+                                    "Order": 2,
+                                },
+                            ],
+                        }
+                    ]
+                }
+            }
+        )
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+        links = adapter.personal_links()
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0]["title"], "People")
+        self.assertEqual(links[0]["section"], "My tools")
+        self.assertNotIn("url", json.dumps(links).lower())
+        target = adapter.resolve(links[0]["safeId"])
+        self.assertIsNotNone(target)
+        assert target is not None
+        self.assertEqual(target.url, "https://rock.example.org/page/12")
+
+    def test_all_category_failures_are_stable(self):
+        http = FakeHttp(failures={spec.path for spec in SEARCH_SPECS})
+        with self.assertRaisesRegex(RockRestError, "rock_search_failed"):
+            RockRestReadOnlyAdapter(FakeCookieProvider(), http).search("Ada")
+
+    def test_url_validation_is_exact_origin_https(self):
+        self.assertEqual(
+            validate_rock_url("/Person/7", DEFAULT_ROCK_ORIGIN),
+            "https://rock.example.org/Person/7",
+        )
+        for value in (
+            "http://rock.example.org/Person/7",
+            "https://attacker.example/",
+            "//attacker.example/path",
+            "https://rock.example.org.attacker.example/",
+        ):
+            with self.subTest(value=value), self.assertRaises(NavigationError):
+                validate_rock_url(value, DEFAULT_ROCK_ORIGIN)
+
+
+if __name__ == "__main__":
+    unittest.main()

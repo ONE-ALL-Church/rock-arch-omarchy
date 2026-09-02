@@ -26,8 +26,12 @@ CATEGORIES = (
     "Content Channel Items",
 )
 
-ALLOWED_RESULT_KEYS = frozenset({"category", "safeId", "title", "subtitle", "status"})
+ALLOWED_RESULT_KEYS = frozenset(
+    {"category", "safeId", "title", "subtitle", "status", "canOpen"}
+)
 ALLOWED_PERSON_KEYS = frozenset({"safeId", "displayName", "subtitle", "campus"})
+ALLOWED_LINK_KEYS = frozenset({"safeId", "title", "section", "isShared"})
+ALLOWED_QUICK_RETURN_KEYS = frozenset({"safeId", "title", "kind"})
 
 
 @dataclass(frozen=True)
@@ -45,5 +49,14 @@ def sanitize_text(value: Any, limit: int) -> str:
     return text[:limit]
 
 
-def allowlist(record: dict[str, Any], keys: frozenset[str]) -> dict[str, str]:
-    return {key: sanitize_text(record.get(key), 160) for key in keys if key in record}
+def allowlist(record: dict[str, Any], keys: frozenset[str]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key in keys:
+        if key not in record:
+            continue
+        result[key] = (
+            bool(record[key])
+            if key in {"canOpen", "isShared"}
+            else sanitize_text(record.get(key), 160)
+        )
+    return result

@@ -14,6 +14,7 @@ _RECORDS = (
         "title": "Ada Rivera",
         "subtitle": "Volunteer Coordinator",
         "status": "Active",
+        "canOpen": False,
     },
     {
         "category": "Groups",
@@ -21,6 +22,7 @@ _RECORDS = (
         "title": "Hillside Community",
         "subtitle": "Small Group",
         "status": "Active",
+        "canOpen": False,
     },
     {
         "category": "Workflows",
@@ -28,6 +30,7 @@ _RECORDS = (
         "title": "New Guest Follow-up",
         "subtitle": "Workflow Type",
         "status": "Active",
+        "canOpen": False,
     },
     {
         "category": "Jobs",
@@ -35,6 +38,7 @@ _RECORDS = (
         "title": "Sample Data Sync",
         "subtitle": "Last run 12 minutes ago",
         "status": "Succeeded",
+        "canOpen": False,
     },
     {
         "category": "Pages",
@@ -42,6 +46,7 @@ _RECORDS = (
         "title": "Operations Dashboard",
         "subtitle": "Internal Page",
         "status": "Published",
+        "canOpen": False,
     },
     {
         "category": "Content Channel Items",
@@ -49,6 +54,7 @@ _RECORDS = (
         "title": "Weekend Update",
         "subtitle": "News Item",
         "status": "Approved",
+        "canOpen": False,
     },
 )
 
@@ -63,10 +69,13 @@ _PERSONS = {
 
 
 class MockAdapter:
-    def search(self, query: str, limit: int = 18) -> list[dict[str, str]]:
+    def search(self, query: str, limit: int = 18) -> list[dict[str, object]]:
         needle = " ".join(query.lower().split())[:120]
         rows = [
-            r for r in _RECORDS if not needle or needle in " ".join(r.values()).lower()
+            r
+            for r in _RECORDS
+            if not needle
+            or needle in " ".join(str(value) for value in r.values()).lower()
         ]
         return [
             allowlist(dict(r), ALLOWED_RESULT_KEYS)

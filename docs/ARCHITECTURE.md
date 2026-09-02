@@ -10,23 +10,28 @@
 4. `MockAdapter`: deterministic, synthetic records for People, Groups,
    Workflows, Jobs, Pages, and Content Channel Items.
 5. `MagnusReadOnlyAdapter`: privileged, bounded file inspection against the
-   exact ONE&ALL production origin, with credentials held in Secret Service
-   and raw Magnus state confined to an ephemeral owner-only directory.
-6. Future live adapters: disabled until tenant identity, authenticated actor,
-   version, and read capability are proven. Their status is one of `unknown`,
-   `stale`, `failed`, or `healthy`.
+   user-selected, validated Rock origin, with per-origin credentials held in
+   Secret Service and raw Magnus state confined to an ephemeral owner-only
+   directory.
+6. `RockRestReadOnlyAdapter`: six fixed Rock REST v1 entity GETs plus the fixed
+   current-user Personal Links action, authenticated by a validated cookie
+   obtained inside the ephemeral Magnus session.
+7. `QuickReturnStore`: same-origin launcher history, deduplicated and capped at
+   20 in an owner-only JSON file.
 
 ## Trust boundary
 
 The QML side never receives credentials, cookies, SQL, raw private response
-bodies, internal exception text, or fields outside the typed display contract.
+bodies, raw URLs/record IDs, internal exception text, or fields outside the
+typed display contract.
 Requests and responses are newline-delimited JSON with a 16 KiB request limit.
 Search text is sent through the socket, not argv. The broker emits no request or
 response logging.
 
-Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and a
-synthetic `safeId`. No contact details, notes, addresses, dates of birth, family
-relationships, photos, or authentication identifiers are in the contract.
+Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and an
+opaque `safeId`. Live search deliberately reports campus as `Not requested`.
+No contact details, notes, addresses, dates of birth, family relationships,
+photos, raw record IDs, or authentication identifiers are in the contract.
 
 ## Rock OAuth boundary
 
@@ -56,30 +61,60 @@ Changing context requires an explicit `set_context` request; no environmental
 signal may change it. `PROD` is a visual safety context only and grants no new
 capabilities. Both contexts remain read-only.
 
-## Live adapter gate
+## Live REST boundary
 
-A live adapter may be enabled only after all gates pass: exact tenant,
-authenticated actor, Rock version, access health, and read-only capability.
-Any missing or ambiguous gate returns `unknown` or `failed`; there is no fallback
-to unguarded REST, SQL, or credentials. Job history is read-only. Job execution
-is intentionally absent at every layer.
+Live data is available only in explicit PROD context and only after a Rock
+domain and its Magnus credentials are configured. The bare domain is normalized
+to an HTTPS origin and rejected if it contains credentials, a path, query,
+fragment, or non-443 port. One Magnus login yields a validated `.ROCK` cookie in
+an ephemeral directory. The broker attaches it only to that exact-origin HTTPS
+GET and destroys the directory after the operation.
+
+The client cannot choose an endpoint. These are Rock's established REST v1
+controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
+`WorkflowTypes`, `ServiceJobs`, `Pages`, and `ContentChannelItems`, with fixed
+`$select`, `$orderby`, `$top=3`, and generated `startswith` filters. Personal
+Links use only `PersonalLinks/GetPersonalLinksData`. Responses are capped at 2
+MiB and transformed immediately into display allowlists. A failed category is
+reported as unavailable; PROD never falls back to mock data. There is no raw
+HTTP, generic entity, SQL, mutation, job execution, or Run Now operation.
+
+The cookie authenticates the actor but does not override Rock authorization.
+Rock controller/action permissions still apply; endpoints that enforce entity
+security continue to do so for the Magnus account.
 
 ## Magnus boundary
 
 Magnus is not an identity provider and does not replace Rock OpenID Connect for
-end users. The adapter accepts only `https://rock.example.org`, permits
-only Magnus tree paths under `api/TriumphTech/Magnus/GetTreeItems/` and content
-paths under `/FileContent/`, and rejects alternate origins, query strings,
-fragments, control characters, backslashes, and traversal segments.
+end users. The adapter accepts only the configured Rock origin, permits only
+Magnus tree paths under `api/TriumphTech/Magnus/GetTreeItems/` and content paths
+under `/FileContent/`, and rejects alternate origins, query strings, fragments,
+control characters, backslashes, and traversal segments.
 
 Credentials are retrieved from Secret Service and the password is sent to the
-Magnus login process over stdin. Magnus receives an ephemeral `XDG_CONFIG_HOME`
+Magnus login process through its stdin prompt, one character at a time to match
+Magnus 0.1.0's interactive reader. Magnus receives an ephemeral `XDG_CONFIG_HOME`
 with owner-only permissions; its plaintext cookie/config artifacts are removed
 when the command exits. Output is size-bounded and sanitized. The public broker
 socket exposes Magnus status only. There are no write, remove, upload, create,
 build, or deployment operations in the adapter or CLI.
 
-Although Rock's `.ROCK` session cookie may authenticate other same-origin API
-routes, the adapter never exposes the cookie or a generic HTTP/URL operation.
-Every non-Magnus API surface requires its own read-only capability and
-authorization gate.
+The cookie is yielded only inside the broker and is never persisted by Rock
+Lens. It is not exposed on the socket and there is no generic HTTP/URL
+operation.
+
+## Navigation, Personal Links, and Quick Returns
+
+Search results and Personal Links cross the socket with process-local HMAC IDs.
+Only the broker can resolve those IDs. Generated search navigation is enabled
+only for confirmed Person (`/Person/{Id}`) and Page (`/page/{Id}`) routes.
+Personal Link targets may be relative but must resolve to HTTPS on the selected
+Rock origin; external and malformed links are omitted.
+
+Successful user-requested opens are added to Quick Returns. The store keeps the
+title, type, order, target, and timestamp locally, but returns only another
+process-local opaque ID, title, and type to QML. Its directory is `0700`, its
+file is `0600`, writes are atomic, entries are validated on every read, and the
+oldest entries are removed beyond 20. Each origin receives a separate store.
+This intentionally emulates Rock's useful return list without importing
+browser-local Rock history.

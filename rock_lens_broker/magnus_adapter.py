@@ -3,23 +3,34 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import select
 import shutil
+import stat
 import subprocess
 import tempfile
-import urllib.parse
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .auth import SecretStore, SecretToolStore
 from .contracts import Context, sanitize_text
+from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
 
-CANONICAL_MAGNUS_SERVER = "https://rock.example.org"
+CANONICAL_MAGNUS_SERVER = DEFAULT_ROCK_ORIGIN
 DEFAULT_TREE_PATH = "api/TriumphTech/Magnus/GetTreeItems/root"
 TREE_PATH_PREFIX = "api/TriumphTech/Magnus/GetTreeItems/"
 FILE_PATH_PREFIX = "/FileContent/"
 MAX_TREE_ITEMS = 500
 MAX_TREE_OUTPUT_BYTES = 2 * 1024 * 1024
 MAX_FILE_BYTES = 4 * 1024 * 1024
+MAX_COOKIE_CONFIG_BYTES = 64 * 1024
+MAX_COOKIE_CONFIG_NODES = 1_024
+MAX_COOKIE_CONFIG_DEPTH = 16
+MAX_PASSWORD_BYTES = 1_024
+PASSWORD_PROMPT_TIMEOUT_SECONDS = 5
+PASSWORD_KEYSTROKE_DELAY_SECONDS = 0.01
 
 
 class MagnusError(Exception):
@@ -27,20 +38,10 @@ class MagnusError(Exception):
 
 
 def validate_magnus_server(value: str) -> str:
-    parsed = urllib.parse.urlsplit(value.strip())
-    canonical = urllib.parse.urlsplit(CANONICAL_MAGNUS_SERVER)
-    if (
-        parsed.scheme.lower() != "https"
-        or parsed.hostname != canonical.hostname
-        or parsed.port not in (None, 443)
-        or parsed.username
-        or parsed.password
-        or parsed.path not in ("", "/")
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise MagnusError("magnus_server_not_allowed")
-    return CANONICAL_MAGNUS_SERVER
+    try:
+        return validate_rock_origin(value)
+    except OriginError as error:
+        raise MagnusError("magnus_server_not_allowed") from error
 
 
 def validate_tree_path(value: str) -> str:
@@ -84,27 +85,32 @@ class MagnusReadOnlyAdapter:
 
     def __init__(
         self,
-        server: str = CANONICAL_MAGNUS_SERVER,
+        server: str | None = None,
         executable: str | None = None,
         secret_store: SecretStore | None = None,
         context: Context = Context.PROD,
     ) -> None:
-        self.server = validate_magnus_server(server)
+        self.server = validate_magnus_server(server) if server else ""
         self.executable = executable or shutil.which("magnus") or ""
         self.secret_store = secret_store or SecretToolStore()
         self.context = context
 
     def status(self) -> dict[str, Any]:
         available = bool(self.executable) and self.secret_store.available()
-        configured = available and bool(self._credentials())
+        configured = available and bool(self.server) and bool(self._credentials())
         return {
             "available": available,
             "configured": configured,
             "mode": "read_only",
-            "server": "rock.example.org",
+            "server": self.server.removeprefix("https://"),
         }
 
+    def set_server(self, value: str) -> None:
+        self.server = validate_magnus_server(value)
+
     def configure(self, username: str, password: str) -> None:
+        if not self.server:
+            raise MagnusError("magnus_server_not_configured")
         normalized_username = username.strip()
         if (
             not normalized_username
@@ -112,18 +118,26 @@ class MagnusReadOnlyAdapter:
             or any(ord(char) < 32 for char in normalized_username)
         ):
             raise MagnusError("invalid_magnus_username")
-        if not password or len(password) > 4_096 or "\x00" in password:
+        if (
+            not password
+            or len(password.encode("utf-8")) > MAX_PASSWORD_BYTES
+            or any(char in password for char in "\x00\r\n")
+        ):
             raise MagnusError("invalid_magnus_password")
         if not self.secret_store.available():
             raise MagnusError("secure_storage_unavailable")
         try:
             self.secret_store.store(
-                self.context, "magnus_username", normalized_username
+                self.context,
+                self._secret_kind("magnus_username"),
+                normalized_username,
             )
-            self.secret_store.store(self.context, "magnus_password", password)
+            self.secret_store.store(
+                self.context, self._secret_kind("magnus_password"), password
+            )
         except Exception as error:
-            self.secret_store.clear(self.context, "magnus_username")
-            self.secret_store.clear(self.context, "magnus_password")
+            self.secret_store.clear(self.context, self._secret_kind("magnus_username"))
+            self.secret_store.clear(self.context, self._secret_kind("magnus_password"))
             raise MagnusError("secure_storage_failed") from error
 
     def list_tree(self, path: str = DEFAULT_TREE_PATH) -> list[dict[str, Any]]:
@@ -144,56 +158,31 @@ class MagnusReadOnlyAdapter:
     def hash_file(self, path: str) -> str:
         return hashlib.sha256(self.read_file(path)).hexdigest()
 
+    @contextmanager
+    def authenticated_cookie(self) -> Iterator[str]:
+        """Yield one validated .ROCK cookie and destroy it after use."""
+
+        with self._session() as (_, cookie):
+            yield cookie
+
     def _credentials(self) -> tuple[str, str] | None:
-        username = self.secret_store.lookup(self.context, "magnus_username")
-        password = self.secret_store.lookup(self.context, "magnus_password")
+        if not self.server:
+            return None
+        username = self.secret_store.lookup(
+            self.context, self._secret_kind("magnus_username")
+        )
+        password = self.secret_store.lookup(
+            self.context, self._secret_kind("magnus_password")
+        )
         return (username, password) if username and password else None
 
+    def _secret_kind(self, kind: str) -> str:
+        origin_key = hashlib.sha256(self.server.encode()).hexdigest()[:16]
+        return f"{kind}:{origin_key}"
+
     def _run(self, command: list[str], maximum_bytes: int) -> bytes:
-        if not self.executable or not self.secret_store.available():
-            raise MagnusError("magnus_unavailable")
-        credentials = self._credentials()
-        if not credentials:
-            raise MagnusError("magnus_not_configured")
-        username, password = credentials
-
-        runtime_parent = Path(
-            os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-        )
-        if not runtime_parent.is_dir():
-            runtime_parent = Path("/tmp")
-        with tempfile.TemporaryDirectory(
-            prefix="rock-lens-magnus-", dir=runtime_parent
-        ) as temporary:
-            config_home = Path(temporary)
-            config_home.chmod(0o700)
-            environment = os.environ.copy()
-            environment["XDG_CONFIG_HOME"] = str(config_home)
-            environment["NO_COLOR"] = "1"
-
-            try:
-                login = subprocess.run(
-                    [
-                        self.executable,
-                        "login",
-                        self.server,
-                        "--username",
-                        username,
-                        "--default",
-                    ],
-                    input=(password + "\n").encode("utf-8"),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=20,
-                    check=False,
-                    env=environment,
-                )
-            except (OSError, subprocess.TimeoutExpired) as error:
-                raise MagnusError("magnus_login_failed") from error
-            if login.returncode != 0:
-                raise MagnusError("magnus_login_failed")
-            self._harden_temporary_files(config_home)
-
+        with self._session() as (environment, _):
+            config_home = Path(environment["XDG_CONFIG_HOME"])
             output_path = config_home / "rock-lens-output"
             flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
             if hasattr(os, "O_NOFOLLOW"):
@@ -220,6 +209,163 @@ class MagnusReadOnlyAdapter:
                     raise MagnusError("magnus_response_out_of_bounds")
                 output.seek(0)
                 return output.read()
+
+    @contextmanager
+    def _session(self) -> Iterator[tuple[dict[str, str], str]]:
+        if not self.server:
+            raise MagnusError("magnus_server_not_configured")
+        if not self.executable or not self.secret_store.available():
+            raise MagnusError("magnus_unavailable")
+        credentials = self._credentials()
+        if not credentials:
+            raise MagnusError("magnus_not_configured")
+        username, password = credentials
+
+        runtime_parent = Path(
+            os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        )
+        if not runtime_parent.is_dir():
+            runtime_parent = Path("/tmp")
+        with tempfile.TemporaryDirectory(
+            prefix="rock-lens-magnus-", dir=runtime_parent
+        ) as temporary:
+            config_home = Path(temporary)
+            config_home.chmod(0o700)
+            environment = os.environ.copy()
+            environment["XDG_CONFIG_HOME"] = str(config_home)
+            environment["NO_COLOR"] = "1"
+
+            if self._interactive_login(environment, username, password) != 0:
+                raise MagnusError("magnus_login_failed")
+            self._harden_temporary_files(config_home)
+            yield environment, self._read_cookie(config_home)
+
+    def _interactive_login(
+        self, environment: dict[str, str], username: str, password: str
+    ) -> int:
+        """Drive Magnus 0.1.0's character-oriented password prompt safely."""
+
+        process: subprocess.Popen[bytes] | None = None
+        try:
+            process = subprocess.Popen(
+                [
+                    self.executable,
+                    "login",
+                    self.server,
+                    "--username",
+                    username,
+                    "--default",
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                env=environment,
+                bufsize=0,
+            )
+            if process.stdin is None or process.stdout is None:
+                raise MagnusError("magnus_login_failed")
+
+            prompt = b""
+            deadline = time.monotonic() + PASSWORD_PROMPT_TIMEOUT_SECONDS
+            while b"Password:" not in prompt:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise MagnusError("magnus_login_failed")
+                readable, _, _ = select.select(
+                    [process.stdout], [], [], min(remaining, 0.25)
+                )
+                if not readable:
+                    if process.poll() is not None:
+                        raise MagnusError("magnus_login_failed")
+                    continue
+                chunk = os.read(process.stdout.fileno(), 256)
+                if not chunk:
+                    raise MagnusError("magnus_login_failed")
+                prompt = (prompt + chunk)[-4_096:]
+
+            for character in password:
+                process.stdin.write(character.encode("utf-8"))
+                process.stdin.flush()
+                time.sleep(PASSWORD_KEYSTROKE_DELAY_SECONDS)
+            process.stdin.write(b"\n")
+            process.stdin.flush()
+            process.stdin.close()
+            return process.wait(timeout=20)
+        except (BrokenPipeError, OSError, subprocess.TimeoutExpired) as error:
+            raise MagnusError("magnus_login_failed") from error
+        finally:
+            if process is not None:
+                if process.poll() is None:
+                    process.kill()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        pass
+                for stream in (process.stdin, process.stdout):
+                    if stream is not None and not stream.closed:
+                        stream.close()
+
+    def _read_cookie(self, config_home: Path) -> str:
+        path = config_home / "magnus-cli-cookies-nodejs" / "config.json"
+        try:
+            resolved = path.resolve(strict=True)
+            if not resolved.is_relative_to(config_home.resolve()):
+                raise MagnusError("invalid_magnus_cookie")
+            flags = os.O_RDONLY
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            descriptor = os.open(path, flags)
+            try:
+                info = os.fstat(descriptor)
+                if (
+                    not stat.S_ISREG(info.st_mode)
+                    or info.st_size > MAX_COOKIE_CONFIG_BYTES
+                ):
+                    raise MagnusError("invalid_magnus_cookie")
+                raw = os.read(descriptor, MAX_COOKIE_CONFIG_BYTES + 1)
+            finally:
+                os.close(descriptor)
+            if len(raw) > MAX_COOKIE_CONFIG_BYTES:
+                raise MagnusError("invalid_magnus_cookie")
+            value = json.loads(raw)
+            records = self._matching_cookie_records(value)
+            if len(records) != 1:
+                raise MagnusError("invalid_magnus_cookie")
+            cookie = records[0].get("cookie")
+        except MagnusError:
+            raise
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise MagnusError("invalid_magnus_cookie") from error
+
+        if (
+            not isinstance(cookie, str)
+            or not cookie.startswith(".ROCK=")
+            or len(cookie) < 7
+            or len(cookie) > 16 * 1024
+            or any(ord(char) < 33 or char in ';,\\"' for char in cookie)
+        ):
+            raise MagnusError("invalid_magnus_cookie")
+        return cookie
+
+    def _matching_cookie_records(self, value: Any) -> list[dict[str, Any]]:
+        """Find Conf records without relying on its dot-notation JSON layout."""
+
+        matches: list[dict[str, Any]] = []
+        pending: list[tuple[Any, int]] = [(value, 0)]
+        visited = 0
+        while pending:
+            current, depth = pending.pop()
+            visited += 1
+            if visited > MAX_COOKIE_CONFIG_NODES or depth > MAX_COOKIE_CONFIG_DEPTH:
+                raise MagnusError("invalid_magnus_cookie")
+            if not isinstance(current, dict):
+                continue
+            if current.get("serverUrl") == self.server and "cookie" in current:
+                matches.append(current)
+                if len(matches) > 1:
+                    raise MagnusError("invalid_magnus_cookie")
+            pending.extend((child, depth + 1) for child in current.values())
+        return matches
 
     @staticmethod
     def _harden_temporary_files(root: Path) -> None:

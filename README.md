@@ -1,15 +1,22 @@
 # Rock Lens
 
-Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. The
-current search slice runs against public-safe mock data, and Rock login uses
-Rock's OpenID Connect server. QML is only a view: search terms and sanitized
-authentication state travel over an owner-only local Unix socket, while
-credentials and tokens remain inside the Python broker and desktop keyring.
+Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. DEV
+uses public-safe synthetic data. PROD uses the `.ROCK` session created by
+Magnus to search six fixed Rock REST v1 resources and load the current person's
+Personal Links. QML is only a view: search terms and opaque navigation IDs
+travel over an owner-only local Unix socket, while credentials, cookies, raw
+record IDs, URLs, and response bodies remain inside the Python broker.
 
 For privileged Rock file inspection, Rock Lens also includes a hardened,
-read-only Magnus adapter. It is fixed to the ONE&ALL production origin, keeps
-credentials in Secret Service, and gives each command an ephemeral Magnus
-profile that is deleted immediately afterward.
+read-only Magnus adapter. Setup first records the selected Rock instance's
+strict HTTPS origin, keeps that origin's credentials in Secret Service, and
+gives each command an ephemeral Magnus profile that is deleted immediately
+afterward.
+
+Rock Lens also emulates Rock's Quick Return behavior. It remembers only
+same-origin records or Personal Links that were opened from the launcher,
+deduplicates them, caps the list at 20, and stores private target data in an
+owner-only local file. It does not read or follow browser history.
 
 ![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
 
@@ -24,7 +31,7 @@ The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-lens/broker.sock`
 and starts the broker without passing queries or credentials as arguments.
 Summon it with `Super+R` or click the explicit `DEV` / `PROD` bar indicator.
 
-## Configure Rock login
+## Optional OpenID Connect client
 
 In Rock, create a dedicated client under `Admin Tools > Settings > OpenID
 Connect Clients`. Register this exact loopback redirect URI:
@@ -52,10 +59,11 @@ python3 -m rock_lens_broker configure --context PROD
 ```
 
 Enter Rock's Public Application Root as the issuer, copy the client ID, accept
-the loopback URI, and leave the secret blank for a public client. Then open
-Rock Lens and choose **Sign in**. The broker discovers Rock's endpoints, opens
-Rock's sign-in/consent page, validates the callback state, exchanges the code,
-and renews expiring sessions with the refresh token.
+the loopback URI, and leave the secret blank for a public client. The broker
+includes this standards-based end-user login boundary, but the current live
+search and Personal Links path does not use it. Those reads use the ephemeral
+local Magnus session described below. The OpenID client remains available for
+future user-facing capabilities that should not use an admin cookie.
 
 The client metadata file is owner-only at
 `$XDG_CONFIG_HOME/rock-lens/oidc.json` (normally
@@ -63,18 +71,31 @@ The client metadata file is owner-only at
 desktop Secret Service. The launcher receives only `configured`, state, and a
 fixed display label.
 
+The selected Rock origin is non-secret metadata stored owner-only at
+`$XDG_CONFIG_HOME/rock-lens/instance.json`. Usernames and passwords are not
+stored there; Secret Service keys are separated by a hash of that origin.
+
 ## Configure Magnus
 
-Magnus is deliberately separate from end-user OpenID Connect login. Configure
-the privileged read-only adapter through a hidden terminal prompt:
+Magnus is deliberately separate from end-user OpenID Connect login. In Rock
+Lens, switch to **PROD** and enter the Rock credentials in the displayed masked
+form. The broker sends them only over its owner-only socket and
+stores them in Secret Service. The equivalent terminal setup remains available:
 
 ```bash
 python3 -m rock_lens_broker magnus configure
 python3 -m rock_lens_broker magnus status
 ```
 
-The adapter exposes only bounded `ls`, `cat`, and `hash` operations. See
-[docs/MAGNUS.md](docs/MAGNUS.md) for its exact path and origin restrictions.
+The same ephemeral session can then perform the fixed, bounded search and
+Personal Links reads. The adapter still exposes only bounded `ls`, `cat`, and
+`hash` file operations; it does not expose a generic REST client. See
+[docs/MAGNUS.md](docs/MAGNUS.md) for its exact restrictions.
+
+In the launcher, PROD search starts only after at least one character is typed.
+The **Links** tab loads Personal Links and local Quick Returns. **Open** is
+offered only for route shapes Rock Lens has verified (currently Person and Page
+results); Personal Links must resolve to the exact Rock origin.
 
 ## Safety guarantees
 
@@ -86,14 +107,22 @@ The adapter exposes only bounded `ls`, `cat`, and `hash` operations. See
   QML, argv, repository files, logs, notifications, or screenshots.
 - Disconnect removes the context's local token set; it does not claim to end
   the user's browser-wide Rock session.
-- The mock adapter remains the only enabled data adapter in this slice. Login
-  establishes the identity boundary but does not silently enable live reads.
-- Live adapters are capability-detected and fail closed.
+- PROD never falls back to synthetic results. Without configured Magnus
+  credentials or with a failed endpoint, the affected live category is empty.
+- Live reads are fixed REST v1 GET operations with bounded responses and field-level
+  output allowlists. QML cannot supply a URL, API path, OData field, or filter
+  expression.
+- Personal Links are read-only, restricted to same-origin HTTPS targets, and
+  represented outside the broker by opaque IDs.
+- Quick Returns contain only launcher-opened targets, are capped at 20, and are
+  stored under `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
 - There is no mutation transport, SQL execution, job trigger, or Run Now UI.
-- Magnus accepts only HTTPS on `rock.example.org`, rejects cross-origin
-  and traversal paths, uses Secret Service, and exposes no mutation operation.
+- Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
+  and traversal paths, uses per-origin Secret Service records, and exposes no
+  mutation operation.
 - Broker errors are reduced to stable public codes. Response bodies, tokens,
-  cookies, SQL, PII, and exceptions are not logged or forwarded to QML.
+  cookies, SQL, unselected PII, URLs, and exceptions are not logged or
+  forwarded to QML.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 [docs/VERIFICATION.md](docs/VERIFICATION.md).

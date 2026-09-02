@@ -17,11 +17,13 @@ from .auth import (
     default_config_path,
 )
 from .contracts import Context
+from .instance import InstanceStore, default_instance_path
 from .magnus_adapter import (
     DEFAULT_TREE_PATH,
     MagnusError,
     MagnusReadOnlyAdapter,
 )
+from .origin import OriginError
 from .server import BrokerServer
 
 
@@ -86,7 +88,8 @@ def magnus(argv: list[str]) -> None:
     hash_parser = commands.add_parser("hash")
     hash_parser.add_argument("path")
     args = parser.parse_args(argv)
-    adapter = MagnusReadOnlyAdapter()
+    instance_store = InstanceStore(default_instance_path())
+    adapter = MagnusReadOnlyAdapter(server=instance_store.get())
 
     try:
         if args.command == "status":
@@ -94,6 +97,9 @@ def magnus(argv: list[str]) -> None:
             return
         if args.command == "configure":
             try:
+                domain = input("Rock domain (for example rock.example.org): ")
+                origin = instance_store.set(domain)
+                adapter.set_server(origin)
                 username = input("Rock username: ")
                 password = getpass.getpass("Rock password: ")
             except (EOFError, KeyboardInterrupt):
@@ -118,7 +124,7 @@ def magnus(argv: list[str]) -> None:
             print(f"Saved {len(content)} bytes with owner-only permissions.")
         else:
             sys.stdout.buffer.write(content)
-    except MagnusError as error:
+    except (MagnusError, OriginError) as error:
         raise SystemExit(str(error)) from error
 
 
