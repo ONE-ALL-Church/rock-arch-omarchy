@@ -5,25 +5,26 @@
 1. `plugin/oneall.rock-lens`: a thin Quickshell bar indicator and launcher.
 2. `rock_lens_broker`: an allowlist-based local broker using an owner-only Unix
    socket (`0700` directory, `0600` socket).
-3. `OAuthManager`: Rock OpenID Connect authorization-code login with S256 PKCE,
-   a loopback callback, refresh-token renewal, and Secret Service persistence.
-4. `MockAdapter`: deterministic, synthetic records for People, Groups,
+3. `RockSessionProvider`: native per-profile Rock login, Secret Service
+   credential storage, and a validated memory-only `.ROCK` cookie.
+4. `OAuthManager`: optional Rock OpenID Connect authorization-code support for
+   future bearer-token capabilities; core login does not require it.
+5. `MockAdapter`: deterministic, synthetic records for People, Groups,
    Workflow Types, Jobs, Pages, and Content Channel Items.
-5. `MagnusReadOnlyAdapter`: privileged, bounded file inspection against the
-   user-selected, validated Rock origin, with per-origin credentials held in
-   Secret Service and raw Magnus state confined to an ephemeral owner-only
-   directory.
-6. `RockRestReadOnlyAdapter`: six fixed Rock REST v1 entity GETs plus the fixed
-   current-user Personal Links action, authenticated by a validated cookie
-   obtained inside the ephemeral Magnus session.
-7. `QuickReturnStore`: same-origin launcher history, deduplicated and capped at
+6. `MagnusReadOnlyAdapter`: optional native capability probe plus descriptor-
+   driven tree browsing, bounded text previews, and hashes on the selected Rock
+   origin. It reuses `RockSessionProvider`; no external CLI is launched.
+7. `RockRestReadOnlyAdapter`: six fixed Rock REST v1 entity GETs plus the fixed
+   current-user Personal Links action, authenticated by the native Rock session.
+8. `QuickReturnStore`: same-origin launcher history, deduplicated and capped at
    20 in an owner-only JSON file.
 
 ## Trust boundary
 
-The QML side never receives credentials, cookies, SQL, raw private response
+The QML side never receives credentials, cookies, SQL, raw entity response
 bodies, raw URLs/record IDs, internal exception text, or fields outside the
-typed display contract.
+typed display contract. The sole content exception is a bounded UTF-8 Magnus
+file preview explicitly selected by the user.
 Requests and responses are newline-delimited JSON with a 16 KiB request limit.
 Search text is sent through the socket, not argv. The broker emits no request or
 response logging.
@@ -33,7 +34,22 @@ opaque `safeId`. Live search deliberately reports campus as `Not requested`.
 No contact details, notes, addresses, dates of birth, family relationships,
 photos, raw record IDs, or authentication identifiers are in the contract.
 
-## Rock OAuth boundary
+## Native Rock session boundary
+
+Each profile stores only its display name, stable random ID, and strict HTTPS
+origin in owner-only JSON. Username and password are stored under that profile
+ID in desktop Secret Service. `RockSessionProvider` verifies new credentials
+with a redirect-free `POST /api/Auth/Login` before replacing a saved login. It
+accepts only a bounded `.ROCK` cookie from `Set-Cookie` and retains that cookie
+only in process memory with a sliding 15-minute idle timeout.
+
+Profiles created by earlier Rock Lens releases automatically migrate their
+`magnus_username` and `magnus_password` Secret Service records into neutral
+`rock_username` and `rock_password` records, then remove the obsolete keys.
+Authentication failure, sign-out, profile change, or a failed authenticated
+request clears the cached cookie.
+
+## Optional Rock OAuth boundary
 
 Rock is the OpenID Provider. The broker loads owner-only issuer/client metadata,
 retrieves Rock's standard discovery document, and accepts only HTTPS
@@ -68,19 +84,17 @@ read-only, and PROD never falls back to synthetic data.
 ## Live REST boundary
 
 Live data is available only in explicit PROD context and only after a Rock
-domain and its Magnus credentials are configured. The bare domain is normalized
-to an HTTPS origin and rejected if it contains credentials, a path, query,
-fragment, or non-443 port. One Magnus login yields a validated `.ROCK` cookie in
-an ephemeral directory. The broker attaches it only to that exact-origin HTTPS
-GET and destroys the directory after the operation. The validated cookie may
-remain only in broker memory with a 15-minute idle timeout, avoiding a full
-Magnus login for each active search session without creating a persistent file.
+profile login is configured. The bare domain is normalized to an HTTPS origin
+and rejected if it contains credentials, a path, query, fragment, or non-443
+port. The broker attaches the validated memory-only `.ROCK` cookie only to
+exact-origin HTTPS requests. Core REST reads do not check for Magnus and remain
+available when the plugin is absent or the account lacks Magnus permission.
 
 The client cannot choose an endpoint. These are Rock's established REST v1
 controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
 `WorkflowTypes`, `ServiceJobs`, `Pages`, and `ContentChannelItems`, with fixed
 `$select`, `$orderby`, `$top=3`, and generated `startswith` filters. The six
-fixed reads share one ephemeral Magnus-authenticated cookie and start in
+fixed reads share one native Rock session cookie and start in
 parallel; results are still transformed in a deterministic category order.
 The Groups projection also expands only `GroupType.Name` for its subtitle.
 People project age, Giving Group, marital/connection/record status, then perform
@@ -103,27 +117,28 @@ operation.
 
 The cookie authenticates the actor but does not override Rock authorization.
 Rock controller/action permissions still apply; endpoints that enforce entity
-security continue to do so for the Magnus account.
+security continue to do so for the signed-in Rock account.
 
-## Magnus boundary
+## Optional Magnus boundary
 
-Magnus is not an identity provider and does not replace Rock OpenID Connect for
-end users. The adapter accepts only the configured Rock origin, permits only
-Magnus tree paths under `api/TriumphTech/Magnus/GetTreeItems/` and content paths
-under `/FileContent/`, and rejects alternate origins, query strings, fragments,
-control characters, backslashes, and traversal segments.
+Magnus is an optional server capability, not an identity provider. After a
+normal Rock login the broker probes only
+`/api/TriumphTech/Magnus/GetServer`. Success enables the Magnus view; 403 or 404
+marks it unavailable for that profile without affecting search or links.
 
-Credentials are retrieved from Secret Service and the password is sent to the
-Magnus login process through its stdin prompt, one character at a time to match
-Magnus 0.1.0's interactive reader. Magnus receives an ephemeral `XDG_CONFIG_HOME`
-with owner-only permissions; its plaintext cookie/config artifacts are removed
-when the command exits. Output is size-bounded and sanitized. The public broker
-socket exposes Magnus status only. There are no write, remove, upload, create,
-build, or deployment operations in the adapter or CLI.
+The native adapter accepts only the configured Rock origin, permits only tree
+paths under `api/TriumphTech/Magnus/GetTreeItems/` and content paths under
+`/FileContent/`, and rejects alternate origins, redirects, query strings,
+fragments, control characters, backslashes, and traversal segments. Tree rows
+and files cross QML only as process-local opaque IDs. Text previews are explicit
+user actions, UTF-8 only, reject NUL bytes, and are capped at 64 KiB; file reads
+are capped at 4 MiB and tree responses at 2 MiB.
 
-The cookie is yielded only inside the broker and is never persisted by Rock
-Lens. It is not exposed on the socket and there is no generic HTTP/URL
-operation.
+Descriptors are sanitized into `build`, `delete`, `upload`, `newFile`, and
+`newFolder` availability labels only when their URI is same-origin and has the
+expected Magnus action prefix. Those labels do not grant an operation: this
+release exposes only browse, preview, and hash. There are no write, remove,
+upload, create, build, deployment, arbitrary HTTP, or raw URL operations.
 
 ## Navigation, Personal Links, and Recent Links
 

@@ -8,7 +8,7 @@
   "description": "Native multi-profile Rock search with optional Magnus browsing",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
-  "entryPoints": {"barWidget": "RockLens.qml"},
+  "entryPoints": {"barWidget": "plugin/oneall.rock-lens/RockLens.qml"},
   "barWidget": {
     "displayName": "Rock Lens",
     "description": "Secure multi-instance Rock discovery, links, and Magnus files",

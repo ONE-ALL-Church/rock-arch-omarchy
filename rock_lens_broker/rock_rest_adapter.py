@@ -20,9 +20,9 @@ from .contracts import (
     allowlist,
     sanitize_text,
 )
-from .magnus_adapter import MagnusError
 from .navigation import NavigationError, NavigationTarget, clean_target
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
+from .rock_session import RockSessionError
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_TARGETS = 256
@@ -247,7 +247,7 @@ SEARCH_SPECS = (
 
 
 class RockRestReadOnlyAdapter:
-    """Typed, allowlisted Rock reads backed by Magnus' ephemeral session cookie."""
+    """Typed, allowlisted Rock reads backed by the native Rock session cookie."""
 
     def __init__(
         self,
@@ -343,7 +343,7 @@ class RockRestReadOnlyAdapter:
                         )
                     except RockRestError:
                         unavailable.append(spec.category)
-        except MagnusError as error:
+        except RockSessionError as error:
             raise RockRestError("rock_login_failed") from error
 
         if len(unavailable) == len(specs):
@@ -357,7 +357,7 @@ class RockRestReadOnlyAdapter:
                 value = self._http.get_json(
                     "/api/PersonalLinks/GetPersonalLinksData", {}, cookie
                 )
-        except MagnusError as error:
+        except RockSessionError as error:
             raise RockRestError("rock_login_failed") from error
         except RockRestError:
             self._invalidate_cookie()

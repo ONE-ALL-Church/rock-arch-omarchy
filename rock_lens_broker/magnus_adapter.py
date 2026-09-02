@@ -1,43 +1,60 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
-import os
-import select
-import shutil
-import stat
-import subprocess
-import tempfile
-import threading
-import time
-from collections.abc import Iterator
-from contextlib import contextmanager
-from pathlib import Path, PurePosixPath
-from typing import Any
+import secrets
+import urllib.error
+import urllib.parse
+import urllib.request
+from collections import OrderedDict
+from contextlib import AbstractContextManager
+from pathlib import PurePosixPath
+from typing import Any, Protocol
 
-from .auth import SecretStore, SecretToolStore
-from .contracts import Context, sanitize_text
+from .contracts import sanitize_text
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
-from .profiles import ProfileError, validate_profile_id
+from .rock_session import RockSessionError
 
 CANONICAL_MAGNUS_SERVER = DEFAULT_ROCK_ORIGIN
 DEFAULT_TREE_PATH = "api/TriumphTech/Magnus/GetTreeItems/root"
 TREE_PATH_PREFIX = "api/TriumphTech/Magnus/GetTreeItems/"
 FILE_PATH_PREFIX = "/FileContent/"
+MAGNUS_API_PREFIX = "/api/TriumphTech/Magnus"
 MAX_TREE_ITEMS = 500
 MAX_TREE_OUTPUT_BYTES = 2 * 1024 * 1024
 MAX_FILE_BYTES = 4 * 1024 * 1024
-MAX_COOKIE_CONFIG_BYTES = 64 * 1024
-MAX_COOKIE_CONFIG_NODES = 1_024
-MAX_COOKIE_CONFIG_DEPTH = 16
-MAX_PASSWORD_BYTES = 1_024
-PASSWORD_PROMPT_TIMEOUT_SECONDS = 5
-PASSWORD_KEYSTROKE_DELAY_SECONDS = 0.01
-AUTH_COOKIE_IDLE_SECONDS = 15 * 60
+MAX_PREVIEW_BYTES = 64 * 1024
+MAX_REGISTERED_ITEMS = 2_000
+HTTP_TIMEOUT_SECONDS = 20
+ROCK_LENS_USER_AGENT = "Rock-Lens/0.10"
 
 
 class MagnusError(Exception):
-    """A stable local error that never includes credentials or response bodies."""
+    """A stable Magnus failure that never includes URLs or response bodies."""
+
+
+class MagnusUnavailableError(MagnusError):
+    """The selected Rock instance or account cannot use Magnus."""
+
+
+class CookieProvider(Protocol):
+    def status(self) -> dict[str, Any]: ...
+
+    def authenticated_cookie(self) -> AbstractContextManager[str]: ...
+
+    def invalidate_authenticated_cookie(self) -> None: ...
+
+
+class MagnusHttp(Protocol):
+    def get_json(self, origin: str, path: str, cookie: str) -> Any: ...
+
+    def get_bytes(self, origin: str, path: str, cookie: str) -> bytes: ...
+
+
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        return None
 
 
 def validate_magnus_server(value: str) -> str:
@@ -67,6 +84,8 @@ def validate_tree_path(value: str) -> str:
 
 def validate_file_path(value: str) -> str:
     path = value.strip()
+    if path.startswith(MAGNUS_API_PREFIX + FILE_PATH_PREFIX):
+        path = path.removeprefix(MAGNUS_API_PREFIX)
     if (
         not path.startswith(FILE_PATH_PREFIX)
         or len(path) == len(FILE_PATH_PREFIX)
@@ -83,482 +102,330 @@ def validate_file_path(value: str) -> str:
     return path
 
 
+class MagnusHttpClient:
+    """Same-origin, redirect-free GET client for the bounded Magnus surface."""
+
+    def __init__(self, opener: Any | None = None) -> None:
+        self._opener = opener
+
+    def get_json(self, origin: str, path: str, cookie: str) -> Any:
+        raw = self._get(origin, path, cookie, MAX_TREE_OUTPUT_BYTES)
+        try:
+            return json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise MagnusError("invalid_magnus_response") from error
+
+    def get_bytes(self, origin: str, path: str, cookie: str) -> bytes:
+        return self._get(origin, path, cookie, MAX_FILE_BYTES)
+
+    def _get(self, origin: str, path: str, cookie: str, maximum: int) -> bytes:
+        safe_origin = validate_magnus_server(origin)
+        if (
+            not isinstance(path, str)
+            or not path.startswith("/")
+            or "://" in path
+            or "?" in path
+            or "#" in path
+            or "\\" in path
+            or any(ord(char) < 32 for char in path)
+        ):
+            raise MagnusError("invalid_magnus_path")
+        if (
+            not isinstance(cookie, str)
+            or not cookie.startswith(".ROCK=")
+            or len(cookie) > 16 * 1024
+            or any(ord(char) < 33 or char in ';,\\"' for char in cookie)
+        ):
+            raise MagnusError("invalid_rock_cookie")
+        request = urllib.request.Request(
+            safe_origin + path,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Cookie": cookie,
+                "User-Agent": ROCK_LENS_USER_AGENT,
+            },
+            method="GET",
+        )
+        try:
+            opener = self._opener or urllib.request.build_opener(_RejectRedirects())
+            with opener.open(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+                raw = response.read(maximum + 1)
+        except urllib.error.HTTPError as error:
+            status = error.code
+            error.close()
+            if status in (401, 403, 404):
+                raise MagnusUnavailableError("magnus_unavailable_for_user") from error
+            raise MagnusError("magnus_request_failed") from error
+        except (OSError, urllib.error.URLError) as error:
+            raise MagnusError("magnus_request_failed") from error
+        if len(raw) > maximum:
+            raise MagnusError("magnus_response_out_of_bounds")
+        return raw
+
+
 class MagnusReadOnlyAdapter:
-    """Hardened read-only boundary around the installed Magnus CLI."""
+    """Optional native Magnus browse/read support using an existing Rock session."""
 
     def __init__(
         self,
+        cookie_provider: CookieProvider,
         server: str | None = None,
-        executable: str | None = None,
-        secret_store: SecretStore | None = None,
-        context: Context = Context.PROD,
-        profile_id: str | None = None,
+        http: MagnusHttp | None = None,
     ) -> None:
+        self.cookie_provider = cookie_provider
         self.server = validate_magnus_server(server) if server else ""
-        self.executable = executable or shutil.which("magnus") or ""
-        self.secret_store = secret_store or SecretToolStore()
-        self.context = context
-        try:
-            self.profile_id = validate_profile_id(profile_id) if profile_id else ""
-        except ProfileError as error:
-            raise MagnusError("invalid_profile") from error
-        self._cached_cookie = ""
-        self._cached_cookie_deadline = 0.0
-        self._cache_generation = 0
-        self._cache_lock = threading.Lock()
-        self._cache_timer: threading.Timer | None = None
+        self.http = http or MagnusHttpClient()
+        self._access = "unknown"
+        self._key = secrets.token_bytes(32)
+        self._targets: OrderedDict[str, tuple[str, str]] = OrderedDict()
 
     def status(self) -> dict[str, Any]:
-        available = bool(self.executable) and self.secret_store.available()
-        configured = (
-            available
-            and bool(self.server)
-            and (self._has_cached_cookie() or bool(self._credentials()))
-        )
+        session_status = self.cookie_provider.status()
+        configured = bool(session_status.get("configured")) and bool(self.server)
         return {
-            "available": available,
+            "available": configured and self._access == "available",
             "configured": configured,
+            "state": self._access if configured else "signed_out",
             "mode": "read_only",
+            "capabilities": (
+                ["browse", "preview", "hash"]
+                if configured and self._access == "available"
+                else []
+            ),
             "server": self.server.removeprefix("https://"),
         }
 
     def set_server(self, value: str) -> None:
         server = validate_magnus_server(value)
         if server != self.server:
-            self._clear_cached_cookie()
+            self._reset()
         self.server = server
 
-    def set_profile(self, profile_id: str, server: str) -> None:
-        try:
-            safe_profile_id = validate_profile_id(profile_id)
-        except ProfileError as error:
-            raise MagnusError("invalid_profile") from error
-        safe_server = validate_magnus_server(server)
-        if safe_profile_id != self.profile_id or safe_server != self.server:
-            self._clear_cached_cookie()
-        self.profile_id = safe_profile_id
-        self.server = safe_server
+    def set_profile(self, _profile_id: str, server: str) -> None:
+        self.set_server(server)
 
     def clear_profile(self) -> None:
-        self._clear_cached_cookie()
-        self.profile_id = ""
         self.server = ""
+        self._reset()
 
-    def configure(self, username: str, password: str) -> None:
-        if not self.server:
-            raise MagnusError("magnus_server_not_configured")
-        normalized_username = username.strip()
-        if (
-            not normalized_username
-            or len(normalized_username) > 200
-            or any(ord(char) < 32 for char in normalized_username)
-        ):
-            raise MagnusError("invalid_magnus_username")
-        if (
-            not password
-            or len(password.encode("utf-8")) > MAX_PASSWORD_BYTES
-            or any(char in password for char in "\x00\r\n")
-        ):
-            raise MagnusError("invalid_magnus_password")
-        if not self.secret_store.available():
-            raise MagnusError("secure_storage_unavailable")
-        try:
-            self.secret_store.store(
-                self.context,
-                self._secret_kind("magnus_username"),
-                normalized_username,
-            )
-            self.secret_store.store(
-                self.context, self._secret_kind("magnus_password"), password
-            )
-        except Exception as error:
-            self.secret_store.clear(self.context, self._secret_kind("magnus_username"))
-            self.secret_store.clear(self.context, self._secret_kind("magnus_password"))
-            raise MagnusError("secure_storage_failed") from error
-        self._clear_cached_cookie()
+    def reset_access(self) -> None:
+        self._reset()
 
-    def migrate_legacy_credentials(self) -> bool:
-        """Copy origin-keyed credentials into the active profile key once."""
-
-        if not self.profile_id or not self.server or not self.secret_store.available():
-            return False
-        if self._credentials():
-            return False
-        username = self.secret_store.lookup(
-            self.context, self._legacy_secret_kind("magnus_username")
-        )
-        password = self.secret_store.lookup(
-            self.context, self._legacy_secret_kind("magnus_password")
-        )
-        if not username or not password:
+    def probe(self) -> bool:
+        if not self.server or not self.cookie_provider.status().get("configured"):
+            self._access = "unknown"
             return False
         try:
-            self.secret_store.store(
-                self.context, self._secret_kind("magnus_username"), username
-            )
-            self.secret_store.store(
-                self.context, self._secret_kind("magnus_password"), password
-            )
-        except Exception as error:
-            self._clear_profile_keys(self.profile_id)
-            raise MagnusError("secure_storage_failed") from error
-        if self._credentials() != (username, password):
-            self._clear_profile_keys(self.profile_id)
-            raise MagnusError("secure_storage_failed")
+            with self.cookie_provider.authenticated_cookie() as cookie:
+                descriptor = self.http.get_json(
+                    self.server, MAGNUS_API_PREFIX + "/GetServer", cookie
+                )
+            if not isinstance(descriptor, dict):
+                raise MagnusError("invalid_magnus_response")
+        except MagnusUnavailableError:
+            self._access = "unavailable"
+            self._targets.clear()
+            return False
+        except RockSessionError:
+            self._access = "error"
+            self._targets.clear()
+            return False
+        except MagnusError:
+            self._access = "error"
+            self._targets.clear()
+            return False
+        self._access = "available"
         return True
-
-    def sign_out(self) -> None:
-        """Clear credentials and the memory-only cookie for the active profile."""
-
-        if self.profile_id:
-            self._clear_profile_keys(self.profile_id)
-        if self.server:
-            for kind in ("magnus_username", "magnus_password"):
-                self.secret_store.clear(self.context, self._legacy_secret_kind(kind))
-        self._clear_cached_cookie()
-
-    def remove_profile_credentials(self, profile_id: str) -> None:
-        try:
-            safe_profile_id = validate_profile_id(profile_id)
-        except ProfileError as error:
-            raise MagnusError("invalid_profile") from error
-        self._clear_profile_keys(safe_profile_id)
-        if safe_profile_id == self.profile_id:
-            self._clear_cached_cookie()
-
-    def test_connection(self) -> None:
-        """Authenticate without reading a Rock API entity."""
-
-        with self.authenticated_cookie():
-            return
 
     def list_tree(self, path: str = DEFAULT_TREE_PATH) -> list[dict[str, Any]]:
         safe_path = validate_tree_path(path)
-        output = self._run(["ls", "--long", "--json", safe_path], MAX_TREE_OUTPUT_BYTES)
         try:
-            value = json.loads(output)
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise MagnusError("invalid_magnus_response") from error
+            with self.cookie_provider.authenticated_cookie() as cookie:
+                value = self.http.get_json(self.server, "/" + safe_path, cookie)
+        except MagnusUnavailableError:
+            self._access = "unavailable"
+            raise
+        except RockSessionError as error:
+            self._access = "error"
+            raise MagnusError("rock_login_failed") from error
+        except MagnusError:
+            self._access = "error"
+            raise
         if not isinstance(value, list) or len(value) > MAX_TREE_ITEMS:
             raise MagnusError("magnus_response_out_of_bounds")
+        self._access = "available"
         return [self._sanitize_tree_item(item) for item in value]
 
     def read_file(self, path: str) -> bytes:
         safe_path = validate_file_path(path)
-        return self._run(["cat", safe_path], MAX_FILE_BYTES)
+        try:
+            with self.cookie_provider.authenticated_cookie() as cookie:
+                content = self.http.get_bytes(
+                    self.server, MAGNUS_API_PREFIX + safe_path, cookie
+                )
+        except MagnusUnavailableError:
+            self._access = "unavailable"
+            raise
+        except RockSessionError as error:
+            self._access = "error"
+            raise MagnusError("rock_login_failed") from error
+        except MagnusError:
+            self._access = "error"
+            raise
+        self._access = "available"
+        return content
 
     def hash_file(self, path: str) -> str:
         return hashlib.sha256(self.read_file(path)).hexdigest()
 
-    @contextmanager
-    def authenticated_cookie(self) -> Iterator[str]:
-        """Yield a validated .ROCK cookie from a brief, memory-only cache."""
-
-        now = time.monotonic()
-        with self._cache_lock:
-            cached_cookie = (
-                self._cached_cookie
-                if self._cached_cookie and now < self._cached_cookie_deadline
-                else ""
-            )
-        if cached_cookie:
-            self._store_cached_cookie(cached_cookie)
-            yield cached_cookie
-            return
-
-        self._clear_cached_cookie()
-        with self._session() as (_, cookie):
-            self._store_cached_cookie(cookie)
-            yield cookie
-
-    def invalidate_authenticated_cookie(self) -> None:
-        """Discard the reusable cookie after a failed authenticated request."""
-
-        self._clear_cached_cookie()
-
-    def _has_cached_cookie(self) -> bool:
-        now = time.monotonic()
-        with self._cache_lock:
-            return bool(
-                self._cached_cookie and now < self._cached_cookie_deadline
-            )
-
-    def _store_cached_cookie(self, cookie: str) -> None:
-        with self._cache_lock:
-            self._cache_generation += 1
-            generation = self._cache_generation
-            if self._cache_timer is not None:
-                self._cache_timer.cancel()
-            self._cached_cookie = cookie
-            self._cached_cookie_deadline = (
-                time.monotonic() + AUTH_COOKIE_IDLE_SECONDS
-            )
-            timer = threading.Timer(
-                AUTH_COOKIE_IDLE_SECONDS,
-                self._expire_cached_cookie,
-                args=(generation,),
-            )
-            timer.daemon = True
-            self._cache_timer = timer
-            timer.start()
-
-    def _expire_cached_cookie(self, generation: int) -> None:
-        with self._cache_lock:
-            if generation != self._cache_generation:
-                return
-            self._cached_cookie = ""
-            self._cached_cookie_deadline = 0.0
-            self._cache_timer = None
-
-    def _clear_cached_cookie(self) -> None:
-        with self._cache_lock:
-            self._cache_generation += 1
-            if self._cache_timer is not None:
-                self._cache_timer.cancel()
-            self._cache_timer = None
-            self._cached_cookie = ""
-            self._cached_cookie_deadline = 0.0
-
-    def _credentials(self) -> tuple[str, str] | None:
-        if not self.server:
-            return None
-        username = self.secret_store.lookup(
-            self.context, self._secret_kind("magnus_username")
-        )
-        password = self.secret_store.lookup(
-            self.context, self._secret_kind("magnus_password")
-        )
-        return (username, password) if username and password else None
-
-    def _secret_kind(self, kind: str) -> str:
-        if self.profile_id:
-            return f"{kind}:profile:{self.profile_id}"
-        return self._legacy_secret_kind(kind)
-
-    def _legacy_secret_kind(self, kind: str) -> str:
-        origin_key = hashlib.sha256(self.server.encode()).hexdigest()[:16]
-        return f"{kind}:{origin_key}"
-
-    def _clear_profile_keys(self, profile_id: str) -> None:
-        for kind in ("magnus_username", "magnus_password"):
-            self.secret_store.clear(self.context, f"{kind}:profile:{profile_id}")
-
-    def _run(self, command: list[str], maximum_bytes: int) -> bytes:
-        with self._session() as (environment, _):
-            config_home = Path(environment["XDG_CONFIG_HOME"])
-            output_path = config_home / "rock-lens-output"
-            flags = os.O_RDWR | os.O_CREAT | os.O_EXCL
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(output_path, flags, 0o600)
-            with os.fdopen(descriptor, "w+b") as output:
-                try:
-                    result = subprocess.run(
-                        [self.executable, *command, "--server", self.server],
-                        stdin=subprocess.DEVNULL,
-                        stdout=output,
-                        stderr=subprocess.DEVNULL,
-                        timeout=30,
-                        check=False,
-                        env=environment,
-                    )
-                except (OSError, subprocess.TimeoutExpired) as error:
-                    raise MagnusError("magnus_request_failed") from error
-                self._harden_temporary_files(config_home)
-                if result.returncode != 0:
-                    raise MagnusError("magnus_request_failed")
-                size = output.tell()
-                if size > maximum_bytes:
-                    raise MagnusError("magnus_response_out_of_bounds")
-                output.seek(0)
-                return output.read()
-
-    @contextmanager
-    def _session(self) -> Iterator[tuple[dict[str, str], str]]:
-        if not self.server:
-            raise MagnusError("magnus_server_not_configured")
-        if not self.executable or not self.secret_store.available():
-            raise MagnusError("magnus_unavailable")
-        credentials = self._credentials()
-        if not credentials:
-            raise MagnusError("magnus_not_configured")
-        username, password = credentials
-
-        runtime_parent = Path(
-            os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-        )
-        if not runtime_parent.is_dir():
-            runtime_parent = Path("/tmp")
-        with tempfile.TemporaryDirectory(
-            prefix="rock-lens-magnus-", dir=runtime_parent
-        ) as temporary:
-            config_home = Path(temporary)
-            config_home.chmod(0o700)
-            environment = os.environ.copy()
-            environment["XDG_CONFIG_HOME"] = str(config_home)
-            environment["NO_COLOR"] = "1"
-
-            if self._interactive_login(environment, username, password) != 0:
-                raise MagnusError("magnus_login_failed")
-            self._harden_temporary_files(config_home)
-            yield environment, self._read_cookie(config_home)
-
-    def _interactive_login(
-        self, environment: dict[str, str], username: str, password: str
-    ) -> int:
-        """Drive Magnus 0.1.0's character-oriented password prompt safely."""
-
-        process: subprocess.Popen[bytes] | None = None
-        try:
-            process = subprocess.Popen(
-                [
-                    self.executable,
-                    "login",
-                    self.server,
-                    "--username",
-                    username,
-                    "--default",
-                ],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                env=environment,
-                bufsize=0,
-            )
-            if process.stdin is None or process.stdout is None:
-                raise MagnusError("magnus_login_failed")
-
-            prompt = b""
-            deadline = time.monotonic() + PASSWORD_PROMPT_TIMEOUT_SECONDS
-            while b"Password:" not in prompt:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise MagnusError("magnus_login_failed")
-                readable, _, _ = select.select(
-                    [process.stdout], [], [], min(remaining, 0.25)
-                )
-                if not readable:
-                    if process.poll() is not None:
-                        raise MagnusError("magnus_login_failed")
-                    continue
-                chunk = os.read(process.stdout.fileno(), 256)
-                if not chunk:
-                    raise MagnusError("magnus_login_failed")
-                prompt = (prompt + chunk)[-4_096:]
-
-            for character in password:
-                process.stdin.write(character.encode("utf-8"))
-                process.stdin.flush()
-                time.sleep(PASSWORD_KEYSTROKE_DELAY_SECONDS)
-            process.stdin.write(b"\n")
-            process.stdin.flush()
-            process.stdin.close()
-            return process.wait(timeout=20)
-        except (BrokenPipeError, OSError, subprocess.TimeoutExpired) as error:
-            raise MagnusError("magnus_login_failed") from error
-        finally:
-            if process is not None:
-                if process.poll() is None:
-                    process.kill()
-                    try:
-                        process.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        pass
-                for stream in (process.stdin, process.stdout):
-                    if stream is not None and not stream.closed:
-                        stream.close()
-
-    def _read_cookie(self, config_home: Path) -> str:
-        path = config_home / "magnus-cli-cookies-nodejs" / "config.json"
-        try:
-            resolved = path.resolve(strict=True)
-            if not resolved.is_relative_to(config_home.resolve()):
-                raise MagnusError("invalid_magnus_cookie")
-            flags = os.O_RDONLY
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(path, flags)
-            try:
-                info = os.fstat(descriptor)
-                if (
-                    not stat.S_ISREG(info.st_mode)
-                    or info.st_size > MAX_COOKIE_CONFIG_BYTES
-                ):
-                    raise MagnusError("invalid_magnus_cookie")
-                raw = os.read(descriptor, MAX_COOKIE_CONFIG_BYTES + 1)
-            finally:
-                os.close(descriptor)
-            if len(raw) > MAX_COOKIE_CONFIG_BYTES:
-                raise MagnusError("invalid_magnus_cookie")
-            value = json.loads(raw)
-            records = self._matching_cookie_records(value)
-            if len(records) != 1:
-                raise MagnusError("invalid_magnus_cookie")
-            cookie = records[0].get("cookie")
-        except MagnusError:
-            raise
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise MagnusError("invalid_magnus_cookie") from error
-
-        if (
-            not isinstance(cookie, str)
-            or not cookie.startswith(".ROCK=")
-            or len(cookie) < 7
-            or len(cookie) > 16 * 1024
-            or any(ord(char) < 33 or char in ';,\\"' for char in cookie)
-        ):
-            raise MagnusError("invalid_magnus_cookie")
-        return cookie
-
-    def _matching_cookie_records(self, value: Any) -> list[dict[str, Any]]:
-        """Find Conf records without relying on its dot-notation JSON layout."""
-
-        matches: list[dict[str, Any]] = []
-        pending: list[tuple[Any, int]] = [(value, 0)]
-        visited = 0
-        while pending:
-            current, depth = pending.pop()
-            visited += 1
-            if visited > MAX_COOKIE_CONFIG_NODES or depth > MAX_COOKIE_CONFIG_DEPTH:
-                raise MagnusError("invalid_magnus_cookie")
-            if not isinstance(current, dict):
+    def browse(self, safe_id: str = "") -> dict[str, Any]:
+        if safe_id:
+            kind, path = self._resolve(safe_id)
+            if kind != "folder":
+                raise MagnusError("invalid_magnus_item")
+            title = PurePosixPath(path).name or "Magnus"
+        else:
+            path = DEFAULT_TREE_PATH
+            title = "Magnus"
+        items = self.list_tree(path)
+        public_items: list[dict[str, Any]] = []
+        for item in items:
+            kind = "folder" if item["isFolder"] else "file"
+            target_path = item.get("path") if kind == "folder" else item.get("filePath")
+            if not isinstance(target_path, str):
                 continue
-            if current.get("serverUrl") == self.server and "cookie" in current:
-                matches.append(current)
-                if len(matches) > 1:
-                    raise MagnusError("invalid_magnus_cookie")
-            pending.extend((child, depth + 1) for child in current.values())
-        return matches
+            item_id = self._register(kind, target_path)
+            public_items.append(
+                {
+                    "safeId": item_id,
+                    "title": item["displayName"],
+                    "kind": kind,
+                    "actions": list(item.get("actions", [])),
+                }
+            )
+        return {
+            "folderId": safe_id,
+            "title": sanitize_text(title, 160),
+            "items": public_items,
+        }
 
-    @staticmethod
-    def _harden_temporary_files(root: Path) -> None:
-        for path in root.rglob("*"):
-            try:
-                path.chmod(0o700 if path.is_dir() else 0o600)
-            except OSError:
-                pass
+    def preview(self, safe_id: str) -> dict[str, str]:
+        kind, path = self._resolve(safe_id)
+        if kind != "file":
+            raise MagnusError("invalid_magnus_item")
+        content = self.read_file(path)
+        if len(content) > MAX_PREVIEW_BYTES or b"\x00" in content:
+            raise MagnusError("magnus_preview_unavailable")
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise MagnusError("magnus_preview_unavailable") from error
+        return {
+            "safeId": safe_id,
+            "title": PurePosixPath(path).name,
+            "content": text,
+            "sha256": hashlib.sha256(content).hexdigest(),
+        }
 
-    @staticmethod
-    def _sanitize_tree_item(value: Any) -> dict[str, Any]:
+    def _reset(self) -> None:
+        self._access = "unknown"
+        self._targets.clear()
+
+    def _register(self, kind: str, path: str) -> str:
+        digest = hmac.new(
+            self._key, f"{self.server}\0{kind}\0{path}".encode(), hashlib.sha256
+        ).hexdigest()[:32]
+        safe_id = "magnus-" + digest
+        self._targets[safe_id] = (kind, path)
+        self._targets.move_to_end(safe_id)
+        while len(self._targets) > MAX_REGISTERED_ITEMS:
+            self._targets.popitem(last=False)
+        return safe_id
+
+    def _resolve(self, safe_id: str) -> tuple[str, str]:
+        clean_id = sanitize_text(safe_id, 100)
+        target = self._targets.get(clean_id)
+        if target is None:
+            raise MagnusError("magnus_item_not_found")
+        self._targets.move_to_end(clean_id)
+        return target
+
+    def _sanitize_tree_item(self, value: Any) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise MagnusError("invalid_magnus_response")
+        display_name = sanitize_text(self._field(value, "displayName"), 200)
+        is_folder = bool(self._field(value, "isFolder"))
+        if not display_name:
+            raise MagnusError("invalid_magnus_response")
         item: dict[str, Any] = {
-            "displayName": sanitize_text(value.get("displayName"), 200),
-            "isFolder": bool(value.get("isFolder")),
+            "displayName": display_name,
+            "isFolder": is_folder,
         }
         for key in ("id", "guid"):
-            if value.get(key) is not None:
-                item[key] = sanitize_text(value.get(key), 100)
-        for source, target, validator in (
-            ("path", "path", validate_tree_path),
-            ("uri", "path", validate_tree_path),
-            ("filePath", "filePath", validate_file_path),
-            ("fileContentUri", "filePath", validate_file_path),
-        ):
-            raw = value.get(source)
-            if isinstance(raw, str):
+            raw = self._field(value, key)
+            if raw is not None:
+                item[key] = sanitize_text(raw, 100)
+
+        candidates = (
+            ("path", "path", self._normalized_tree_path),
+            ("uri", "path", self._normalized_tree_path),
+            ("filePath", "filePath", self._normalized_file_path),
+            ("fileContentUri", "filePath", self._normalized_file_path),
+        )
+        for source, target, validator in candidates:
+            raw = self._field(value, source)
+            if isinstance(raw, str) and target not in item:
                 try:
                     item[target] = validator(raw)
                 except MagnusError:
                     pass
+
+        actions: list[str] = []
+        for source, name, prefix in (
+            ("buildUri", "build", "/Build/"),
+            ("deleteUri", "delete", "/Delete/"),
+            ("uploadFileUri", "upload", "/Upload/"),
+            ("newFileUri", "newFile", "/NewFile/"),
+            ("newFolderUri", "newFolder", "/NewFolder/"),
+        ):
+            raw = self._field(value, source)
+            if isinstance(raw, str) and self._valid_action_uri(raw, prefix):
+                actions.append(name)
+        item["actions"] = actions
         return item
+
+    def _normalized_tree_path(self, value: str) -> str:
+        return validate_tree_path(self._same_origin_path(value))
+
+    def _normalized_file_path(self, value: str) -> str:
+        return validate_file_path(self._same_origin_path(value))
+
+    def _same_origin_path(self, value: str) -> str:
+        candidate = value.strip()
+        if "://" not in candidate:
+            return candidate
+        parsed = urllib.parse.urlsplit(candidate)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if validate_magnus_server(origin) != self.server or parsed.query or parsed.fragment:
+            raise MagnusError("magnus_cross_origin_uri")
+        return parsed.path
+
+    def _valid_action_uri(self, value: str, action_prefix: str) -> bool:
+        try:
+            path = self._same_origin_path(value)
+        except MagnusError:
+            return False
+        return (
+            path.startswith(MAGNUS_API_PREFIX + action_prefix)
+            and len(path) > len(MAGNUS_API_PREFIX + action_prefix)
+            and "\\" not in path
+            and not any(part in (".", "..") for part in PurePosixPath(path).parts)
+            and all(ord(char) >= 32 for char in path)
+        )
+
+    @staticmethod
+    def _field(value: dict[str, Any], name: str) -> Any:
+        if name in value:
+            return value[name]
+        pascal = name[0].upper() + name[1:]
+        return value.get(pascal)

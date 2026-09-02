@@ -7,10 +7,10 @@
   installed user-scoped. Important REST authorization guidance is official and
   source-backed; ServiceJob and ServiceJobHistory shapes are official Model Map
   evidence.
-- Rock OAuth: authorization-code, S256 PKCE, exact state validation, refresh,
-  owner-only config, Secret Service stdin handling, and public response
-  redaction are covered by local tests. No live login was attempted because no
-  tenant-specific OpenID client is configured on this machine.
+- Rock login: the production path now posts credentials directly to the
+  selected instance's `/api/Auth/Login`, accepts only its `.ROCK` cookie, and
+  stores only the per-profile username/password in Secret Service. The cookie
+  remains memory-only with a 15-minute idle expiry.
 - Public discovery probe: Rock's public demo returned its canonical HTTPS
   issuer and the expected `/Auth/Authorize` and `/Auth/Token` endpoints; the
   broker accepted that document under its exact-issuer/same-origin checks.
@@ -18,22 +18,18 @@
   time.
 - Production SQL: not attempted because V3 `/v3/sql/health` was unavailable and
   no guarded `sqlread` identity was proven.
-- Magnus: upstream package `rock-magnus-cli` version `0.1.0` is installed. Its
-  raw credential/cookie persistence and URL handling were isolated behind the
-  HTTPS-only, exact-origin, same-origin, read-only adapter documented in
-  `docs/MAGNUS.md`; no production mutation path is exposed.
-- Magnus's three existing local config directories are owner-only (`0700`) and
-  its existing metadata file is `0600`. Credentials are now configured in
-  Secret Service for the selected origin. A live bounded `magnus ls` completed
-  successfully; no Magnus mutation command was exposed or attempted.
+- Magnus: Rock Lens now implements the bounded descriptor/tree/file reads
+  natively with the authenticated Rock cookie. Neither `rock-magnus-cli`, Node,
+  npm, nor Rock MCP is a runtime dependency. No production mutation path is
+  exposed.
 - Live Rock reads: the six fixed REST v1 endpoint/OData requests and the
-  Personal Links action all returned successfully with the Magnus-backed
+  Personal Links action all returned successfully with the native Rock session
   cookie. A privacy-safe no-match query returned no records and no unavailable
   categories; Personal Links returned 15 same-origin entries, recorded only as
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/OAuth/Magnus/REST/navigation/instance tests: 49 passing via
+- Broker/auth/Magnus/REST/navigation/instance tests: 63 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -178,6 +174,30 @@
   count and internal category label were printed. Sixty tests cover the broker
   Clear operation and local history-file removal. Temporary visual captures
   were deleted after inspection.
+- Plugin version `0.10.0` separates universal Rock login from optional Magnus
+  access. Every configured profile authenticates natively at its own Rock
+  origin and can use the six allowlisted search categories, Personal Links,
+  and local Recent Links without Magnus. A descriptor probe adds the Magnus tab
+  only when the selected account is authorized; that tab currently exposes
+  opaque-ID folder browsing, bounded UTF-8 preview, and SHA-256 only. Contract
+  coverage explicitly verifies that live search and Personal Links continue
+  when Magnus is unavailable.
+- The packaged plugin now includes the Python broker and root manifest, starts
+  with the system Python from its installed directory, and has no Rock MCP,
+  Magnus CLI, Node, npm, pip, or uv runtime dependency. The full repository and
+  installed copy both pass Omarchy plugin validation. The installed broker's
+  working directory is the installed plugin path, and the live on-demand shell
+  summon returns `ok`.
+- The live installed v0.10.0 broker authenticated with the migrated profile,
+  reported native Rock connected and Magnus available, returned a six-folder
+  Magnus root without exposing names or paths, and completed a random no-match
+  six-category Rock search with no unavailable category. Only counts and
+  capability states were printed.
+- Sixty-three unit tests pass. Python bytecode compilation, `git diff --check`,
+  Omarchy plugin validation, standalone QML parsing, `hyprctl reload`, and an
+  empty `hyprctl configerrors` check also pass. A full shell restart was not
+  repeated because the session was locked; plugin rescan, installed-path broker
+  execution, and live summon provided the non-disruptive checks.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and

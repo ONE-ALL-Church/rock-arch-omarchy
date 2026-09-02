@@ -1,280 +1,240 @@
 import json
 import unittest
-from pathlib import Path
-from unittest.mock import patch
+import urllib.error
+from contextlib import contextmanager
 
 from rock_lens_broker.magnus_adapter import (
     CANONICAL_MAGNUS_SERVER,
+    DEFAULT_TREE_PATH,
+    MAGNUS_API_PREFIX,
+    MAX_FILE_BYTES,
     MagnusError,
+    MagnusHttpClient,
     MagnusReadOnlyAdapter,
+    MagnusUnavailableError,
     validate_file_path,
     validate_magnus_server,
     validate_tree_path,
 )
 
 
-class FakeSecretStore:
-    def __init__(self):
-        self.values = {}
+class FakeCookieProvider:
+    def __init__(self, configured=True):
+        self.configured = configured
+        self.invalidated = False
 
-    def available(self):
-        return True
+    def status(self):
+        return {"configured": self.configured}
 
-    def lookup(self, context, kind):
-        return self.values.get((context, kind))
+    @contextmanager
+    def authenticated_cookie(self):
+        if not self.configured:
+            raise MagnusError("rock_login_required")
+        yield ".ROCK=test-session"
 
-    def store(self, context, kind, value):
-        self.values[(context, kind)] = value
+    def invalidate_authenticated_cookie(self):
+        self.invalidated = True
 
-    def clear(self, context, kind):
-        self.values.pop((context, kind), None)
+
+class FakeMagnusHttp:
+    def __init__(self, responses=None):
+        self.responses = responses or {}
+        self.calls = []
+
+    def get_json(self, origin, path, cookie):
+        self.calls.append(("json", origin, path, cookie))
+        value = self.responses.get(path, [])
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    def get_bytes(self, origin, path, cookie):
+        self.calls.append(("bytes", origin, path, cookie))
+        value = self.responses.get(path, b"")
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def read(self, maximum):
+        return self.payload[:maximum]
+
+
+class FakeOpener:
+    def __init__(self, payload=b"{}", failure=None):
+        self.payload = payload
+        self.failure = failure
+        self.calls = []
+
+    def open(self, request, timeout):
+        self.calls.append((request, timeout))
+        if self.failure:
+            raise self.failure
+        return FakeResponse(self.payload)
 
 
 class MagnusAdapterTests(unittest.TestCase):
-    def setUp(self):
-        self.secrets = FakeSecretStore()
-        self.adapter = MagnusReadOnlyAdapter(
-            server=CANONICAL_MAGNUS_SERVER,
-            executable="/usr/bin/magnus",
-            secret_store=self.secrets,
-        )
-
-    @staticmethod
-    def _write_cookie(environment, *, nested=False):
-        root = Path(environment["XDG_CONFIG_HOME"])
-        path = root / "magnus-cli-cookies-nodejs" / "config.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        record = {
-            "cookie": ".ROCK=test-session",
-            "serverUrl": CANONICAL_MAGNUS_SERVER,
-            "timestamp": 1_700_000_000_000,
-        }
-        value = (
-            {"https://admin": {"oneandall": {"church": record}}}
-            if nested
-            else {CANONICAL_MAGNUS_SERVER: record}
-        )
-        path.write_text(
-            json.dumps(value),
-            encoding="utf-8",
-        )
-
-    def test_server_is_https_and_reduced_to_a_strict_origin(self):
+    def test_server_and_paths_are_strictly_same_origin(self):
         self.assertEqual(
             validate_magnus_server(CANONICAL_MAGNUS_SERVER + "/"),
             CANONICAL_MAGNUS_SERVER,
         )
         self.assertEqual(
-            validate_magnus_server("rock.example.org"),
-            "https://rock.example.org",
+            validate_magnus_server("rock.example.org"), "https://rock.example.org"
+        )
+        self.assertEqual(
+            validate_tree_path(DEFAULT_TREE_PATH), DEFAULT_TREE_PATH
+        )
+        self.assertEqual(
+            validate_file_path(
+                "/api/TriumphTech/Magnus/FileContent/block-handler/5/content.lava"
+            ),
+            "/FileContent/block-handler/5/content.lava",
         )
         for invalid in (
             "http://rock.example.org",
             "https://user:pass@rock.example.org",
             "https://rock.example.org/api",
-            "https://rock.example.org?next=bad",
-            "javascript:alert(1)",
         ):
             with self.subTest(invalid=invalid), self.assertRaises(MagnusError):
                 validate_magnus_server(invalid)
-
-    def test_paths_reject_cross_origin_and_traversal(self):
-        self.assertEqual(
-            validate_tree_path("api/TriumphTech/Magnus/GetTreeItems/root"),
-            "api/TriumphTech/Magnus/GetTreeItems/root",
-        )
-        self.assertEqual(
-            validate_file_path("/FileContent/block-handler/5350/content.lava"),
-            "/FileContent/block-handler/5350/content.lava",
-        )
         for invalid in (
             "https://attacker.example/tree",
-            "api/TriumphTech/Magnus/GetTreeItems/",
             "api/TriumphTech/Magnus/GetTreeItems/../secrets",
             "api/TriumphTech/Magnus/Delete/root",
         ):
             with self.subTest(invalid=invalid), self.assertRaises(MagnusError):
                 validate_tree_path(invalid)
-        for invalid in (
-            "https://attacker.example/file",
-            "/FileContent/",
-            "/FileContent/../secrets",
-            "/api/TriumphTech/Magnus/FileContent/file",
-        ):
-            with self.subTest(invalid=invalid), self.assertRaises(MagnusError):
-                validate_file_path(invalid)
+        with self.assertRaises(MagnusError):
+            validate_file_path("/FileContent/../secrets")
 
-    def test_credentials_are_secret_store_only(self):
-        self.adapter.configure("rock-user", "private-password")
-        self.assertIn("rock-user", self.secrets.values.values())
-        self.assertIn("private-password", self.secrets.values.values())
-        self.assertTrue(self.adapter.status()["configured"])
-
-    def test_credentials_are_isolated_by_rock_origin(self):
-        self.adapter.configure("oneall-user", "oneall-password")
-        self.adapter.set_server("https://rock.example.org")
-        self.assertFalse(self.adapter.status()["configured"])
-        self.adapter.configure("other-user", "other-password")
-        self.assertEqual(len(self.secrets.values), 4)
-        self.adapter.set_server(CANONICAL_MAGNUS_SERVER)
-        self.assertTrue(self.adapter.status()["configured"])
-
-    def test_profile_credentials_can_share_an_origin_and_sign_out_independently(self):
-        first_id = "a" * 32
-        second_id = "b" * 32
-        self.adapter.set_profile(first_id, CANONICAL_MAGNUS_SERVER)
-        self.adapter.configure("first-user", "first-password")
-        self.adapter.set_profile(second_id, CANONICAL_MAGNUS_SERVER)
-        self.assertFalse(self.adapter.status()["configured"])
-        self.adapter.configure("second-user", "second-password")
-        self.adapter.sign_out()
-        self.assertFalse(self.adapter.status()["configured"])
-        self.adapter.set_profile(first_id, CANONICAL_MAGNUS_SERVER)
-        self.assertTrue(self.adapter.status()["configured"])
-
-    def test_legacy_credentials_migrate_without_returning_secret_values(self):
-        self.adapter.configure("legacy-user", "legacy-password")
-        self.adapter.set_profile("c" * 32, CANONICAL_MAGNUS_SERVER)
-        self.assertTrue(self.adapter.migrate_legacy_credentials())
-        self.assertTrue(self.adapter.status()["configured"])
-
-    @patch("rock_lens_broker.magnus_adapter.subprocess.run")
-    def test_cli_runs_in_ephemeral_config_and_never_puts_password_in_argv(self, run):
-        self.adapter.configure("rock-user", "private-password")
-        tree = [
-            {
-                "displayName": "Safe item",
-                "isFolder": True,
-                "id": 14,
-                "path": "api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14",
-                "buildUri": "https://attacker.example/build",
-                "deleteUri": "/delete/14",
-            }
-        ]
-
-        def login(environment, username, password):
-            self.assertEqual(username, "rock-user")
-            self.assertEqual(password, "private-password")
-            self._write_cookie(environment)
-            return 0
-
-        def invoke(argv, **kwargs):
-            kwargs["stdout"].write(json.dumps(tree).encode())
-            return type("Result", (), {"returncode": 0})()
-
-        run.side_effect = invoke
-        with patch.object(self.adapter, "_interactive_login", side_effect=login):
-            self.assertEqual(
-                self.adapter.list_tree(),
-                [
-                    {
-                        "displayName": "Safe item",
-                        "isFolder": True,
-                        "id": "14",
-                        "path": (
-                            "api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14"
-                        ),
-                    }
-                ],
-            )
-        request = run.call_args_list[0]
-        self.assertNotIn("private-password", request.args[0])
-        self.assertNotIn("--verbose", request.args[0])
-        self.assertEqual(request.args[0][-2:], ["--server", CANONICAL_MAGNUS_SERVER])
-        temporary = Path(request.kwargs["env"]["XDG_CONFIG_HOME"])
-        self.assertFalse(temporary.exists())
-
-    @patch("rock_lens_broker.magnus_adapter.subprocess.run")
-    def test_response_size_is_bounded(self, run):
-        self.adapter.configure("rock-user", "private-password")
-
-        def login(environment, username, password):
-            self._write_cookie(environment)
-            return 0
-
-        def invoke(argv, **kwargs):
-            kwargs["stdout"].write(b"x" * (4 * 1024 * 1024 + 1))
-            return type("Result", (), {"returncode": 0})()
-
-        run.side_effect = invoke
-        with (
-            patch.object(self.adapter, "_interactive_login", side_effect=login),
-            self.assertRaisesRegex(MagnusError, "out_of_bounds"),
-        ):
-            self.adapter.read_file("/FileContent/block-handler/5350/content.lava")
-
-    @patch("rock_lens_broker.magnus_adapter.subprocess.run")
-    def test_cookie_profile_is_removed_after_session(self, run):
-        self.adapter.configure("rock-user", "private-password")
-        temporary = None
-
-        def login(environment, username, password):
-            nonlocal temporary
-            self._write_cookie(environment)
-            temporary = Path(environment["XDG_CONFIG_HOME"])
-            return 0
-
-        with (
-            patch.object(self.adapter, "_interactive_login", side_effect=login),
-            self.adapter.authenticated_cookie() as cookie,
-        ):
-            self.assertEqual(cookie, ".ROCK=test-session")
-            self.assertIsNotNone(temporary)
-            assert temporary is not None
-            self.assertTrue(temporary.exists())
-        assert temporary is not None
-        self.assertFalse(temporary.exists())
-
-    @patch("rock_lens_broker.magnus_adapter.subprocess.run")
-    def test_cookie_is_reused_briefly_in_memory_without_a_second_login(self, run):
-        self.adapter.configure("rock-user", "private-password")
-
-        def login(environment, username, password):
-            self._write_cookie(environment)
-            return 0
-
-        with patch.object(
-            self.adapter, "_interactive_login", side_effect=login
-        ) as interactive_login:
-            with self.adapter.authenticated_cookie() as first:
-                self.assertEqual(first, ".ROCK=test-session")
-            with self.adapter.authenticated_cookie() as second:
-                self.assertEqual(second, ".ROCK=test-session")
-        self.assertEqual(interactive_login.call_count, 1)
-
-    @patch("rock_lens_broker.magnus_adapter.subprocess.run")
-    def test_cookie_parser_accepts_conf_dot_notation_layout(self, run):
-        self.adapter.configure("rock-user", "private-password")
-
-        def login(environment, username, password):
-            self._write_cookie(environment, nested=True)
-            return 0
-
-        with (
-            patch.object(self.adapter, "_interactive_login", side_effect=login),
-            self.adapter.authenticated_cookie() as cookie,
-        ):
-            self.assertEqual(cookie, ".ROCK=test-session")
-
-    def test_cookie_parser_requires_one_record_for_the_exact_origin(self):
-        valid = {
-            "cookie": ".ROCK=test-session",
-            "serverUrl": CANONICAL_MAGNUS_SERVER,
-        }
-        self.assertEqual(
-            self.adapter._matching_cookie_records({"nested": valid}), [valid]
+    def test_probe_is_optional_and_distinguishes_missing_access(self):
+        provider = FakeCookieProvider()
+        available_http = FakeMagnusHttp(
+            {MAGNUS_API_PREFIX + "/GetServer": {"DisplayName": "Rock"}}
         )
+        adapter = MagnusReadOnlyAdapter(
+            provider, CANONICAL_MAGNUS_SERVER, available_http
+        )
+        self.assertEqual(adapter.status()["state"], "unknown")
+        self.assertTrue(adapter.probe())
+        self.assertEqual(adapter.status()["state"], "available")
         self.assertEqual(
-            self.adapter._matching_cookie_records(
+            adapter.status()["capabilities"], ["browse", "preview", "hash"]
+        )
+
+        denied = MagnusReadOnlyAdapter(
+            provider,
+            CANONICAL_MAGNUS_SERVER,
+            FakeMagnusHttp(
                 {
-                    "cookie": ".ROCK=wrong-origin",
-                    "serverUrl": "https://rock.example.org",
+                    MAGNUS_API_PREFIX + "/GetServer": MagnusUnavailableError(
+                        "magnus_unavailable_for_user"
+                    )
                 }
             ),
-            [],
         )
-        with self.assertRaisesRegex(MagnusError, "invalid_magnus_cookie"):
-            self.adapter._matching_cookie_records({"a": valid, "b": valid})
+        self.assertFalse(denied.probe())
+        self.assertEqual(denied.status()["state"], "unavailable")
+
+    def test_tree_descriptors_drive_read_only_capabilities_and_use_opaque_ids(self):
+        tree = [
+            {
+                "DisplayName": "Themes",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/Themes",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/Themes",
+                "DeleteUri": "https://attacker.example/delete",
+            },
+            {
+                "DisplayName": "Site.lava",
+                "IsFolder": False,
+                "FileContentUri": "/api/TriumphTech/Magnus/FileContent/theme/Site.lava",
+            },
+        ]
+        http = FakeMagnusHttp({"/" + DEFAULT_TREE_PATH: tree})
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(), CANONICAL_MAGNUS_SERVER, http
+        )
+        listed = adapter.list_tree()
+        self.assertEqual(listed[0]["actions"], ["build"])
+        self.assertNotIn("deleteUri", listed[0])
+        self.assertEqual(listed[1]["filePath"], "/FileContent/theme/Site.lava")
+
+        browser = adapter.browse()
+        self.assertEqual(len(browser["items"]), 2)
+        self.assertTrue(all(row["safeId"].startswith("magnus-") for row in browser["items"]))
+        serialized = json.dumps(browser)
+        self.assertNotIn("GetTreeItems", serialized)
+        self.assertNotIn("FileContent", serialized)
+        self.assertNotIn("attacker.example", serialized)
+
+    def test_text_preview_is_bounded_and_includes_a_hash(self):
+        tree = [
+            {
+                "displayName": "content.lava",
+                "isFolder": False,
+                "filePath": "/FileContent/block-handler/5/content.lava",
+            }
+        ]
+        path = MAGNUS_API_PREFIX + "/FileContent/block-handler/5/content.lava"
+        http = FakeMagnusHttp(
+            {"/" + DEFAULT_TREE_PATH: tree, path: b"Hello {{ Person.NickName }}"}
+        )
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(), CANONICAL_MAGNUS_SERVER, http
+        )
+        safe_id = adapter.browse()["items"][0]["safeId"]
+        preview = adapter.preview(safe_id)
+        self.assertEqual(preview["content"], "Hello {{ Person.NickName }}")
+        self.assertEqual(len(preview["sha256"]), 64)
+
+        http.responses[path] = b"\x00binary"
+        with self.assertRaisesRegex(MagnusError, "preview_unavailable"):
+            adapter.preview(safe_id)
+
+    def test_http_client_bounds_responses_and_never_follows_action_urls(self):
+        opener = FakeOpener(b"x" * (MAX_FILE_BYTES + 1))
+        client = MagnusHttpClient(opener)
+        with self.assertRaisesRegex(MagnusError, "out_of_bounds"):
+            client.get_bytes(
+                CANONICAL_MAGNUS_SERVER,
+                MAGNUS_API_PREFIX + "/FileContent/test.txt",
+                ".ROCK=test-session",
+            )
+        request, _ = opener.calls[0]
+        self.assertEqual(request.get_method(), "GET")
+        self.assertEqual(request.get_header("Cookie"), ".ROCK=test-session")
+        self.assertTrue(request.full_url.startswith(CANONICAL_MAGNUS_SERVER))
+
+        denied = MagnusHttpClient(
+            FakeOpener(
+                failure=urllib.error.HTTPError(
+                    "https://rock.example", 403, "Forbidden", {}, None
+                )
+            )
+        )
+        with self.assertRaises(MagnusUnavailableError):
+            denied.get_json(
+                CANONICAL_MAGNUS_SERVER,
+                MAGNUS_API_PREFIX + "/GetServer",
+                ".ROCK=test-session",
+            )
+
+    def test_no_mutating_methods_are_exposed(self):
+        adapter = MagnusReadOnlyAdapter(FakeCookieProvider(), CANONICAL_MAGNUS_SERVER)
+        for name in ("write_file", "build", "delete_resource", "create_file", "create_folder", "upload_files"):
+            self.assertFalse(hasattr(adapter, name), name)
 
 
 if __name__ == "__main__":

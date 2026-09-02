@@ -22,7 +22,7 @@ from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
 from rock_lens_broker.rock_rest_adapter import SearchBatch
 
 
-class FakeMagnus:
+class FakeSession:
     def __init__(self, configured):
         self.configured = configured
         self.saved = None
@@ -32,7 +32,7 @@ class FakeMagnus:
         return {
             "available": True,
             "configured": self.configured,
-            "mode": "read_only",
+            "state": "ready" if self.configured else "signed_out",
             "server": self.server.removeprefix("https://"),
         }
 
@@ -70,9 +70,55 @@ class FakeMagnus:
 
     def test_connection(self):
         if not self.configured:
-            from rock_lens_broker.magnus_adapter import MagnusError
+            from rock_lens_broker.rock_session import RockSessionError
 
-            raise MagnusError("magnus_not_configured")
+            raise RockSessionError("rock_login_required")
+
+
+class FakeMagnus:
+    def __init__(self, available=False):
+        self.available = available
+        self.server = DEFAULT_ROCK_ORIGIN
+        self.state = "available" if available else "unavailable"
+
+    def status(self):
+        return {
+            "available": self.available,
+            "configured": True,
+            "state": self.state,
+            "mode": "read_only",
+            "capabilities": ["browse", "preview", "hash"] if self.available else [],
+            "server": self.server.removeprefix("https://"),
+        }
+
+    def set_server(self, value):
+        self.server = value
+
+    def set_profile(self, profile_id, value):
+        self.profile_id = profile_id
+        self.server = value
+
+    def clear_profile(self):
+        self.profile_id = ""
+        self.server = ""
+        self.available = False
+        self.state = "signed_out"
+
+    def reset_access(self):
+        self.available = False
+        self.state = "unknown"
+
+    def probe(self):
+        if self.state == "unknown":
+            self.state = "unavailable"
+        self.available = self.state == "available"
+        return self.available
+
+    def browse(self, safe_id=""):
+        return {"folderId": safe_id, "title": "Magnus", "items": []}
+
+    def preview(self, safe_id):
+        return {"safeId": safe_id, "title": "test.lava", "content": "test", "sha256": "a" * 64}
 
 
 class FakeLive:
@@ -317,6 +363,7 @@ class BrokerContractTests(unittest.TestCase):
         broker = Broker(
             self.state,
             config_file=self.config,
+            session=FakeSession(True),
             magnus=FakeMagnus(True),
             live=live,
             instance_file=self.instance,
@@ -332,12 +379,60 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(live.search_calls[-1], "Delta")
         self.assertEqual(live.search_categories[-1], "Groups")
 
-    def test_prod_without_magnus_fails_closed_without_live_call(self):
+    def test_prod_search_and_links_do_not_require_magnus_access(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
         live = FakeLive()
         broker = Broker(
             self.state,
             config_file=self.config,
+            session=FakeSession(True),
+            magnus=FakeMagnus(False),
+            live=live,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        status = broker.handle({"op": "status"})
+        self.assertTrue(status["rock"]["configured"])
+        self.assertFalse(status["magnus"]["available"])
+
+        search = broker.handle({"op": "search", "query": "Ada"})
+        self.assertEqual(search["source"], "live")
+        self.assertEqual(search["results"][0]["safeId"], "rock-safe-person")
+
+        links = broker.handle({"op": "navigation_status", "section": "personal"})
+        self.assertTrue(links["personalLinksAvailable"])
+        self.assertEqual(links["personalLinks"][0]["safeId"], "rock-safe-link")
+
+    def test_magnus_browse_and_preview_use_bounded_read_only_operations(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            session=FakeSession(True),
+            magnus=FakeMagnus(True),
+            live=FakeLive(),
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        browser = broker.handle({"op": "magnus_browse", "safeId": ""})
+        self.assertTrue(browser["ok"])
+        self.assertEqual(browser["magnusBrowser"]["items"], [])
+
+        preview = broker.handle(
+            {"op": "magnus_preview", "safeId": "opaque-magnus-item"}
+        )
+        self.assertTrue(preview["ok"])
+        self.assertEqual(preview["magnusPreview"]["sha256"], "a" * 64)
+
+    def test_prod_without_rock_login_fails_closed_without_live_call(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            session=FakeSession(False),
             magnus=FakeMagnus(False),
             live=live,
             instance_file=self.instance,
@@ -348,18 +443,20 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(response["results"], [])
         self.assertEqual(live.search_calls, [])
 
-    def test_plugin_can_configure_magnus_without_echoing_credentials(self):
+    def test_plugin_can_configure_rock_without_echoing_credentials(self):
+        session = FakeSession(False)
         magnus = FakeMagnus(False)
         live = FakeLive()
         broker = Broker(
             self.state,
             config_file=self.config,
+            session=session,
             magnus=magnus,
             live=live,
         )
         response = broker.handle(
             {
-                "op": "magnus_configure",
+                "op": "rock_configure",
                 "domain": "rock.example.org",
                 "username": "rock-user",
                 "password": "private-password",
@@ -367,7 +464,7 @@ class BrokerContractTests(unittest.TestCase):
         )
         self.assertTrue(response["ok"])
         self.assertTrue(response["refreshLive"])
-        self.assertEqual(magnus.saved, ("rock-user", "private-password"))
+        self.assertEqual(session.saved, ("rock-user", "private-password"))
         self.assertEqual(magnus.server, DEFAULT_ROCK_ORIGIN)
         self.assertEqual(InstanceStore(self.instance).get(), DEFAULT_ROCK_ORIGIN)
         serialized = json.dumps(response)
@@ -375,11 +472,13 @@ class BrokerContractTests(unittest.TestCase):
         self.assertNotIn("private-password", serialized)
 
     def test_profile_lifecycle_and_preferences_are_broker_managed(self):
+        session = FakeSession(False)
         magnus = FakeMagnus(False)
         live = FakeLive()
         broker = Broker(
             self.state,
             config_file=self.config,
+            session=session,
             magnus=magnus,
             live=live,
         )
@@ -418,16 +517,18 @@ class BrokerContractTests(unittest.TestCase):
 
         signed_out = broker.handle({"op": "profile_sign_out"})
         self.assertEqual(signed_out["connection"], "signed_out")
-        self.assertFalse(signed_out["magnus"]["configured"])
+        self.assertFalse(signed_out["rock"]["configured"])
         removed = broker.handle({"op": "profile_remove", "profileId": profile_id})
         self.assertEqual(removed["profiles"]["profiles"], [])
         self.assertFalse(removed["instance"]["configured"])
 
     def test_profiles_with_same_domain_have_distinct_ids_and_switch(self):
+        session = FakeSession(False)
         magnus = FakeMagnus(False)
         broker = Broker(
             self.state,
             config_file=self.config,
+            session=session,
             magnus=magnus,
             live=FakeLive(),
         )
@@ -462,6 +563,7 @@ class BrokerContractTests(unittest.TestCase):
         broker = Broker(
             self.state,
             config_file=self.config,
+            session=FakeSession(True),
             magnus=FakeMagnus(True),
             live=live,
             url_opener=lambda url: opened.append(url) is None,

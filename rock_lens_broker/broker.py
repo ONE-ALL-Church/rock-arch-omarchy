@@ -25,9 +25,10 @@ from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
 from .profiles import ProfileError, ProfileStore, RockProfile, default_profile_name
 from .quick_return import QuickReturnStore
 from .rock_rest_adapter import RockRestError, RockRestReadOnlyAdapter, SearchBatch
+from .rock_session import RockSessionError, RockSessionProvider
 
 
-class MagnusStatusProvider(Protocol):
+class RockSessionStatusProvider(Protocol):
     def status(self) -> dict[str, Any]: ...
 
     def authenticated_cookie(self) -> AbstractContextManager[str]: ...
@@ -47,6 +48,22 @@ class MagnusStatusProvider(Protocol):
     def remove_profile_credentials(self, profile_id: str) -> None: ...
 
     def test_connection(self) -> None: ...
+
+
+class MagnusStatusProvider(Protocol):
+    def status(self) -> dict[str, Any]: ...
+
+    def set_server(self, value: str) -> None: ...
+
+    def set_profile(self, profile_id: str, server: str) -> None: ...
+
+    def clear_profile(self) -> None: ...
+
+    def probe(self) -> bool: ...
+
+    def browse(self, safe_id: str = "") -> dict[str, Any]: ...
+
+    def preview(self, safe_id: str) -> dict[str, str]: ...
 
 
 class LiveReadAdapter(Protocol):
@@ -75,6 +92,7 @@ class Broker:
         state_file: Path | None = None,
         auth: OAuthManager | None = None,
         config_file: Path | None = None,
+        session: RockSessionStatusProvider | None = None,
         magnus: MagnusStatusProvider | None = None,
         live: LiveReadAdapter | None = None,
         quick_returns: QuickReturnStore | None = None,
@@ -102,25 +120,26 @@ class Broker:
         active_profile = self._profile_store.active()
         self._active_profile_id = active_profile.profile_id if active_profile else ""
         self._origin = active_profile.origin if active_profile else None
-        self._magnus = magnus or MagnusReadOnlyAdapter(
-            server=self._origin,
+        self._session = session or RockSessionProvider(
+            origin=self._origin,
             profile_id=self._active_profile_id or None,
         )
-        if magnus and active_profile:
-            setter = getattr(self._magnus, "set_profile", None)
-            if callable(setter):
-                setter(active_profile.profile_id, active_profile.origin)
-            else:
-                self._magnus.set_server(active_profile.origin)
-        if self._profile_store.migrated_profile_id:
-            migrate = getattr(self._magnus, "migrate_legacy_credentials", None)
+        if session and active_profile:
+            self._session.set_profile(active_profile.profile_id, active_profile.origin)
+        if active_profile:
+            migrate = getattr(self._session, "migrate_legacy_credentials", None)
             if callable(migrate):
                 try:
                     migrate()
-                except MagnusError:
+                except RockSessionError:
                     pass
+        self._magnus = magnus or MagnusReadOnlyAdapter(
+            self._session, server=self._origin
+        )
+        if magnus and active_profile:
+            self._magnus.set_profile(active_profile.profile_id, active_profile.origin)
         self._live = live or RockRestReadOnlyAdapter(
-            self._magnus, origin=self._origin or DEFAULT_ROCK_ORIGIN
+            self._session, origin=self._origin or DEFAULT_ROCK_ORIGIN
         )
         if live and self._origin:
             self._live.set_origin(self._origin)
@@ -170,6 +189,7 @@ class Broker:
     def capabilities(
         self,
         auth: dict[str, Any] | None = None,
+        rock: dict[str, Any] | None = None,
         magnus: dict[str, Any] | None = None,
     ) -> list[dict[str, str]]:
         auth = auth or self._auth.public_status(self._context)
@@ -183,12 +203,23 @@ class Broker:
             oauth_health = HealthState.FAILED
         elif oauth_state is AuthState.EXPIRED:
             oauth_health = HealthState.STALE
+        rock = rock or self._session.status()
         magnus = magnus or self._magnus.status()
-        magnus_detail = (
-            "Secure read-only adapter configured"
-            if magnus["configured"]
-            else "Secure login required"
+        rock_health = (
+            HealthState.HEALTHY if rock["configured"] else HealthState.UNKNOWN
         )
+        magnus_state = magnus.get("state", "unknown")
+        magnus_health = (
+            HealthState.HEALTHY
+            if magnus_state == "available"
+            else HealthState.FAILED if magnus_state == "error" else HealthState.UNKNOWN
+        )
+        magnus_detail = {
+            "available": "Browse, preview, and hash available",
+            "unavailable": "Not installed or not authorized",
+            "error": "Capability check could not complete",
+            "signed_out": "Rock login required",
+        }.get(magnus_state, "Capability not checked")
         return [
             Capability(
                 "mock",
@@ -201,27 +232,35 @@ class Broker:
             ).public_dict(),
             Capability("rock_oauth", oauth_health, auth["label"]).public_dict(),
             Capability(
+                "rock_session",
+                rock_health,
+                "Native Rock login" if rock["configured"] else "Rock login required",
+            ).public_dict(),
+            Capability(
                 "rock_rest", self._live_health, "Allowlisted GETs only"
             ).public_dict(),
             Capability(
                 "sql", HealthState.UNKNOWN, "Read-only identity unproven"
             ).public_dict(),
-            Capability("magnus", HealthState.UNKNOWN, magnus_detail).public_dict(),
+            Capability("magnus", magnus_health, magnus_detail).public_dict(),
         ]
 
     def handle(self, raw: dict[str, Any]) -> dict[str, Any]:
         op = sanitize_text(raw.get("op"), 40)
         if op == "status":
+            self._probe_magnus()
             auth = self._auth.public_status(self._context)
+            rock = self._session.status()
             magnus = self._magnus.status()
             return self._ok(
                 context=self._context.value,
                 developerMode=self._developer_mode,
                 auth=auth,
+                rock=rock,
                 instance=self._instance_status(),
                 magnus=magnus,
                 profiles=self._profile_store.snapshot(),
-                capabilities=self.capabilities(auth, magnus),
+                capabilities=self.capabilities(auth, rock, magnus),
                 categories=list(self._mock.categories()),
             )
         if op == "set_context":
@@ -238,6 +277,7 @@ class Broker:
                 context=self._context.value,
                 developerMode=self._developer_mode,
                 auth=self._auth.public_status(self._context),
+                rock=self._session.status(),
                 instance=self._instance_status(),
                 magnus=self._magnus.status(),
                 profiles=self._profile_store.snapshot(),
@@ -249,8 +289,9 @@ class Broker:
         if op == "auth_disconnect":
             return self._ok(auth=self._auth.disconnect(self._context))
         if op == "magnus_status":
+            self._probe_magnus()
             return self._ok(magnus=self._magnus.status())
-        if op == "magnus_configure":
+        if op in {"rock_configure", "magnus_configure"}:
             domain = raw.get("domain")
             username = raw.get("username")
             password = raw.get("password")
@@ -259,7 +300,7 @@ class Broker:
                 or not isinstance(username, str)
                 or not isinstance(password, str)
             ):
-                return self._error("invalid_magnus_credentials")
+                return self._error("invalid_rock_credentials")
             added_profile: RockProfile | None = None
             try:
                 origin = validate_rock_origin(domain)
@@ -271,16 +312,19 @@ class Broker:
                     self._activate_profile(added_profile)
                 elif active.origin != origin:
                     return self._error("profile_domain_mismatch")
-                self._magnus.configure(username, password)
+                self._session.configure(username, password)
+                self._reset_magnus_access()
+                self._probe_magnus(force=True)
             except OriginError:
                 return self._error("invalid_rock_origin")
-            except (MagnusError, ProfileError) as error:
+            except (RockSessionError, ProfileError) as error:
                 if added_profile:
                     self._rollback_profile_add(added_profile)
                 return self._error(str(error))
             self._live.clear()
             return self._ok(
                 instance=self._instance_status(),
+                rock=self._session.status(),
                 magnus=self._magnus.status(),
                 refreshLive=True,
                 profiles=self._profile_store.snapshot(),
@@ -293,7 +337,8 @@ class Broker:
             try:
                 profile = self._profile_store.set_active(raw.get("profileId"))
                 self._activate_profile(profile)
-            except (ProfileError, MagnusError) as error:
+                self._probe_magnus()
+            except (ProfileError, RockSessionError, MagnusError) as error:
                 return self._error(str(error))
             return self._profile_response(refreshLive=True)
         if op == "profile_rename":
@@ -306,12 +351,14 @@ class Broker:
             username = raw.get("username")
             password = raw.get("password")
             if not isinstance(username, str) or not isinstance(password, str):
-                return self._error("invalid_magnus_credentials")
+                return self._error("invalid_rock_credentials")
             if not self._profile_store.active():
                 return self._error("profile_not_found")
             try:
-                self._magnus.configure(username, password)
-            except MagnusError as error:
+                self._session.configure(username, password)
+                self._reset_magnus_access()
+                self._probe_magnus(force=True)
+            except RockSessionError as error:
                 return self._error(str(error))
             self._live.clear()
             return self._profile_response(refreshLive=True)
@@ -319,21 +366,19 @@ class Broker:
             if not self._profile_store.active():
                 return self._error("profile_not_found")
             try:
-                tester = getattr(self._magnus, "test_connection", None)
-                if callable(tester):
-                    tester()
-                else:
-                    with self._magnus.authenticated_cookie():
-                        pass
-            except MagnusError as error:
+                self._session.test_connection()
+                self._reset_magnus_access()
+                self._probe_magnus(force=True)
+            except RockSessionError as error:
                 return self._error(str(error))
             return self._profile_response(connection="connected")
         if op == "profile_sign_out":
             if not self._profile_store.active():
                 return self._error("profile_not_found")
             try:
-                self._magnus.sign_out()
-            except MagnusError as error:
+                self._session.sign_out()
+                self._reset_magnus_access()
+            except RockSessionError as error:
                 return self._error(str(error))
             self._live.clear()
             return self._profile_response(connection="signed_out")
@@ -348,6 +393,28 @@ class Broker:
         if op == "recent_links_clear":
             self._quick_returns.clear()
             return self._ok(quickReturns=[])
+        if op == "magnus_browse":
+            if self._context is not Context.PROD:
+                return self._error("magnus_requires_prod")
+            safe_id = raw.get("safeId", "")
+            if not isinstance(safe_id, str):
+                return self._error("invalid_magnus_item")
+            try:
+                browser = self._magnus.browse(sanitize_text(safe_id, 100))
+            except MagnusError as error:
+                return self._error(str(error))
+            return self._ok(magnus=self._magnus.status(), magnusBrowser=browser)
+        if op == "magnus_preview":
+            if self._context is not Context.PROD:
+                return self._error("magnus_requires_prod")
+            safe_id = raw.get("safeId")
+            if not isinstance(safe_id, str):
+                return self._error("invalid_magnus_item")
+            try:
+                preview = self._magnus.preview(sanitize_text(safe_id, 100))
+            except MagnusError as error:
+                return self._error(str(error))
+            return self._ok(magnus=self._magnus.status(), magnusPreview=preview)
         if op == "search":
             query, category = parse_search_query(raw.get("query"))
             preferences = self._profile_store.preferences()
@@ -371,12 +438,14 @@ class Broker:
                     source="synthetic",
                     unavailable=[],
                 )
-            if not self._origin or not self._magnus.status()["configured"]:
+            if not self._origin or not self._session.status()["configured"]:
                 return self._ok(
                     context=self._context.value,
                     results=[],
                     source="unavailable",
                     unavailable=unavailable_categories,
+                    rock=self._session.status(),
+                    magnus=self._magnus.status(),
                 )
             if not query and category is None:
                 return self._ok(
@@ -384,6 +453,8 @@ class Broker:
                     results=[],
                     source="live",
                     unavailable=[],
+                    rock=self._session.status(),
+                    magnus=self._magnus.status(),
                 )
             try:
                 batch = self._live.search(
@@ -399,6 +470,8 @@ class Broker:
                     results=[],
                     source="unavailable",
                     unavailable=unavailable_categories,
+                    rock=self._session.status(),
+                    magnus=self._magnus.status(),
                 )
             self._live_health = (
                 HealthState.STALE if batch.unavailable else HealthState.HEALTHY
@@ -408,6 +481,8 @@ class Broker:
                 results=batch.results,
                 source="live",
                 unavailable=list(batch.unavailable),
+                rock=self._session.status(),
+                magnus=self._magnus.status(),
             )
         if op == "person_quick_look":
             safe_id = sanitize_text(raw.get("safeId"), 100)
@@ -438,7 +513,7 @@ class Broker:
             if (
                 self._context is Context.PROD
                 and self._origin
-                and self._magnus.status()["configured"]
+                and self._session.status()["configured"]
             ):
                 try:
                     personal_links = self._live.personal_links()
@@ -486,9 +561,8 @@ class Broker:
         if profile is None:
             self._active_profile_id = ""
             self._origin = None
-            clearer = getattr(self._magnus, "clear_profile", None)
-            if callable(clearer):
-                clearer()
+            self._session.clear_profile()
+            self._magnus.clear_profile()
             self._live.clear()
             self._quick_returns = QuickReturnStore(
                 self._quick_root / "quick-returns-unconfigured.json"
@@ -497,11 +571,8 @@ class Broker:
             return
         self._active_profile_id = profile.profile_id
         self._origin = profile.origin
-        setter = getattr(self._magnus, "set_profile", None)
-        if callable(setter):
-            setter(profile.profile_id, profile.origin)
-        else:
-            self._magnus.set_server(profile.origin)
+        self._session.set_profile(profile.profile_id, profile.origin)
+        self._magnus.set_profile(profile.profile_id, profile.origin)
         self._live.set_origin(profile.origin)
         if self._quick_returns_injected:
             self._quick_returns.set_origin(profile.origin)
@@ -515,6 +586,7 @@ class Broker:
         return self._ok(
             profiles=self._profile_store.snapshot(),
             instance=self._instance_status(),
+            rock=self._session.status(),
             magnus=self._magnus.status(),
             **payload,
         )
@@ -523,14 +595,16 @@ class Broker:
         username = raw.get("username")
         password = raw.get("password")
         if not isinstance(username, str) or not isinstance(password, str):
-            return self._error("invalid_magnus_credentials")
+            return self._error("invalid_rock_credentials")
         previous = self._profile_store.active()
         added: RockProfile | None = None
         try:
             added = self._profile_store.add(raw.get("name"), raw.get("domain"))
             self._activate_profile(added)
-            self._magnus.configure(username, password)
-        except (ProfileError, MagnusError) as error:
+            self._session.configure(username, password)
+            self._reset_magnus_access()
+            self._probe_magnus(force=True)
+        except (ProfileError, RockSessionError) as error:
             if added:
                 self._rollback_profile_add(added, previous)
             return self._error(str(error))
@@ -542,7 +616,7 @@ class Broker:
         added: RockProfile,
         previous: RockProfile | None = None,
     ) -> None:
-        remover = getattr(self._magnus, "remove_profile_credentials", None)
+        remover = getattr(self._session, "remove_profile_credentials", None)
         if callable(remover):
             remover(added.profile_id)
         try:
@@ -556,7 +630,7 @@ class Broker:
     def _profile_remove(self, profile_id: object) -> dict[str, Any]:
         try:
             profile = self._profile_store.get(profile_id)
-            remover = getattr(self._magnus, "remove_profile_credentials", None)
+            remover = getattr(self._session, "remove_profile_credentials", None)
             if callable(remover):
                 remover(profile.profile_id)
             path = self._quick_return_path(profile.profile_id)
@@ -564,9 +638,22 @@ class Broker:
             self._profile_store.remove(profile.profile_id)
             if profile.profile_id == self._active_profile_id:
                 self._activate_profile(self._profile_store.active())
-        except (ProfileError, MagnusError) as error:
+        except (ProfileError, RockSessionError, MagnusError) as error:
             return self._error(str(error))
         return self._profile_response(refreshLive=True)
+
+    def _reset_magnus_access(self) -> None:
+        resetter = getattr(self._magnus, "reset_access", None)
+        if callable(resetter):
+            resetter()
+
+    def _probe_magnus(self, force: bool = False) -> None:
+        if self._context is not Context.PROD or not self._session.status()["configured"]:
+            return
+        state = self._magnus.status().get("state", "unknown")
+        if not force and state not in {"unknown", "error"}:
+            return
+        self._magnus.probe()
 
     def _quick_return_path(self, profile_id: str | None = None) -> Path:
         key = profile_id or self._active_profile_id or "unconfigured"

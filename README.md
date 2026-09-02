@@ -1,23 +1,27 @@
 # Rock Lens
 
-Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. Normal
-use is locked to production and uses the `.ROCK` session created by Magnus to
-search six fixed Rock REST v1 resources and load the current person's Personal
-Links. Group results include their Rock Group Type. The six category reads run
-concurrently, and a brief memory-only Magnus session cache keeps successive
-searches responsive without persisting the cookie. A compact Settings view
-supports multiple Rock instances or accounts, connection testing, sign-out,
-profile removal, per-profile Recent Links, category controls, person-context
-visibility, and close-after-open behavior. QML is only a view: search
-terms and opaque navigation IDs travel over an owner-only local Unix socket,
-while credentials, cookies, raw record IDs, URLs, and response bodies remain
-inside the Python broker.
+Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. Every
+user signs in directly to their Rock instance through the native Python broker;
+Magnus is not the login provider and neither the Magnus CLI nor Rock MCP is a
+runtime dependency. The resulting `.ROCK` cookie is retained only in broker
+memory with a 15-minute idle timeout and authenticates six fixed Rock REST v1
+search resources plus the current person's Personal Links.
 
-For privileged Rock file inspection, Rock Lens also includes a hardened,
-read-only Magnus adapter. Setup first records the selected Rock instance's
-strict HTTPS origin, keeps that origin's credentials in Secret Service, and
-gives each command an ephemeral Magnus profile that is deleted immediately
-afterward.
+After login, Rock Lens probes the optional server-side Magnus API. Users whose
+account and Rock instance expose it receive a separate read-only **Magnus** tab
+for filesystem-style browsing, bounded text preview, and SHA-256 verification.
+Everyone else keeps the complete search, Personal Links, and Recent Links
+experience without an error or empty core UI. Magnus item descriptors determine
+which server actions exist, but write, build, upload, create, and delete remain
+disabled.
+
+A compact Settings view supports multiple Rock instances or accounts,
+connection testing, sign-out, profile removal, per-profile Recent Links,
+category controls, person-context visibility, and close-after-open behavior.
+Search terms and opaque navigation or Magnus IDs travel over an owner-only local
+Unix socket. Credentials, cookies, raw Rock record IDs, and raw server URLs do
+not cross that boundary; only a user-requested bounded Magnus text preview is
+returned to the panel.
 
 Rock Lens also emulates Rock's Quick Return behavior as **Recent Links**. It
 remembers only same-origin records or Personal Links that were opened from the
@@ -26,12 +30,24 @@ in an owner-only local file. It does not read or follow browser history.
 
 ![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
 
-## Run the MVP
+## Install or run locally
 
 ```bash
 python3 -m unittest discover -s tests -v
 python3 -m rock_lens_broker --socket /tmp/rock-lens-demo.sock
 ```
+
+The repository itself is a valid Omarchy plugin: its root `manifest.json`
+points to the QML entry point and includes the Python broker. A published copy
+can therefore be installed directly without Node.js, npm, Magnus CLI, or Rock
+MCP:
+
+```bash
+omarchy plugin add https://github.com/OWNER/rock-lens-omarchy.git --enable
+```
+
+For a standalone broker command outside Omarchy, install the same dependency-free
+Python package with `uv tool install .`.
 
 The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-lens/broker.sock`
 and starts the broker without passing queries or credentials as arguments.
@@ -83,11 +99,10 @@ Developer-mode OAuth metadata can still be configured with
 `ROCK_LENS_DEVELOPER_MODE=1` and `--context DEV`.
 
 Enter Rock's Public Application Root as the issuer, copy the client ID, accept
-the loopback URI, and leave the secret blank for a public client. The broker
-includes this standards-based end-user login boundary, but the current live
-search and Personal Links path does not use it. Those reads use the ephemeral
-local Magnus session described below. The OpenID client remains available for
-future user-facing capabilities that should not use an admin cookie.
+the loopback URI, and leave the secret blank for a public client. This OIDC
+client remains available for future token-based capabilities. Current search,
+links, and Magnus reads use the native per-profile Rock session login below and
+do not require an administrator to register an OAuth client.
 
 The client metadata file is owner-only at
 `$XDG_CONFIG_HOME/rock-lens/oidc.json` (normally
@@ -102,25 +117,23 @@ stored there; Secret Service keys use stable random profile IDs, so two accounts
 on the same Rock instance remain separate. Existing single-instance setup and
 Recent Links migrate automatically, with the old history retained as rollback.
 
-## Configure Magnus
+## Configure a Rock profile
 
-Magnus is deliberately separate from end-user OpenID Connect login. Open
-**Settings** (or press `Ctrl+,`) and enter Rock credentials in the masked form.
-The broker sends them only over
-its owner-only socket and stores them in Secret Service. The equivalent terminal
-setup remains available:
+Open **Settings** (or press `Ctrl+,`) and enter the Rock domain, username, and
+password in the masked form. The broker first verifies the login directly at
+the selected origin, then stores the credentials in Secret Service. The
+equivalent terminal setup remains available:
 
 ```bash
-python3 -m rock_lens_broker magnus configure
-python3 -m rock_lens_broker magnus status
+python3 -m rock_lens_broker rock login
+python3 -m rock_lens_broker rock status
 ```
 
-The same ephemeral session can then perform the fixed, bounded search and
-Personal Links reads. Its temporary profile is removed immediately; only the
-validated cookie is retained in broker memory with a 15-minute idle timeout.
-The adapter still exposes only bounded `ls`, `cat`, and
-`hash` file operations; it does not expose a generic REST client. See
-[docs/MAGNUS.md](docs/MAGNUS.md) for its exact restrictions.
+The native login performs the fixed, bounded search and Personal Links reads.
+It then probes Magnus independently. A successful probe enables the panel's
+Magnus tab and the bounded `ls`, `cat`, and `hash` terminal operations. A 403 or
+404 marks Magnus unavailable for only that profile; it never disables normal
+Rock functionality. See [docs/MAGNUS.md](docs/MAGNUS.md) for the exact boundary.
 
 **Sign out** clears the selected profile's password, username, and in-memory
 cookie while keeping its profile metadata and local Recent Links. **Remove**
@@ -171,14 +184,15 @@ history.
 
 - Normal use is locked to PROD. DEV requires the exact process-level developer
   flag and remains visibly labeled while enabled.
-- Rock login uses authorization code flow, S256 PKCE, exact callback state
-  validation, HTTPS discovery, and same-origin authorization/token endpoints.
-- Client secrets and access/refresh tokens use Secret Service and never enter
-  QML, argv, repository files, logs, notifications, or screenshots.
-- Disconnect removes the context's local token set; it does not claim to end
-  the user's browser-wide Rock session.
-- PROD never falls back to synthetic results. Without configured Magnus
-  credentials or with a failed endpoint, the affected live category is empty.
+- Native Rock login sends credentials only in a same-origin HTTPS request body,
+  rejects redirects, validates the `.ROCK` cookie, and saves credentials only
+  after a successful login. The optional OIDC implementation retains its S256
+  PKCE and exact-origin protections.
+- Passwords, client secrets, cookies, and access/refresh tokens never enter
+  argv, repository files, logs, notifications, or screenshots.
+- PROD never falls back to synthetic results. Without a configured Rock login
+  the affected live category is empty; missing Magnus access affects only the
+  Magnus tab.
 - Live reads are fixed REST v1 GET operations with bounded responses and field-level
   output allowlists. QML cannot supply a URL, API path, OData field, or filter
   expression.
@@ -189,7 +203,7 @@ history.
   `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
 - There is no mutation transport, SQL execution, job trigger, or Run Now UI.
 - Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
-  and traversal paths, uses per-origin Secret Service records, and exposes no
+  and traversal paths, uses the same authenticated Rock session, and exposes no
   mutation operation.
 - Broker errors are reduced to stable public codes. Response bodies, tokens,
   cookies, SQL, unselected PII, URLs, and exceptions are not logged or

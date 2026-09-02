@@ -12,9 +12,9 @@ Panel {
   ipcTarget: "oneall.rock-lens"
   manageIpc: false
 
-  readonly property string projectPath: "/home/bscottdavis/Documents/Codex/2026-09-01/rock-lens-omarchy"
   readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))) + "/rock-lens"
   readonly property string socketPath: runtimeDir + "/broker.sock"
+  readonly property string packageRoot: Quickshell.env("ROCK_LENS_HOME") || (Quickshell.env("HOME") + "/.config/omarchy/plugins/oneall.rock-lens")
   property string contextName: "PROD"
   property bool developerMode: false
   property string viewMode: "search"
@@ -44,8 +44,17 @@ Panel {
   property bool pendingClearRecent: false
   property bool editLoginMode: false
   property string pendingSuccessText: ""
+  property bool rockAvailable: false
+  property bool rockConfigured: false
   property bool magnusAvailable: false
-  property bool magnusConfigured: false
+  property string magnusState: "unknown"
+  property var magnusItems: []
+  property var magnusPreview: null
+  property var magnusHistory: []
+  property string magnusFolderId: ""
+  property string magnusFolderTitle: "Magnus"
+  property int magnusCursor: -1
+  property bool magnusBusy: false
   property bool personalLinksAvailable: false
   property bool setupBusy: false
   property bool searchInFlight: false
@@ -55,6 +64,7 @@ Panel {
   property int recentCursor: -1
   property int linkCursor: -1
   readonly property int navigationCount: personalLinks.length
+  readonly property int magnusCount: magnusItems.length
   readonly property bool queryIsEmpty: query.trim().length === 0
   readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
   readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
@@ -64,8 +74,8 @@ Panel {
     !domainField.activeFocus && !usernameField.activeFocus && !passwordField.activeFocus &&
     !profileNameField.activeFocus && !activeUsernameField.activeFocus && !activePasswordField.activeFocus
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
-    magnusConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
-    magnusAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Magnus unavailable"
+    rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
+    rockAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Secure password storage unavailable"
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -178,6 +188,10 @@ Panel {
       focusSearch()
       return
     }
+    if (viewMode === "magnus" && (magnusPreview !== null || magnusHistory.length > 0)) {
+      magnusBack()
+      return
+    }
     if (!clearScope()) close()
   }
 
@@ -186,6 +200,7 @@ Panel {
     try { response = JSON.parse(line) } catch (e) { return }
     if (!response || response.ok !== true) {
       setupBusy = false
+      magnusBusy = false
       pendingSuccessText = ""
       feedbackText = response && response.error ? String(response.error).split("_").join(" ") : "Request failed"
       return
@@ -204,9 +219,26 @@ Panel {
       developerMode = response.developerMode === true
     if (response.instance)
       instanceDomain = String(response.instance.origin || "").replace("https://", "")
+    if (response.rock) {
+      rockAvailable = response.rock.available === true
+      rockConfigured = response.rock.configured === true
+    }
     if (response.magnus) {
       magnusAvailable = response.magnus.available === true
-      magnusConfigured = response.magnus.configured === true
+      magnusState = String(response.magnus.state || "unknown")
+      if (!magnusAvailable && viewMode === "magnus") focusSearch()
+    }
+    if (response.magnusBrowser) {
+      magnusBusy = false
+      magnusPreview = null
+      magnusFolderId = String(response.magnusBrowser.folderId || "")
+      magnusFolderTitle = String(response.magnusBrowser.title || "Magnus")
+      magnusItems = Array.isArray(response.magnusBrowser.items) ? response.magnusBrowser.items : []
+      magnusCursor = magnusItems.length ? 0 : -1
+    }
+    if (response.magnusPreview) {
+      magnusBusy = false
+      magnusPreview = response.magnusPreview
     }
     if (response.profiles) {
       profilesLoaded = true
@@ -273,7 +305,7 @@ Panel {
       if (preferenceCloseAfterOpen) Qt.callLater(function() { root.close() })
     }
     else if (response.source === "unavailable" && !staleSearch)
-      feedbackText = "Live Rock search needs Magnus setup"
+      feedbackText = "Live Rock search needs a saved Rock login"
     else if (response.source && !staleSearch)
       feedbackText = ""
     if (staleSearch) Qt.callLater(function() { root.refreshSearch() })
@@ -397,6 +429,58 @@ Panel {
       root.revealItem(personalLinkRepeater.itemAt(root.linkCursor))
     })
   }
+  function openMagnus() {
+    if (!magnusAvailable) return
+    viewMode = "magnus"
+    resultCursor = -1
+    recentCursor = -1
+    linkCursor = -1
+    quickLook = null
+    feedbackText = ""
+    panelFlick.contentY = 0
+    if (!magnusItems.length && !magnusBusy) {
+      magnusHistory = []
+      magnusFolderId = ""
+      magnusFolderTitle = "Magnus"
+      magnusBusy = true
+      request({op: "magnus_browse"})
+    } else if (magnusItems.length) {
+      magnusCursor = Math.max(0, magnusCursor)
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+  }
+  function selectMagnus(index) {
+    if (!magnusItems.length) return
+    magnusCursor = Math.max(0, Math.min(magnusItems.length - 1, index))
+    Qt.callLater(function() {
+      keyCatcher.forceActiveFocus()
+      root.revealItem(magnusRepeater.itemAt(root.magnusCursor))
+    })
+  }
+  function activateMagnus(index) {
+    if (index < 0 || index >= magnusItems.length || magnusBusy) return
+    var item = magnusItems[index]
+    magnusBusy = true
+    if (item.kind === "folder") {
+      magnusHistory = magnusHistory.concat([{id: magnusFolderId, title: magnusFolderTitle}])
+      request({op: "magnus_browse", safeId: item.safeId})
+    } else {
+      request({op: "magnus_preview", safeId: item.safeId})
+    }
+  }
+  function magnusBack() {
+    if (magnusBusy) return
+    if (magnusPreview !== null) {
+      magnusPreview = null
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+      return
+    }
+    if (!magnusHistory.length) return
+    var previous = magnusHistory[magnusHistory.length - 1]
+    magnusHistory = magnusHistory.slice(0, magnusHistory.length - 1)
+    magnusBusy = true
+    request({op: "magnus_browse", safeId: previous.id})
+  }
   function selectSearchItem(index) {
     if (queryIsEmpty) selectRecent(index)
     else selectResult(index)
@@ -407,11 +491,15 @@ Panel {
         selectSearchItem(0)
       else if (viewMode === "search")
         selectPersonalLink(0)
+      else if (viewMode === "personal" && magnusAvailable)
+        openMagnus()
       else
         focusSearch()
       return
     }
-    if (viewMode === "personal") {
+    if (viewMode === "magnus") {
+      selectPersonalLink(Math.max(0, navigationCount - 1))
+    } else if (viewMode === "personal") {
       if (activeSearchCount) selectSearchItem(activeSearchCount - 1)
       else focusSearch()
     } else if (resultCursor >= 0 || recentCursor >= 0) {
@@ -426,6 +514,15 @@ Panel {
       return
     }
     if (dy === 0) return
+    if (viewMode === "magnus") {
+      if (magnusPreview !== null) return
+      if (!magnusCount) return
+      var nextMagnus = magnusCursor < 0 ? (dy > 0 ? 0 : magnusCount - 1) : magnusCursor + dy
+      if (nextMagnus < 0) selectPersonalLink(Math.max(0, navigationCount - 1))
+      else if (nextMagnus >= magnusCount) focusSearch()
+      else selectMagnus(nextMagnus)
+      return
+    }
     if (viewMode === "search") {
       var searchCursor = showRecentLinks ? recentCursor : resultCursor
       if (searchCursor < 0) {
@@ -471,6 +568,10 @@ Panel {
       }
       return
     }
+    if (viewMode === "magnus") {
+      if (magnusPreview === null) activateMagnus(magnusCursor)
+      return
+    }
     if (linkCursor < 0 || linkCursor >= navigationCount) return
     request({op: "open_navigation", safeId: personalLinks[linkCursor].safeId})
   }
@@ -481,7 +582,7 @@ Panel {
       activateResult(0)
     }
   }
-  function saveMagnusCredentials() {
+  function saveRockCredentials() {
     var username = setupUsername.trim()
     if (!username || !setupPassword || setupBusy || !activeProfileId) return
     setupBusy = true
@@ -504,6 +605,9 @@ Panel {
     if (!profileId || profileId === activeProfileId || setupBusy) return
     setupBusy = true
     editLoginMode = false
+    magnusItems = []
+    magnusPreview = null
+    magnusHistory = []
     pendingSuccessText = "Profile switched"
     request({op: "profile_switch", profileId: profileId})
   }
@@ -552,6 +656,9 @@ Panel {
     recentCursor = -1
     linkCursor = -1
     quickLook = null
+    magnusItems = []
+    magnusPreview = null
+    magnusHistory = []
     setupPassword = ""
     request({op: "set_context", context: contextName})
     request({op: "status"})
@@ -574,7 +681,7 @@ Panel {
   Process {
     id: brokerProcess
     command: ["python3", "-m", "rock_lens_broker"]
-    workingDirectory: root.projectPath
+    workingDirectory: root.packageRoot
     running: true
   }
 
@@ -631,7 +738,7 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: "ROCK" + (root.developerMode ? " " + root.contextName : "") +
-      (root.contextName === "PROD" && root.magnusConfigured ? "  ●" : "")
+      (root.contextName === "PROD" && root.rockConfigured ? "  ●" : "")
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
     horizontalMargin: 8
     onPressed: root.toggle()
@@ -650,13 +757,16 @@ Panel {
     RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus
-      backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0
+      blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus || magnusTextArea.activeFocus
+      backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
       onActivateRequested: root.activateCursor()
-      onBackspaceRequested: root.backspaceToSearch()
+      onBackspaceRequested: {
+        if (root.viewMode === "magnus") root.magnusBack()
+        else root.backspaceToSearch()
+      }
 
       Column {
         id: content
@@ -678,7 +788,7 @@ Panel {
           }
           Item { Layout.fillWidth: true }
           Repeater {
-            model: ["search", "personal"]
+            model: root.magnusAvailable ? ["search", "personal", "magnus"] : ["search", "personal"]
             delegate: Rectangle {
               required property var modelData
               Layout.preferredWidth: tabText.implicitWidth + 20
@@ -688,7 +798,7 @@ Panel {
               Text {
                 id: tabText
                 anchors.centerIn: parent
-                text: modelData === "search" ? "Search" : "Personal Links"
+                text: modelData === "search" ? "Search" : (modelData === "personal" ? "Personal Links" : "Magnus")
                 color: Color.foreground
                 font.bold: root.viewMode === modelData
               }
@@ -697,7 +807,8 @@ Panel {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   if (modelData === "search") root.focusSearch()
-                  else root.selectPersonalLink(0)
+                  else if (modelData === "personal") root.selectPersonalLink(0)
+                  else root.openMagnus()
                 }
               }
             }
@@ -753,7 +864,7 @@ Panel {
                 root.moveCursor(0, event.key === Qt.Key_Down ? 1 : -1)
                 event.accepted = true
               } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                if (root.contextName === "PROD" && !root.magnusConfigured) return
+                if (root.contextName === "PROD" && !root.rockConfigured) return
                 var backwards = event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier)
                 root.moveTab(backwards ? -1 : 1)
                 event.accepted = true
@@ -795,7 +906,7 @@ Panel {
         }
 
         Column {
-          visible: root.viewMode !== "settings" && root.contextName === "PROD" && !root.magnusConfigured
+          visible: root.viewMode !== "settings" && root.contextName === "PROD" && !root.rockConfigured
           width: content.width
           height: visible ? implicitHeight : 0
           spacing: Style.spacing.sm
@@ -815,7 +926,7 @@ Panel {
 
         Flickable {
           id: panelFlick
-          readonly property real maximumHeight: Style.space(root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.magnusConfigured ? 180 : 420))
+          readonly property real maximumHeight: Style.space(root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 420))
           width: content.width
           height: Math.min(maximumHeight, Math.max(Style.space(72), body.implicitHeight))
           contentWidth: width
@@ -890,7 +1001,7 @@ Panel {
               Text {
                 visible: root.results.length === 0
                 width: body.width
-                text: root.contextName === "PROD" && !root.magnusConfigured ? "Live results stay empty until Magnus is configured." : "No matching results."
+                text: root.contextName === "PROD" && !root.rockConfigured ? "Live results stay empty until a Rock login is saved." : "No matching results."
                 color: Color.foreground
                 opacity: 0.6
                 wrapMode: Text.WordWrap
@@ -999,7 +1110,7 @@ Panel {
                 visible: root.personalLinks.length === 0
                 width: body.width
                 text: root.contextName !== "PROD" ? "Switch to PROD to load your Rock bookmarks." :
-                  root.magnusConfigured ? "No same-site Personal Links were returned." : "Magnus setup is needed to load Personal Links."
+                  root.rockConfigured ? "No same-site Personal Links were returned." : "A Rock login is needed to load Personal Links."
                 color: Color.foreground
                 opacity: 0.6
                 wrapMode: Text.WordWrap
@@ -1026,6 +1137,134 @@ Panel {
                     onClicked: {
                       root.selectPersonalLink(index)
                       root.request({op: "open_navigation", safeId: modelData.safeId})
+                    }
+                  }
+                }
+              }
+            }
+
+            Column {
+              visible: root.viewMode === "magnus"
+              width: body.width
+              height: visible ? implicitHeight : 0
+              spacing: Style.spacing.sm
+
+              RowLayout {
+                width: parent.width
+                Button {
+                  visible: root.magnusPreview !== null || root.magnusHistory.length > 0
+                  text: "Back"
+                  enabled: !root.magnusBusy
+                  onClicked: root.magnusBack()
+                }
+                Text {
+                  Layout.fillWidth: true
+                  text: root.magnusPreview ? root.magnusPreview.title : root.magnusFolderTitle
+                  color: Color.foreground
+                  font.pixelSize: Style.font.heading
+                  font.bold: true
+                  textFormat: Text.PlainText
+                  elide: Text.ElideMiddle
+                }
+                Text {
+                  text: "Read only"
+                  color: "#86efac"
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: true
+                }
+              }
+
+              Text {
+                visible: root.magnusBusy
+                width: parent.width
+                text: "Loading Magnus…"
+                color: Color.foreground
+                opacity: 0.6
+              }
+
+              Column {
+                visible: root.magnusPreview !== null && !root.magnusBusy
+                width: parent.width
+                height: visible ? implicitHeight : 0
+                spacing: Style.spacing.sm
+                Text {
+                  width: parent.width
+                  text: root.magnusPreview ? "SHA-256 · " + root.magnusPreview.sha256 : ""
+                  color: Color.foreground
+                  opacity: 0.55
+                  font.pixelSize: Style.font.bodySmall
+                  textFormat: Text.PlainText
+                  elide: Text.ElideMiddle
+                }
+                ScrollView {
+                  width: parent.width
+                  height: Style.space(320)
+                  clip: true
+                  TextArea {
+                    id: magnusTextArea
+                    text: root.magnusPreview ? root.magnusPreview.content : ""
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.NoWrap
+                    font.family: "monospace"
+                    color: Color.foreground
+                    background: Rectangle {
+                      radius: 7
+                      color: Qt.rgba(1, 1, 1, 0.05)
+                      border.width: 1
+                      border.color: Qt.rgba(1, 1, 1, 0.10)
+                    }
+                    Keys.onEscapePressed: root.magnusBack()
+                  }
+                }
+              }
+
+              Text {
+                visible: root.magnusPreview === null && !root.magnusBusy && root.magnusItems.length === 0
+                width: parent.width
+                text: "This Magnus folder is empty."
+                color: Color.foreground
+                opacity: 0.6
+                wrapMode: Text.WordWrap
+              }
+
+              Repeater {
+                id: magnusRepeater
+                model: root.magnusPreview === null ? root.magnusItems : []
+                delegate: Rectangle {
+                  required property var modelData
+                  required property int index
+                  width: body.width
+                  height: Style.space(48)
+                  radius: 7
+                  color: index === root.magnusCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  Column {
+                    anchors.fill: parent
+                    anchors.margins: 7
+                    Text {
+                      width: parent.width
+                      text: (modelData.kind === "folder" ? "▸ " : "") + modelData.title
+                      color: Color.foreground
+                      font.bold: true
+                      textFormat: Text.PlainText
+                      elide: Text.ElideRight
+                    }
+                    Text {
+                      width: parent.width
+                      text: modelData.kind + (modelData.actions && modelData.actions.length ? " · Server actions: " + modelData.actions.join(", ") : "")
+                      color: Color.foreground
+                      opacity: 0.55
+                      font.pixelSize: Style.font.bodySmall
+                      textFormat: Text.PlainText
+                      elide: Text.ElideRight
+                    }
+                  }
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      root.selectMagnus(index)
+                      root.activateMagnus(index)
                     }
                   }
                 }
@@ -1161,17 +1400,30 @@ Panel {
                   Text { text: "Connection"; color: Color.foreground; font.bold: true }
                   Item { Layout.fillWidth: true }
                   Text {
-                    text: root.magnusConfigured ? "Connected" : "Login required"
-                    color: root.magnusConfigured ? "#86efac" : Color.foreground
-                    opacity: root.magnusConfigured ? 0.9 : 0.62
+                    text: root.rockConfigured ? "Connected" : "Login required"
+                    color: root.rockConfigured ? "#86efac" : Color.foreground
+                    opacity: root.rockConfigured ? 0.9 : 0.62
                     font.pixelSize: Style.font.bodySmall
                   }
+                }
+                Text {
+                  visible: root.rockConfigured
+                  width: parent.width
+                  text: root.magnusState === "available" ? "Magnus · browse, preview, and hash available" :
+                    root.magnusState === "unavailable" ? "Magnus · not installed or not authorized for this account" :
+                    root.magnusState === "error" ? "Magnus · access check could not complete" :
+                    "Magnus · checking access"
+                  color: root.magnusAvailable ? "#86efac" : Color.foreground
+                  opacity: root.magnusAvailable ? 0.88 : 0.58
+                  font.pixelSize: Style.font.bodySmall
+                  wrapMode: Text.WordWrap
+                  textFormat: Text.PlainText
                 }
                 Row {
                   spacing: Style.spacing.sm
                   Button {
-                    visible: root.magnusConfigured
-                    text: root.editLoginMode ? "Cancel" : (root.magnusConfigured ? "Change login" : "Enter login")
+                    visible: root.rockConfigured
+                    text: root.editLoginMode ? "Cancel" : (root.rockConfigured ? "Change login" : "Enter login")
                     enabled: !root.setupBusy
                     onClicked: {
                       root.editLoginMode = !root.editLoginMode
@@ -1181,9 +1433,9 @@ Panel {
                     }
                   }
                   Button {
-                    visible: root.magnusConfigured
+                    visible: root.rockConfigured
                     text: "Test"
-                    enabled: root.magnusConfigured && !root.setupBusy
+                    enabled: root.rockConfigured && !root.setupBusy
                     onClicked: {
                       root.setupBusy = true
                       root.feedbackText = "Testing connection…"
@@ -1191,14 +1443,14 @@ Panel {
                     }
                   }
                   Button {
-                    visible: root.magnusConfigured
+                    visible: root.rockConfigured
                     text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
-                    enabled: root.magnusConfigured && !root.setupBusy
+                    enabled: root.rockConfigured && !root.setupBusy
                     onClicked: root.signOut()
                   }
                 }
                 Column {
-                  visible: root.editLoginMode || !root.magnusConfigured
+                  visible: root.editLoginMode || !root.rockConfigured
                   width: parent.width
                   height: visible ? implicitHeight : 0
                   spacing: Style.spacing.sm
@@ -1220,12 +1472,12 @@ Panel {
                     selectByMouse: true
                     inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
                     onTextChanged: root.setupPassword = text
-                    onAccepted: root.saveMagnusCredentials()
+                    onAccepted: root.saveRockCredentials()
                   }
                   Button {
                     text: root.setupBusy ? "Saving…" : "Save login"
                     enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                    onClicked: root.saveMagnusCredentials()
+                    onClicked: root.saveRockCredentials()
                   }
                 }
               }
@@ -1281,7 +1533,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.9.1 · Ctrl+, opens Settings"
+                text: "Rock Lens 0.10.0 · Ctrl+, opens Settings"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall
@@ -1295,6 +1547,7 @@ Panel {
           width: parent.width
           text: root.feedbackText || (root.searchInFlight ? "Searching…" :
             root.viewMode === "settings" ? "Esc returns to Search · Changes save automatically" :
+            root.viewMode === "magnus" ? (root.magnusPreview ? "Esc or Back returns to files" : "↑↓ browse · Enter preview · Esc back") :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
             root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links" :
             "Try g: groups or w: workflow types · ↑↓ navigate · Enter open")
