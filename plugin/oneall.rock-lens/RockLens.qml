@@ -28,7 +28,7 @@ Panel {
   property string activeProfileId: ""
   property bool preferencePersonContext: true
   property bool preferenceRecentLinks: true
-  property bool preferenceCloseAfterOpen: false
+  property bool preferenceCloseAfterOpen: true
   property var enabledCategories: ["People", "Groups", "Workflows", "Jobs", "Pages", "Content Channel Items"]
   property var quickLook: null
   property var requestQueue: []
@@ -57,6 +57,10 @@ Panel {
   property string magnusFolderTitle: "Magnus"
   property int magnusCursor: -1
   property bool magnusBusy: false
+  property bool magnusActionBusy: false
+  property string pendingMagnusBuildId: ""
+  property string pendingMagnusBuildTitle: ""
+  property bool pendingMagnusBuildRecent: false
   property bool personalLinksAvailable: false
   property bool setupBusy: false
   property bool setupSlow: false
@@ -198,6 +202,10 @@ Panel {
   }
 
   function escapePanel() {
+    if (pendingMagnusBuildId !== "" && !magnusActionBusy) {
+      cancelMagnusBuild()
+      return
+    }
     if (viewMode === "settings") {
       focusSearch()
       return
@@ -216,6 +224,7 @@ Panel {
       searchInFlight = false
       searchPending = false
       searchInFlightQuery = ""
+      magnusActionBusy = false
       feedbackText = "Rock Lens received an invalid response"
       return
     }
@@ -225,6 +234,7 @@ Panel {
       searchPending = false
       searchInFlightQuery = ""
       magnusBusy = false
+      magnusActionBusy = false
       magnusProbeInFlight = false
       if (magnusState === "checking") magnusState = "error"
       pendingSuccessText = ""
@@ -267,6 +277,22 @@ Panel {
     if (response.magnusPreview) {
       magnusBusy = false
       magnusPreview = response.magnusPreview
+    }
+    if (response.magnusDownload) {
+      magnusActionBusy = false
+      feedbackText = "Saved " + response.magnusDownload.savedAs + " to Downloads"
+    }
+    if (response.magnusCopied) {
+      magnusActionBusy = false
+      feedbackText = response.magnusCopied.value === "hash" ? "SHA-256 copied" : "File contents copied"
+    }
+    if (response.magnusBuild) {
+      magnusActionBusy = false
+      pendingMagnusBuildId = ""
+      pendingMagnusBuildTitle = ""
+      pendingMagnusBuildRecent = false
+      feedbackText = String(response.magnusBuild.message || "Build started successfully") +
+        (preferenceRecentLinks ? " · Added to Recent Links" : "")
     }
     if (response.profiles) {
       profilesLoaded = true
@@ -344,6 +370,7 @@ Panel {
     if (!staleSearch && Array.isArray(response.unavailable) && response.unavailable.length)
       feedbackText = "Unavailable: " + response.unavailable.join(", ")
     else if (response.opened === true) {
+      magnusActionBusy = false
       feedbackText = preferenceRecentLinks ? "Opened in Rock and added to Recent Links" : "Opened in Rock"
       if (preferenceCloseAfterOpen) Qt.callLater(function() { root.close() })
     }
@@ -530,6 +557,68 @@ Panel {
       request({op: "magnus_preview", safeId: item.safeId})
     }
   }
+  function hasMagnusAction(action) {
+    return magnusPreview && Array.isArray(magnusPreview.actions) && magnusPreview.actions.indexOf(action) >= 0
+  }
+  function refreshMagnus() {
+    if (magnusBusy || magnusActionBusy) return
+    magnusBusy = true
+    if (magnusPreview)
+      request({op: "magnus_preview", safeId: magnusPreview.safeId})
+    else
+      request({op: "magnus_browse", safeId: magnusFolderId})
+  }
+  function runMagnusAction(op, value) {
+    if (!magnusPreview || magnusBusy || magnusActionBusy) return
+    magnusActionBusy = true
+    var payload = {op: op, safeId: magnusPreview.safeId}
+    if (value) payload.value = value
+    request(payload)
+  }
+  function prepareMagnusBuild(safeId, title, recent) {
+    if (!safeId || magnusBusy || magnusActionBusy) return
+    pendingMagnusBuildId = String(safeId)
+    pendingMagnusBuildTitle = String(title || "mobile app").replace(/^Deploy /, "")
+    pendingMagnusBuildRecent = recent === true
+    feedbackText = "Confirm this production mobile app build"
+  }
+  function cancelMagnusBuild() {
+    if (magnusActionBusy) return
+    pendingMagnusBuildId = ""
+    pendingMagnusBuildTitle = ""
+    pendingMagnusBuildRecent = false
+    feedbackText = "Build cancelled"
+  }
+  function confirmMagnusBuild() {
+    if (!pendingMagnusBuildId || magnusActionBusy) return
+    magnusActionBusy = true
+    request({
+      op: pendingMagnusBuildRecent ? "activate_recent" : "magnus_build",
+      safeId: pendingMagnusBuildId,
+      confirmed: true
+    })
+  }
+  function handleMagnusKey(value) {
+    var key = String(value || "").toLowerCase()
+    if (viewMode !== "magnus" || magnusBusy || magnusActionBusy) return
+    if (magnusPreview) {
+      if (key === "d") runMagnusAction("magnus_download", "")
+      else if (key === "c" && hasMagnusAction("copy")) runMagnusAction("magnus_copy", "content")
+      else if (key === "h") runMagnusAction("magnus_copy", "hash")
+      else if (key === "o" && hasMagnusAction("view")) runMagnusAction("magnus_open", "")
+      else if (key === "r") refreshMagnus()
+      return
+    }
+    if (key === "r") {
+      refreshMagnus()
+      return
+    }
+    if (key === "b" && magnusCursor >= 0 && magnusCursor < magnusItems.length) {
+      var item = magnusItems[magnusCursor]
+      if (item.actions && item.actions.indexOf("build") >= 0)
+        prepareMagnusBuild(item.safeId, item.title, false)
+    }
+  }
   function magnusBack() {
     if (magnusBusy) return
     if (magnusPreview !== null) {
@@ -627,11 +716,23 @@ Panel {
     else if (item.category === "People")
       request({op: "person_quick_look", safeId: item.safeId})
   }
+  function activateRecent(index) {
+    if (index < 0 || index >= quickReturns.length) return
+    var item = quickReturns[index]
+    if (item.kind === "Magnus Build")
+      prepareMagnusBuild(item.safeId, item.title, true)
+    else
+      request({op: "activate_recent", safeId: item.safeId})
+  }
   function activateCursor() {
+    if (pendingMagnusBuildId !== "") {
+      confirmMagnusBuild()
+      return
+    }
     if (viewMode === "search") {
       if (showRecentLinks) {
         if (recentCursor >= 0 && recentCursor < quickReturns.length)
-          request({op: "open_navigation", safeId: quickReturns[recentCursor].safeId})
+          activateRecent(recentCursor)
       } else {
         activateResult(resultCursor)
       }
@@ -646,7 +747,7 @@ Panel {
   }
   function activateFirstSearchItem() {
     if (showRecentLinks) {
-      if (quickReturns.length) request({op: "open_navigation", safeId: quickReturns[0].safeId})
+      if (quickReturns.length) activateRecent(0)
     } else {
       activateResult(0)
     }
@@ -677,6 +778,9 @@ Panel {
     magnusItems = []
     magnusPreview = null
     magnusHistory = []
+    pendingMagnusBuildId = ""
+    pendingMagnusBuildTitle = ""
+    pendingMagnusBuildRecent = false
     pendingSuccessText = "Profile switched"
     request({op: "profile_switch", profileId: profileId})
   }
@@ -741,6 +845,9 @@ Panel {
     magnusItems = []
     magnusPreview = null
     magnusHistory = []
+    pendingMagnusBuildId = ""
+    pendingMagnusBuildTitle = ""
+    pendingMagnusBuildRecent = false
     setupPassword = ""
     request({op: "set_context", context: contextName})
     request({op: "status", probeMagnus: true})
@@ -872,6 +979,7 @@ Panel {
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
       onActivateRequested: root.activateCursor()
+      onTextKey: function(value) { root.handleMagnusKey(value) }
       onBackspaceRequested: {
         if (root.viewMode === "magnus") root.magnusBack()
         else root.backspaceToSearch()
@@ -1181,6 +1289,28 @@ Panel {
                 opacity: 0.6
                 wrapMode: Text.WordWrap
               }
+              Rectangle {
+                visible: root.pendingMagnusBuildId !== "" && root.pendingMagnusBuildRecent
+                width: body.width
+                height: visible ? buildRecentConfirm.implicitHeight + 24 : 0
+                radius: 9
+                color: Qt.rgba(0.45, 0.2, 0.05, 0.35)
+                border.width: 1
+                border.color: "#f59e0b"
+                ColumnLayout {
+                  id: buildRecentConfirm
+                  anchors.fill: parent
+                  anchors.margins: 12
+                  spacing: 8
+                  Text { Layout.fillWidth: true; text: "Deploy " + root.pendingMagnusBuildTitle + " again?"; color: Color.foreground; font.bold: true; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+                  Text { Layout.fillWidth: true; text: "This triggers the production mobile app build stored in Recent Links."; color: Color.foreground; opacity: 0.68; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+                  RowLayout {
+                    Button { text: "Cancel"; enabled: !root.magnusActionBusy; onClicked: root.cancelMagnusBuild() }
+                    Button { text: root.magnusActionBusy ? "Deploying…" : "Deploy again"; enabled: !root.magnusActionBusy; onClicked: root.confirmMagnusBuild() }
+                    Item { Layout.fillWidth: true }
+                  }
+                }
+              }
               Repeater {
                 id: quickReturnRepeater
                 model: root.quickReturns
@@ -1202,7 +1332,7 @@ Panel {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                       root.selectRecent(index)
-                      root.request({op: "open_navigation", safeId: modelData.safeId})
+                      root.activateRecent(index)
                     }
                   }
                 }
@@ -1277,10 +1407,38 @@ Panel {
                   elide: Text.ElideMiddle
                 }
                 Text {
-                  text: "Read only"
+                  text: "Read + deploy"
                   color: "#86efac"
                   font.pixelSize: Style.font.bodySmall
                   font.bold: true
+                }
+                Button {
+                  text: "Refresh"
+                  enabled: !root.magnusBusy && !root.magnusActionBusy
+                  onClicked: root.refreshMagnus()
+                }
+              }
+
+              Rectangle {
+                visible: root.pendingMagnusBuildId !== "" && !root.pendingMagnusBuildRecent
+                width: body.width
+                height: visible ? buildMagnusConfirm.implicitHeight + 24 : 0
+                radius: 9
+                color: Qt.rgba(0.45, 0.2, 0.05, 0.35)
+                border.width: 1
+                border.color: "#f59e0b"
+                ColumnLayout {
+                  id: buildMagnusConfirm
+                  anchors.fill: parent
+                  anchors.margins: 12
+                  spacing: 8
+                  Text { Layout.fillWidth: true; text: "Deploy " + root.pendingMagnusBuildTitle + "?"; color: Color.foreground; font.bold: true; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+                  Text { Layout.fillWidth: true; text: "This triggers a production mobile app build. The successful build will be saved in Recent Links."; color: Color.foreground; opacity: 0.68; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+                  RowLayout {
+                    Button { text: "Cancel"; enabled: !root.magnusActionBusy; onClicked: root.cancelMagnusBuild() }
+                    Button { text: root.magnusActionBusy ? "Deploying…" : "Deploy now"; enabled: !root.magnusActionBusy; onClicked: root.confirmMagnusBuild() }
+                    Item { Layout.fillWidth: true }
+                  }
                 }
               }
 
@@ -1306,9 +1464,27 @@ Panel {
                   textFormat: Text.PlainText
                   elide: Text.ElideMiddle
                 }
-                ScrollView {
+                RowLayout {
                   width: parent.width
-                  height: Style.space(320)
+                  spacing: 6
+                  Button { text: root.magnusActionBusy ? "Working…" : "Download"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_download", "") }
+                  Button { visible: root.hasMagnusAction("copy"); text: "Copy"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_copy", "content") }
+                  Button { text: "Copy hash"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_copy", "hash") }
+                  Button { visible: root.hasMagnusAction("view"); text: "Open in Rock"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_open", "") }
+                  Item { Layout.fillWidth: true }
+                }
+                Text {
+                  visible: root.magnusPreview && root.magnusPreview.previewAvailable !== true
+                  width: parent.width
+                  text: "Preview is unavailable for this binary or large file. You can still download it or copy its hash."
+                  color: Color.foreground
+                  opacity: 0.68
+                  wrapMode: Text.WordWrap
+                }
+                ScrollView {
+                  visible: root.magnusPreview && root.magnusPreview.previewAvailable === true
+                  width: parent.width
+                  height: visible ? Style.space(320) : 0
                   clip: true
                   TextArea {
                     id: magnusTextArea
@@ -1351,6 +1527,7 @@ Panel {
                   Column {
                     anchors.fill: parent
                     anchors.margins: 7
+                    anchors.rightMargin: modelData.actions && modelData.actions.indexOf("build") >= 0 ? 92 : 7
                     Text {
                       width: parent.width
                       text: (modelData.kind === "folder" ? "▸ " : "") + modelData.title
@@ -1361,7 +1538,9 @@ Panel {
                     }
                     Text {
                       width: parent.width
-                      text: modelData.kind + (modelData.actions && modelData.actions.length ? " · Server actions: " + modelData.actions.join(", ") : "")
+                      text: modelData.kind === "folder" ?
+                        (modelData.actions && modelData.actions.indexOf("build") >= 0 ? "Mobile app · deploy available" : "Folder") :
+                        "File · preview and download"
                       color: Color.foreground
                       opacity: 0.55
                       font.pixelSize: Style.font.bodySmall
@@ -1371,10 +1550,26 @@ Panel {
                   }
                   MouseArea {
                     anchors.fill: parent
+                    anchors.rightMargin: modelData.actions && modelData.actions.indexOf("build") >= 0 ? 88 : 0
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                       root.selectMagnus(index)
                       root.activateMagnus(index)
+                    }
+                  }
+                  Button {
+                    visible: modelData.actions && modelData.actions.indexOf("build") >= 0
+                    width: 78
+                    height: 32
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Deploy"
+                    enabled: !root.magnusBusy && !root.magnusActionBusy
+                    z: 2
+                    onClicked: {
+                      root.selectMagnus(index)
+                      root.prepareMagnusBuild(modelData.safeId, modelData.title, false)
                     }
                   }
                 }
@@ -1643,7 +1838,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.10.3 · Ctrl+, opens Settings"
+                    text: "Rock Lens 0.11.0 · Ctrl+, opens Settings"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall
@@ -1660,7 +1855,7 @@ Panel {
             !root.statusLoaded ? "Checking saved Rock login…" :
             root.contextName === "PROD" && !root.rockConfigured ? "Open Settings to save a Rock login." :
             root.viewMode === "settings" ? "Tab Search · Shift+Tab previous · Esc Search · Changes save automatically" :
-            root.viewMode === "magnus" ? (root.magnusPreview ? "Esc or Back returns to files · Tab Settings" : "↑↓ browse · Enter preview · Esc back · Tab Settings") :
+            root.viewMode === "magnus" ? (root.magnusPreview ? "D download · C copy · H hash · O open · R refresh · Esc files" : "↑↓ browse · Enter opens · B deploy · R refresh · Tab Settings") :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
             root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links · Shift+Tab Settings" :
             "Try g: groups or w: workflow types · ↑↓ navigate · Tab switch · Enter open")

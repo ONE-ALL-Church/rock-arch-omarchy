@@ -81,7 +81,7 @@ def configure(argv: list[str]) -> None:
 
 def magnus(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(
-        description="Native read-only Rock Magnus operations"
+        description="Native Rock Magnus reads and controlled mobile app builds"
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("status")
@@ -195,7 +195,7 @@ def main() -> None:
         / "rock-lens"
     )
     parser = argparse.ArgumentParser(
-        description="Owner-local, read-only Rock Lens broker"
+        description="Owner-local Rock Lens broker"
     )
     parser.add_argument("--socket", type=Path, default=runtime / "broker.sock")
     parser.add_argument("--state-file", type=Path, default=state / "context")

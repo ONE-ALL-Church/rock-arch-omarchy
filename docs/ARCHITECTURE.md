@@ -12,12 +12,14 @@
 5. `MockAdapter`: deterministic, synthetic records for People, Groups,
    Workflow Types, Jobs, Pages, and Content Channel Items.
 6. `MagnusReadOnlyAdapter`: optional native capability probe plus descriptor-
-   driven tree browsing, bounded text previews, and hashes on the selected Rock
+   driven browsing, bounded previews/downloads, clipboard values, hashes,
+   same-origin view links, and confirmed mobile app builds on the selected Rock
    origin. It reuses `RockSessionProvider`; no external CLI is launched.
 7. `RockRestReadOnlyAdapter`: six fixed Rock REST v1 entity GETs plus the fixed
    current-user Personal Links action, authenticated by the native Rock session.
-8. `QuickReturnStore`: same-origin launcher history, deduplicated and capped at
-   20 in an owner-only JSON file.
+8. `QuickReturnStore`: same-origin launcher and successful-build history,
+   deduplicated and capped at 20 in an owner-only JSON file. Build entries are
+   executed only through the Magnus validator and require confirmation again.
 
 ## Trust boundary
 
@@ -78,8 +80,9 @@ the context control, and the broker rejects requests to enter DEV. Synthetic
 DEV data is available only when the broker process starts with the exact
 `ROCK_LENS_DEVELOPER_MODE=1` flag; values such as `true` or `yes` fail closed.
 When enabled, the UI restores the visibly labeled context control and explicit
-`set_context` requests may select either context. Both contexts remain
-read-only, and PROD never falls back to synthetic data.
+`set_context` requests may select either context. DEV remains synthetic, PROD
+never falls back to synthetic data, and only PROD can perform the narrowly
+gated Magnus mobile app build action.
 
 ## Live REST boundary
 
@@ -134,11 +137,13 @@ and files cross QML only as process-local opaque IDs. Text previews are explicit
 user actions, UTF-8 only, reject NUL bytes, and are capped at 64 KiB; file reads
 are capped at 4 MiB and tree responses at 2 MiB.
 
-Descriptors are sanitized into `build`, `delete`, `upload`, `newFile`, and
-`newFolder` availability labels only when their URI is same-origin and has the
-expected Magnus action prefix. Those labels do not grant an operation: this
-release exposes only browse, preview, and hash. There are no write, remove,
-upload, create, build, deployment, arbitrary HTTP, or raw URL operations.
+Descriptors become capabilities only after validation. Files expose bounded
+download, content/hash copy, and an optional same-origin view target. Folders
+expose build only when Magnus supplies the exact numeric mobile app build path.
+Delete, upload, new-file, new-folder, broader build, arbitrary HTTP, and raw URL
+operations are discarded. Build uses the Magnus CLI-compatible POST contract,
+has no automatic retry, and requires confirmation in QML before the broker is
+called.
 
 ## Navigation, Personal Links, and Recent Links
 
@@ -151,13 +156,16 @@ Item (`/ContentChannelItem/{Id}`). Personal Link targets may be relative but
 must resolve to HTTPS on the selected Rock origin; external and malformed
 links are omitted.
 
-Successful user-requested opens are shown as Recent Links. The underlying Quick
-Return store keeps the title, type, order, target, and timestamp locally, but
+Successful user-requested opens and successful mobile app builds are shown as
+Recent Links. The underlying Quick Return store keeps the title, type, order,
+target, and timestamp locally, but
 returns only another process-local opaque ID, title, and type to QML. Its
 directory is `0700`, its file is `0600`, writes are atomic, entries are
 validated on every read, and the oldest entries are removed beyond 20. Each
 origin receives a separate store, and Recent Links are omitted from DEV
-responses. The broker serves this local list independently from Personal Links,
+responses. A Magnus Build entry cannot be opened as a URL; activation routes it
+back through the build-path validator after another UI confirmation. The broker
+serves this local list independently from Personal Links,
 so showing the empty Search state never performs a Rock network request. This
 intentionally emulates Rock's useful return list without importing browser-local
 Rock history.

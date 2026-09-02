@@ -1,6 +1,5 @@
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 QML_PATH = (
     Path(__file__).resolve().parents[1]
@@ -36,6 +35,23 @@ class QmlNavigationTests(unittest.TestCase):
             "      openSettings(false)",
             source,
         )
+
+    def test_magnus_actions_and_recent_builds_are_explicit(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+
+        for operation in (
+            '"magnus_download"',
+            '"magnus_copy"',
+            '"magnus_open"',
+            '"magnus_build"',
+            '"activate_recent"',
+        ):
+            self.assertIn(operation, source)
+        self.assertIn('text: "Deploy now"', source.replace('root.magnusActionBusy ? "Deploying…" : ', ''))
+        self.assertIn('item.kind === "Magnus Build"', source)
+        self.assertIn("confirmed: true", source)
+        self.assertIn('key === "b"', source)
+        self.assertNotIn("Server actions:", source)
 
 
 if __name__ == "__main__":

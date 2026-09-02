@@ -17,13 +17,17 @@ search, Personal Links, and Recent Links continue normally. A transient network
 failure is reported as a capability-check error and can be retried by reopening
 the panel or testing the profile connection.
 
-## Read-only functionality
+## Controlled functionality
 
 Authorized profiles receive a **Magnus** tab with:
 
 - descriptor-driven folder browsing;
 - explicit UTF-8 text preview capped at 64 KiB;
-- SHA-256 for every preview;
+- bounded downloads saved without overwrite and with mode `0600`;
+- content and SHA-256 clipboard copy through stdin, never argv;
+- SHA-256 for every selected file, including binary files;
+- same-origin **Open in Rock** when the descriptor advertises a view URI;
+- explicit, confirmed mobile app builds;
 - same-origin validation for tree, content, and advertised action URIs.
 
 The terminal interface uses the same native adapter:
@@ -47,9 +51,10 @@ backslashes, control characters, and traversal segments are rejected. Tree
 responses are capped at 2 MiB/500 items and content reads at 4 MiB.
 
 QML never receives these paths. The broker registers each folder and file under
-a process-local HMAC identifier. Item descriptors may advertise `build`,
-`delete`, `upload`, `newFile`, or `newFolder`; Rock Lens emits only the validated
-action name as informational UI and discards the URI. Magnus uses the generic
+a process-local HMAC identifier. The broker retains a build URI only when it is
+same-origin and exactly matches
+`/api/TriumphTech/Magnus/Build/mobileapps/{numeric-id}`. Delete, upload, new-file,
+new-folder, and broader build URIs are discarded. Magnus uses the generic
 descriptor `Uri` for both folders and files, so the broker validates it as a
 tree path or content path according to the descriptor's `IsFolder` value.
 
@@ -65,12 +70,18 @@ records written by earlier releases to neutral `rock_username` and
 `rock_password` keys, then removes the obsolete records. Sign-out clears both
 new and legacy keys as well as the in-memory cookie.
 
-## Mutation and promotion policy
+## Build and promotion policy
 
-This release does not expose Magnus `write`, `build`, `rm`, `mkdir`, `touch`, or
-`upload` through QML, the broker socket, or its Python adapter. A future authoring
-workspace must preserve the descriptor-derived URI internally and add, in
-order:
+Version 0.11 exposes the Magnus CLI-compatible `POST` build action only for a
+descriptor-provided mobile app URI. The first run and every Recent Link rerun
+require an inline production confirmation. A successful build is stored as a
+profile-scoped **Magnus Build** Recent Link without exposing the URI to QML.
+Rock Lens does not retry a timed-out build because the server may already have
+accepted it.
+
+Magnus `write`, `rm`, `mkdir`, `touch`, and `upload` remain unavailable through
+QML, the broker socket, and the Python adapter. A future authoring workspace
+must add, in order:
 
 1. a mode-`0600` rollback copy and before/after hash;
 2. a local diff and explicit confirmation;

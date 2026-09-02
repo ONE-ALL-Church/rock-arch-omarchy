@@ -1,4 +1,4 @@
-"""Rock Lens local broker. Public API is intentionally small and read-only."""
+"""Rock Lens local broker with a deliberately narrow public API."""
 
 from .contracts import Context, HealthState
 

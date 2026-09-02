@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .auth import AuthState, ConfigStore, OAuthManager, default_config_path
+from .clipboard import copy_to_clipboard
 from .contracts import (
-    CATEGORIES,
     Capability,
     Context,
     HealthState,
@@ -18,7 +18,7 @@ from .contracts import (
     sanitize_text,
 )
 from .instance import InstanceStore, default_instance_path
-from .magnus_adapter import MagnusError, MagnusReadOnlyAdapter
+from .magnus_adapter import MagnusBuildOutcome, MagnusError, MagnusReadOnlyAdapter
 from .mock_adapter import MockAdapter
 from .navigation import NavigationTarget, open_rock_url
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
@@ -32,6 +32,8 @@ class RockSessionStatusProvider(Protocol):
     def status(self) -> dict[str, Any]: ...
 
     def authenticated_cookie(self) -> AbstractContextManager[str]: ...
+
+    def invalidate_authenticated_cookie(self) -> None: ...
 
     def configure(self, username: str, password: str) -> None: ...
 
@@ -63,7 +65,17 @@ class MagnusStatusProvider(Protocol):
 
     def browse(self, safe_id: str = "") -> dict[str, Any]: ...
 
-    def preview(self, safe_id: str) -> dict[str, str]: ...
+    def preview(self, safe_id: str) -> dict[str, Any]: ...
+
+    def download(self, safe_id: str) -> dict[str, Any]: ...
+
+    def copy_value(self, safe_id: str, value: str) -> str: ...
+
+    def view_target(self, safe_id: str) -> NavigationTarget: ...
+
+    def build(self, safe_id: str) -> MagnusBuildOutcome: ...
+
+    def build_recent(self, url: str, title: str) -> MagnusBuildOutcome: ...
 
 
 class LiveReadAdapter(Protocol):
@@ -97,6 +109,7 @@ class Broker:
         live: LiveReadAdapter | None = None,
         quick_returns: QuickReturnStore | None = None,
         url_opener: Callable[[str], bool] | None = None,
+        clipboard_writer: Callable[[str], bool] | None = None,
         instance_file: Path | None = None,
         profile_file: Path | None = None,
         developer_mode: bool | None = None,
@@ -162,6 +175,7 @@ class Broker:
         if quick_returns and self._origin:
             self._quick_returns.set_origin(self._origin)
         self._url_opener = url_opener
+        self._clipboard_writer = clipboard_writer or copy_to_clipboard
         self._live_health = HealthState.UNKNOWN
         self._auth = auth or OAuthManager(
             ConfigStore(config_file or default_config_path())
@@ -412,6 +426,57 @@ class Broker:
             except MagnusError as error:
                 return self._error(str(error))
             return self._ok(magnus=self._magnus.status(), magnusPreview=preview)
+        if op == "magnus_download":
+            if self._context is not Context.PROD:
+                return self._error("magnus_requires_prod")
+            safe_id = raw.get("safeId")
+            if not isinstance(safe_id, str):
+                return self._error("invalid_magnus_item")
+            try:
+                download = self._magnus.download(sanitize_text(safe_id, 100))
+            except MagnusError as error:
+                return self._error(str(error))
+            return self._ok(magnusDownload=download)
+        if op == "magnus_copy":
+            if self._context is not Context.PROD:
+                return self._error("magnus_requires_prod")
+            safe_id = raw.get("safeId")
+            value = raw.get("value")
+            if not isinstance(safe_id, str) or value not in {"content", "hash"}:
+                return self._error("invalid_magnus_item")
+            try:
+                copied_value = self._magnus.copy_value(
+                    sanitize_text(safe_id, 100), value
+                )
+            except MagnusError as error:
+                return self._error(str(error))
+            if not self._clipboard_writer(copied_value):
+                return self._error("clipboard_unavailable")
+            return self._ok(magnusCopied={"value": value})
+        if op == "magnus_open":
+            if self._context is not Context.PROD:
+                return self._error("magnus_requires_prod")
+            safe_id = raw.get("safeId")
+            if not isinstance(safe_id, str):
+                return self._error("invalid_magnus_item")
+            try:
+                target = self._magnus.view_target(sanitize_text(safe_id, 100))
+            except MagnusError as error:
+                return self._error(str(error))
+            return self._open_target(target)
+        if op == "magnus_build":
+            if self._context is not Context.PROD:
+                return self._error("magnus_requires_prod")
+            if raw.get("confirmed") is not True:
+                return self._error("build_confirmation_required")
+            safe_id = raw.get("safeId")
+            if not isinstance(safe_id, str):
+                return self._error("invalid_magnus_item")
+            try:
+                outcome = self._magnus.build(sanitize_text(safe_id, 100))
+            except MagnusError as error:
+                return self._error(str(error))
+            return self._complete_build(outcome)
         if op == "search":
             query, category = parse_search_query(raw.get("query"))
             preferences = self._profile_store.preferences()
@@ -500,6 +565,11 @@ class Broker:
             return self._navigation_status(section)
         if op == "open_navigation":
             return self._open_navigation(sanitize_text(raw.get("safeId"), 100))
+        if op == "activate_recent":
+            return self._activate_recent(
+                sanitize_text(raw.get("safeId"), 100),
+                raw.get("confirmed") is True,
+            )
         return self._error("unsupported_operation")
 
     def _navigation_status(self, section: str) -> dict[str, Any]:
@@ -537,6 +607,11 @@ class Broker:
         target = self._live.resolve(safe_id) or self._quick_returns.resolve(safe_id)
         if not isinstance(target, NavigationTarget):
             return self._error("not_found")
+        if target.kind == "Magnus Build":
+            return self._error("build_confirmation_required")
+        return self._open_target(target)
+
+    def _open_target(self, target: NavigationTarget) -> dict[str, Any]:
         opened = (
             self._url_opener(target.url)
             if self._url_opener
@@ -549,6 +624,35 @@ class Broker:
             self._quick_returns.add(target)
         return self._ok(
             opened=True,
+            quickReturns=(
+                self._quick_returns.public_items() if recent_links_enabled else []
+            ),
+        )
+
+    def _activate_recent(self, safe_id: str, confirmed: bool = False) -> dict[str, Any]:
+        if self._context is not Context.PROD:
+            return self._error("navigation_requires_prod")
+        target = self._quick_returns.resolve(safe_id)
+        if not isinstance(target, NavigationTarget):
+            return self._error("not_found")
+        if target.kind != "Magnus Build":
+            return self._open_target(target)
+        if not confirmed:
+            return self._error("build_confirmation_required")
+        try:
+            outcome = self._magnus.build_recent(
+                target.url, target.title.removeprefix("Deploy ")
+            )
+        except MagnusError as error:
+            return self._error(str(error))
+        return self._complete_build(outcome)
+
+    def _complete_build(self, outcome: MagnusBuildOutcome) -> dict[str, Any]:
+        recent_links_enabled = self._profile_store.preferences()["recentLinks"]
+        if recent_links_enabled:
+            self._quick_returns.add(outcome.target)
+        return self._ok(
+            magnusBuild=outcome.public_dict(),
             quickReturns=(
                 self._quick_returns.public_items() if recent_links_enabled else []
             ),

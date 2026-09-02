@@ -1,7 +1,10 @@
 import json
+import tempfile
 import unittest
 import urllib.error
 from contextlib import contextmanager
+from email.message import Message
+from pathlib import Path
 
 from rock_lens_broker.magnus_adapter import (
     CANONICAL_MAGNUS_SERVER,
@@ -51,6 +54,13 @@ class FakeMagnusHttp:
     def get_bytes(self, origin, path, cookie):
         self.calls.append(("bytes", origin, path, cookie))
         value = self.responses.get(path, b"")
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    def post_json(self, origin, path, cookie):
+        self.calls.append(("post", origin, path, cookie))
+        value = self.responses.get(path, {})
         if isinstance(value, Exception):
             raise value
         return value
@@ -130,7 +140,16 @@ class MagnusAdapterTests(unittest.TestCase):
         self.assertTrue(adapter.probe())
         self.assertEqual(adapter.status()["state"], "available")
         self.assertEqual(
-            adapter.status()["capabilities"], ["browse", "preview", "hash"]
+            adapter.status()["capabilities"],
+            [
+                "browse",
+                "preview",
+                "hash",
+                "download",
+                "copy",
+                "open",
+                "mobile_app_build",
+            ],
         )
 
         denied = MagnusReadOnlyAdapter(
@@ -160,13 +179,13 @@ class MagnusAdapterTests(unittest.TestCase):
         adapter.set_profile("second-profile", CANONICAL_MAGNUS_SERVER)
         self.assertEqual(adapter.status()["state"], "unknown")
 
-    def test_tree_descriptors_drive_read_only_capabilities_and_use_opaque_ids(self):
+    def test_tree_descriptors_drive_controlled_capabilities_and_use_opaque_ids(self):
         tree = [
             {
-                "DisplayName": "Themes",
+                "DisplayName": "ONE&ALL Mobile",
                 "IsFolder": True,
-                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/Themes",
-                "BuildUri": "/api/TriumphTech/Magnus/Build/Themes",
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/mobileapps/14",
                 "DeleteUri": "https://attacker.example/delete",
             },
             {
@@ -191,6 +210,40 @@ class MagnusAdapterTests(unittest.TestCase):
         self.assertNotIn("GetTreeItems", serialized)
         self.assertNotIn("FileContent", serialized)
         self.assertNotIn("attacker.example", serialized)
+        self.assertNotIn("Build/mobileapps", serialized)
+
+    def test_only_exact_mobile_app_build_descriptors_are_enabled(self):
+        tree = [
+            {
+                "DisplayName": "App",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/mobileapps/14",
+            },
+            {
+                "DisplayName": "Theme",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/Themes",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/Themes",
+            },
+            {
+                "DisplayName": "Foreign",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/15",
+                "BuildUri": "https://attacker.example/api/TriumphTech/Magnus/Build/mobileapps/15",
+            },
+        ]
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(),
+            CANONICAL_MAGNUS_SERVER,
+            FakeMagnusHttp({"/" + DEFAULT_TREE_PATH: tree}),
+        )
+
+        rows = adapter.browse()["items"]
+
+        self.assertEqual(rows[0]["actions"], ["build"])
+        self.assertEqual(rows[1]["actions"], [])
+        self.assertEqual(rows[2]["actions"], [])
 
     def test_generic_uri_is_discriminated_by_folder_type(self):
         tree = [
@@ -243,8 +296,83 @@ class MagnusAdapterTests(unittest.TestCase):
         self.assertEqual(len(preview["sha256"]), 64)
 
         http.responses[path] = b"\x00binary"
-        with self.assertRaisesRegex(MagnusError, "preview_unavailable"):
-            adapter.preview(safe_id)
+        binary = adapter.preview(safe_id)
+        self.assertFalse(binary["previewAvailable"])
+        self.assertEqual(binary["content"], "")
+        self.assertEqual(binary["actions"], ["download", "copyHash"])
+
+    def test_download_copy_and_remote_view_are_bounded_and_private(self):
+        tree = [
+            {
+                "DisplayName": "mobile.json",
+                "IsFolder": False,
+                "FileContentUri": "/api/TriumphTech/Magnus/FileContent/mobileapps/14/mobile.json",
+                "RemoteViewUri": "/page/123?file=mobile.json",
+            }
+        ]
+        path = MAGNUS_API_PREFIX + "/FileContent/mobileapps/14/mobile.json"
+        http = FakeMagnusHttp(
+            {"/" + DEFAULT_TREE_PATH: tree, path: b'{"name":"ONE&ALL"}'}
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            downloads = Path(temporary) / "Downloads"
+            adapter = MagnusReadOnlyAdapter(
+                FakeCookieProvider(), CANONICAL_MAGNUS_SERVER, http, downloads
+            )
+            row = adapter.browse()["items"][0]
+            self.assertEqual(row["actions"], ["download", "copyHash", "view"])
+            safe_id = row["safeId"]
+            self.assertEqual(adapter.copy_value(safe_id, "content"), '{"name":"ONE&ALL"}')
+            self.assertEqual(len(adapter.copy_value(safe_id, "hash")), 64)
+            first = adapter.download(safe_id)
+            second = adapter.download(safe_id)
+            self.assertEqual(first["savedAs"], "mobile.json")
+            self.assertEqual(second["savedAs"], "mobile (1).json")
+            self.assertEqual((downloads / "mobile.json").read_bytes(), b'{"name":"ONE&ALL"}')
+            self.assertEqual((downloads / "mobile.json").stat().st_mode & 0o777, 0o600)
+            self.assertEqual(
+                adapter.view_target(safe_id).url,
+                CANONICAL_MAGNUS_SERVER + "/page/123?file=mobile.json",
+            )
+            self.assertNotIn(str(downloads), json.dumps(first))
+
+    def test_mobile_app_build_posts_descriptor_uri_and_returns_repeat_target(self):
+        tree = [
+            {
+                "DisplayName": "ONE&ALL Mobile",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/mobileapps/14",
+            }
+        ]
+        build_path = "/api/TriumphTech/Magnus/Build/mobileapps/14"
+        http = FakeMagnusHttp(
+            {
+                "/" + DEFAULT_TREE_PATH: tree,
+                build_path: {
+                    "ActionSuccessful": True,
+                    "ResponseMessage": "Build queued.",
+                },
+            }
+        )
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(), CANONICAL_MAGNUS_SERVER, http
+        )
+        safe_id = adapter.browse()["items"][0]["safeId"]
+
+        outcome = adapter.build(safe_id)
+
+        self.assertEqual(outcome.public_dict(), {"title": "ONE&ALL Mobile", "message": "Build queued."})
+        self.assertEqual(outcome.target.kind, "Magnus Build")
+        self.assertEqual(outcome.target.url, CANONICAL_MAGNUS_SERVER + build_path)
+        self.assertEqual(http.calls[-1][0], "post")
+        repeated = adapter.build_recent(outcome.target.url, outcome.title)
+        self.assertEqual(repeated.target.url, outcome.target.url)
+        with self.assertRaisesRegex(MagnusError, "not_allowed"):
+            adapter.build_recent(
+                CANONICAL_MAGNUS_SERVER + "/api/TriumphTech/Magnus/Build/Themes",
+                "Theme",
+            )
 
     def test_http_client_bounds_responses_and_never_follows_action_urls(self):
         opener = FakeOpener(b"x" * (MAX_FILE_BYTES + 1))
@@ -263,7 +391,7 @@ class MagnusAdapterTests(unittest.TestCase):
         denied = MagnusHttpClient(
             FakeOpener(
                 failure=urllib.error.HTTPError(
-                    "https://rock.example", 403, "Forbidden", {}, None
+                    "https://rock.example", 403, "Forbidden", Message(), None
                 )
             )
         )
@@ -274,9 +402,20 @@ class MagnusAdapterTests(unittest.TestCase):
                 ".ROCK=test-session",
             )
 
-    def test_no_mutating_methods_are_exposed(self):
+        post_opener = FakeOpener(b'{"ActionSuccessful":true}')
+        post_client = MagnusHttpClient(post_opener)
+        post_client.post_json(
+            CANONICAL_MAGNUS_SERVER,
+            "/api/TriumphTech/Magnus/Build/mobileapps/14",
+            ".ROCK=test-session",
+        )
+        post_request, _ = post_opener.calls[0]
+        self.assertEqual(post_request.get_method(), "POST")
+        self.assertEqual(post_request.data, b"")
+
+    def test_file_mutation_methods_are_not_exposed(self):
         adapter = MagnusReadOnlyAdapter(FakeCookieProvider(), CANONICAL_MAGNUS_SERVER)
-        for name in ("write_file", "build", "delete_resource", "create_file", "create_folder", "upload_files"):
+        for name in ("write_file", "delete_resource", "create_file", "create_folder", "upload_files"):
             self.assertFalse(hasattr(adapter, name), name)
 
 

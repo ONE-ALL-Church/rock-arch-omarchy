@@ -1,6 +1,6 @@
 # Rock Lens
 
-Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. Every
+Rock Lens is an Omarchy 4.0.2+ launcher for Rock RMS discovery. Every
 user signs in directly to their Rock instance through the native Python broker;
 Magnus is not the login provider and neither the Magnus CLI nor Rock MCP is a
 runtime dependency. The resulting `.ROCK` cookie is retained only in broker
@@ -8,12 +8,14 @@ memory with a 15-minute idle timeout and authenticates six fixed Rock REST v1
 search resources plus the current person's Personal Links.
 
 After login, Rock Lens probes the optional server-side Magnus API. Users whose
-account and Rock instance expose it receive a separate read-only **Magnus** tab
-for filesystem-style browsing, bounded text preview, and SHA-256 verification.
+account and Rock instance expose it receive a separate **Magnus** tab for
+filesystem-style browsing, bounded text preview, download, clipboard copy,
+SHA-256 verification, same-origin viewing, and controlled mobile app builds.
 Everyone else keeps the complete search, Personal Links, and Recent Links
 experience without an error or empty core UI. Magnus item descriptors determine
-which server actions exist, but write, build, upload, create, and delete remain
-disabled.
+which server actions exist. Only exact descriptor-provided mobile-app build
+endpoints can be triggered, and every build requires an explicit production
+confirmation. Write, upload, create, and delete remain disabled.
 
 A compact Settings view supports multiple Rock instances or accounts,
 connection testing, sign-out, profile removal, per-profile Recent Links,
@@ -117,6 +119,9 @@ preferences are non-secret metadata stored owner-only at
 stored there; Secret Service keys use stable random profile IDs, so two accounts
 on the same Rock instance remain separate. Existing single-instance setup and
 Recent Links migrate automatically, with the old history retained as rollback.
+Successful mobile app builds are also added as **Magnus Build** Recent Links so
+they can be re-triggered quickly; re-triggering always displays the production
+confirmation again.
 
 ## Configure a Rock profile
 
@@ -200,12 +205,15 @@ history.
 - Personal Links are read-only, restricted to same-origin HTTPS targets, and
   represented outside the broker by opaque IDs.
 - Recent Links (the local Quick Return store) contain only launcher-opened
-  targets, are capped at 20, are visible only in PROD, and are stored under
+  targets and successfully triggered mobile app builds, are capped at 20, are
+  visible only in PROD, and are stored under
   `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
-- There is no mutation transport, SQL execution, job trigger, or Run Now UI.
+- There is no general mutation transport, SQL execution, job trigger, or Run
+  Now UI. The sole server-side action is an explicitly confirmed mobile app
+  build advertised by the selected Magnus descriptor.
 - Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
-  and traversal paths, uses the same authenticated Rock session, and exposes no
-  mutation operation.
+  and traversal paths, uses the same authenticated Rock session, and does not
+  expose write, upload, create, or delete operations.
 - Broker errors are reduced to stable public codes. Response bodies, tokens,
   cookies, SQL, unselected PII, URLs, and exceptions are not logged or
   forwarded to QML.

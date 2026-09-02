@@ -17,6 +17,7 @@ from rock_lens_broker.contracts import (
     parse_search_query,
 )
 from rock_lens_broker.instance import InstanceStore
+from rock_lens_broker.magnus_adapter import MagnusBuildOutcome
 from rock_lens_broker.navigation import NavigationTarget
 from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
 from rock_lens_broker.rock_rest_adapter import SearchBatch
@@ -40,6 +41,9 @@ class FakeSession:
     def authenticated_cookie(self):
         yield ".ROCK=test-session"
 
+    def invalidate_authenticated_cookie(self):
+        return None
+
     def configure(self, username, password):
         self.saved = (username, password)
         self.configured = True
@@ -47,9 +51,9 @@ class FakeSession:
     def set_server(self, value):
         self.server = value
 
-    def set_profile(self, profile_id, value):
+    def set_profile(self, profile_id, server):
         self.profile_id = profile_id
-        self.server = value
+        self.server = server
 
     def clear_profile(self):
         self.profile_id = ""
@@ -81,23 +85,24 @@ class FakeMagnus:
         self.server = DEFAULT_ROCK_ORIGIN
         self.state = "available" if available else "unavailable"
         self.probe_calls = 0
+        self.build_calls = []
 
     def status(self):
         return {
             "available": self.available,
             "configured": True,
             "state": self.state,
-            "mode": "read_only",
-            "capabilities": ["browse", "preview", "hash"] if self.available else [],
+            "mode": "controlled",
+            "capabilities": ["browse", "preview", "hash", "download", "copy", "open", "mobile_app_build"] if self.available else [],
             "server": self.server.removeprefix("https://"),
         }
 
     def set_server(self, value):
         self.server = value
 
-    def set_profile(self, profile_id, value):
+    def set_profile(self, profile_id, server):
         self.profile_id = profile_id
-        self.server = value
+        self.server = server
 
     def clear_profile(self):
         self.profile_id = ""
@@ -120,7 +125,52 @@ class FakeMagnus:
         return {"folderId": safe_id, "title": "Magnus", "items": []}
 
     def preview(self, safe_id):
-        return {"safeId": safe_id, "title": "test.lava", "content": "test", "sha256": "a" * 64}
+        return {
+            "safeId": safe_id,
+            "title": "test.lava",
+            "content": "test",
+            "sha256": "a" * 64,
+            "sizeBytes": 4,
+            "previewAvailable": True,
+            "actions": ["download", "copyHash", "copy", "view"],
+        }
+
+    def download(self, safe_id):
+        return {
+            "title": "test.lava",
+            "savedAs": "test.lava",
+            "folder": "Downloads",
+            "sizeBytes": 4,
+            "sha256": "a" * 64,
+        }
+
+    def copy_value(self, safe_id, value):
+        return "test" if value == "content" else "a" * 64
+
+    def view_target(self, safe_id):
+        return NavigationTarget(
+            "test.lava", "Magnus File", 80, self.server + "/page/123"
+        )
+
+    def build(self, safe_id):
+        self.build_calls.append(("descriptor", safe_id))
+        return self._build_outcome()
+
+    def build_recent(self, url, title):
+        self.build_calls.append(("recent", url, title))
+        return self._build_outcome()
+
+    def _build_outcome(self):
+        return MagnusBuildOutcome(
+            "ONE&ALL Mobile",
+            "Build queued.",
+            NavigationTarget(
+                "Deploy ONE&ALL Mobile",
+                "Magnus Build",
+                5,
+                self.server + "/api/TriumphTech/Magnus/Build/mobileapps/14",
+            ),
+        )
 
 
 class FakeLive:
@@ -337,19 +387,18 @@ class BrokerContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, serialized)
 
-    def test_magnus_contract_is_read_only_and_private(self):
+    def test_magnus_contract_is_controlled_and_private(self):
         response = self.broker.handle({"op": "magnus_status"})
-        self.assertEqual(response["magnus"]["mode"], "read_only")
+        self.assertEqual(response["magnus"]["mode"], "controlled")
         self.assertEqual(
             self.broker.handle({"op": "status"})["magnus"]["mode"],
-            "read_only",
+            "controlled",
         )
         serialized = json.dumps(response).lower()
         for forbidden in ("username", "password", "cookie", "credential"):
             self.assertNotIn(forbidden, serialized)
         for op in (
             "magnus_write",
-            "magnus_build",
             "magnus_rm",
             "magnus_mkdir",
             "magnus_touch",
@@ -430,7 +479,7 @@ class BrokerContractTests(unittest.TestCase):
         broker.handle({"op": "magnus_status"})
         self.assertEqual(magnus.probe_calls, 2)
 
-    def test_magnus_browse_and_preview_use_bounded_read_only_operations(self):
+    def test_magnus_browse_and_preview_use_bounded_operations(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
         broker = Broker(
             self.state,
@@ -451,6 +500,97 @@ class BrokerContractTests(unittest.TestCase):
         )
         self.assertTrue(preview["ok"])
         self.assertEqual(preview["magnusPreview"]["sha256"], "a" * 64)
+
+    def test_magnus_file_actions_keep_values_private(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        opened = []
+        clipboard = []
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            session=FakeSession(True),
+            magnus=FakeMagnus(True),
+            live=FakeLive(),
+            url_opener=lambda url: opened.append(url) is None,
+            clipboard_writer=lambda value: clipboard.append(value) is None,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        downloaded = broker.handle(
+            {"op": "magnus_download", "safeId": "opaque-magnus-item"}
+        )
+        copied = broker.handle(
+            {
+                "op": "magnus_copy",
+                "safeId": "opaque-magnus-item",
+                "value": "content",
+            }
+        )
+        opened_response = broker.handle(
+            {"op": "magnus_open", "safeId": "opaque-magnus-item"}
+        )
+
+        self.assertEqual(downloaded["magnusDownload"]["folder"], "Downloads")
+        self.assertEqual(copied["magnusCopied"], {"value": "content"})
+        self.assertEqual(clipboard, ["test"])
+        self.assertTrue(opened_response["opened"])
+        self.assertEqual(opened, [DEFAULT_ROCK_ORIGIN + "/page/123"])
+        self.assertNotIn('"content": "test"', json.dumps(copied))
+
+    def test_successful_build_becomes_confirmed_repeatable_recent_link(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        magnus = FakeMagnus(True)
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            session=FakeSession(True),
+            magnus=magnus,
+            live=FakeLive(),
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        confirmation = broker.handle(
+            {"op": "magnus_build", "safeId": "opaque-mobile-app"}
+        )
+        self.assertEqual(confirmation["error"], "build_confirmation_required")
+        self.assertEqual(magnus.build_calls, [])
+        built = broker.handle(
+            {
+                "op": "magnus_build",
+                "safeId": "opaque-mobile-app",
+                "confirmed": True,
+            }
+        )
+
+        self.assertEqual(built["magnusBuild"]["message"], "Build queued.")
+        self.assertEqual(built["quickReturns"][0]["kind"], "Magnus Build")
+        self.assertNotIn("Build/mobileapps/14", json.dumps(built))
+        recent_id = built["quickReturns"][0]["safeId"]
+        self.assertEqual(
+            broker.handle({"op": "open_navigation", "safeId": recent_id})[
+                "error"
+            ],
+            "build_confirmation_required",
+        )
+        self.assertEqual(len(magnus.build_calls), 1)
+
+        repeat_confirmation = broker.handle(
+            {"op": "activate_recent", "safeId": recent_id}
+        )
+        self.assertEqual(
+            repeat_confirmation["error"], "build_confirmation_required"
+        )
+        self.assertEqual(len(magnus.build_calls), 1)
+        repeated = broker.handle(
+            {"op": "activate_recent", "safeId": recent_id, "confirmed": True}
+        )
+
+        self.assertTrue(repeated["ok"])
+        self.assertEqual(len(magnus.build_calls), 2)
+        self.assertEqual(magnus.build_calls[-1][0], "recent")
+        self.assertEqual(repeated["quickReturns"][0]["kind"], "Magnus Build")
 
     def test_prod_without_rock_login_fails_closed_without_live_call(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

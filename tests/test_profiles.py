@@ -28,10 +28,10 @@ class ProfileStoreTests(unittest.TestCase):
         self.assertEqual(active.origin, DEFAULT_ROCK_ORIGIN)
         self.assertEqual(store.migrated_profile_id, active.profile_id)
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
-        self.assertEqual(
-            ProfileStore(self.path, self.instance).active().profile_id,
-            active.profile_id,
-        )
+        reloaded = ProfileStore(self.path, self.instance).active()
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.profile_id, active.profile_id)
 
     def test_profiles_can_share_an_origin_and_switch_by_id(self):
         store = ProfileStore(self.path, self.instance)

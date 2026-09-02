@@ -18,10 +18,10 @@
   time.
 - Production SQL: not attempted because V3 `/v3/sql/health` was unavailable and
   no guarded `sqlread` identity was proven.
-- Magnus: Rock Lens now implements the bounded descriptor/tree/file reads
-  natively with the authenticated Rock cookie. Neither `rock-magnus-cli`, Node,
-  npm, nor Rock MCP is a runtime dependency. No production mutation path is
-  exposed.
+- Magnus: Rock Lens implements bounded descriptor/tree/file reads and exact
+  descriptor-provided mobile app builds natively with the authenticated Rock
+  cookie. Neither `rock-magnus-cli`, Node, npm, nor Rock MCP is a runtime
+  dependency. No file write, upload, create, or delete path is exposed.
 - Live Rock reads: the six fixed REST v1 endpoint/OData requests and the
   Personal Links action all returned successfully with the native Rock session
   cookie. A privacy-safe no-match query returned no records and no unavailable
@@ -29,7 +29,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/auth/Magnus/REST/navigation/instance tests: 65 passing via
+- Broker/auth/Magnus/REST/navigation/instance tests: 74 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -220,6 +220,21 @@
   route. Entering Settings transfers focus to the shared key catcher so the
   next Tab or Shift+Tab remains deterministic. Sixty-seven tests pass,
   including a source-contract regression for both traversal directions.
+- Plugin version `0.11.0` adds explicit Download, Copy, Copy hash, Refresh, and
+  descriptor-provided Open in Rock actions for Magnus files. Binary and large
+  files retain download/hash actions even when text preview is unavailable.
+  Mobile app deployment is limited to same-origin numeric
+  `/api/TriumphTech/Magnus/Build/mobileapps/{id}` descriptors and requires an
+  inline confirmation plus `confirmed: true` at the broker boundary. Successful
+  builds become profile-scoped Magnus Build Recent Links; re-triggering one
+  requires confirmation again, and direct URL opening is rejected. All build
+  execution tests used fakes; no live build was invoked.
+  The installed v0.11.0 broker was then restarted in PROD and a privacy-bounded
+  descriptor-only check found five mobile apps advertising the allowed build
+  action. Sending one opaque ID without confirmation returned
+  `build_confirmation_required`; no POST was sent. The replacement shell and
+  broker responded normally, the runtime directory/socket remained
+  `0700`/`0600`, plugin validation passed, and `hyprctl configerrors` was empty.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
@@ -254,5 +269,5 @@
   broker process replacement, state persistence, binding registration, and
   post-restart panel opening were verified in the active session.
 
-No telemetry, feedback, production write, job trigger, deploy, or publication
-was performed.
+No telemetry, feedback, production file write, job trigger, live build, deploy,
+or publication was performed during verification.
