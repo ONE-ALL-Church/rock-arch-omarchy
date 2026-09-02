@@ -15,7 +15,8 @@ Panel {
   readonly property string projectPath: "/home/bscottdavis/Documents/Codex/2026-09-01/rock-lens-omarchy"
   readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))) + "/rock-lens"
   readonly property string socketPath: runtimeDir + "/broker.sock"
-  property string contextName: "DEV"
+  property string contextName: "PROD"
+  property bool developerMode: false
   property string viewMode: "search"
   property alias query: searchField.text
   property var results: []
@@ -152,6 +153,8 @@ Panel {
     }
     if (response.context && !staleSearch)
       contextName = response.context === "PROD" ? "PROD" : "DEV"
+    if (response.developerMode !== undefined)
+      developerMode = response.developerMode === true
     if (response.instance)
       instanceDomain = String(response.instance.origin || "").replace("https://", "")
     if (response.magnus) {
@@ -390,6 +393,7 @@ Panel {
     setupPassword = ""
   }
   function switchContext() {
+    if (!developerMode) return
     contextName = contextName === "DEV" ? "PROD" : "DEV"
     results = []
     personalLinks = []
@@ -471,7 +475,8 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "ROCK " + root.contextName + (root.contextName === "PROD" && root.magnusConfigured ? "  ●" : "")
+    text: "ROCK" + (root.developerMode ? " " + root.contextName : "") +
+      (root.contextName === "PROD" && root.magnusConfigured ? "  ●" : "")
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
     horizontalMargin: 8
     onPressed: root.toggle()
@@ -508,12 +513,13 @@ Panel {
           spacing: Style.spacing.sm
           Text { text: "Rock Lens"; color: Color.foreground; font.pixelSize: Style.font.title; font.bold: true }
           Rectangle {
+            visible: root.developerMode
             Layout.preferredWidth: contextLabel.implicitWidth + 16
             Layout.preferredHeight: contextLabel.implicitHeight + 8
             radius: 6
             color: root.contextName === "PROD" ? "#7f1d1d" : "#14532d"
             Text { id: contextLabel; anchors.centerIn: parent; text: root.contextName; color: "white"; font.bold: true }
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.switchContext() }
+            MouseArea { anchors.fill: parent; enabled: root.developerMode; cursorShape: Qt.PointingHandCursor; onClicked: root.switchContext() }
           }
           Item { Layout.fillWidth: true }
           Repeater {

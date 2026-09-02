@@ -33,7 +33,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/OAuth/Magnus/REST/navigation/instance tests: 47 passing via
+- Broker/OAuth/Magnus/REST/navigation/instance tests: 49 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -44,9 +44,9 @@
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.
 - Restart persistence: broker PID changed across an Omarchy shell restart,
-  owner-only socket/state permissions remained `0700`/`0600`, explicit context
-  remained `DEV`, plugin re-registration completed, and the final summon
-  returned `ok`.
+  owner-only socket/state permissions remained `0700`/`0600`, the normal-mode
+  context was migrated to `PROD`, plugin re-registration completed, and the
+  final summon returned `ok`.
 - Shortcut registration: Hyprland reports `modmask: 64`, key `R`, description
   `Rock Lens`. Synthetic input injection was inconclusive, so the registered
   binding plus its exact IPC target were verified separately.
@@ -62,7 +62,7 @@
 - Restarted the real Omarchy shell, rescanned plugins, and confirmed shell IPC
   recovered.
 - The broker restarted under a new process, recreated its owner-only runtime
-  boundary (`0700` directory and `0600` socket), and preserved explicit `DEV`
+  boundary (`0700` directory and `0600` socket), and stored enforced `PROD`
   context in the owner-only state file.
 - `omarchy plugin list --json` reports `oneall.rock-lens` enabled, and
   `shell.json` retains it immediately after `omarchy.tailscale` on the right
@@ -84,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.7.0` after shell restart, registered the
+- Omarchy loaded plugin version `0.8.0` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -126,11 +126,12 @@
   targets. Adapter coverage asserts the canonical Person, Group, Workflow Type,
   Scheduled Job, Page, and Content Channel Item routes and requires `canOpen`
   for every transformed live result.
-- The panel now combines its title, environment badge, and Search/Personal
-  Links tabs in one compact header; uses a shorter search prompt, tighter row
-  spacing, a concise connection line and footer, and shows the repeated Open
-  control only on the selected row. An empty Search shows local Recent Links;
-  Personal Links load only when their tab is selected. DEV navigation omits the
+- The panel now combines its title and Search/Personal Links tabs in one compact
+  header; uses a shorter search prompt, tighter row spacing, a concise
+  connection line and footer, and shows the repeated Open control only on the
+  selected row. An empty Search shows local Recent Links; Personal Links load
+  only when their tab is selected. The context badge is absent in normal mode
+  and reappears only when developer mode is enabled. DEV navigation omits the
   per-origin PROD Recent Link history.
 - Plugin version `0.7.0` replaces the combined Links view with a dedicated
   Personal Links tab and shows the local Quick Return history as Recent Links
@@ -143,6 +144,15 @@
   Links. Installed-panel checks confirmed the two-tab layout, Tab/Shift+Tab
   transitions, and Backspace returning from a selected Recent Link to an
   editable search field. Temporary captures were deleted.
+- Plugin version `0.8.0` gates synthetic DEV behind the exact
+  `ROCK_LENS_DEVELOPER_MODE=1` process setting. Contract tests cover the exact
+  flag value, PROD default, migration of a persisted DEV value, disabled mock
+  capability, and broker rejection of direct DEV requests. With the flag absent,
+  the installed broker restarted in PROD, reported `developerMode: false`, and
+  returned `developer_mode_disabled` for a direct context-switch request. The
+  state file remained `0600`; the runtime directory/socket remained
+  `0700`/`0600`. A panel-only visual check confirmed that the context badge and
+  switch are absent, and its temporary capture was deleted.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and

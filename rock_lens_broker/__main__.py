@@ -16,7 +16,7 @@ from .auth import (
     SecretToolStore,
     default_config_path,
 )
-from .contracts import Context
+from .contracts import Context, developer_mode_enabled
 from .instance import InstanceStore, default_instance_path
 from .magnus_adapter import (
     DEFAULT_TREE_PATH,
@@ -34,12 +34,16 @@ def configure(argv: list[str]) -> None:
     parser.add_argument(
         "--context",
         choices=[context.value for context in Context],
-        default=Context.DEV.value,
+        default=Context.PROD.value,
     )
     parser.add_argument("--config-file", type=Path, default=default_config_path())
     args = parser.parse_args(argv)
 
     context = Context(args.context)
+    if context is Context.DEV and not developer_mode_enabled():
+        raise SystemExit(
+            "DEV configuration requires ROCK_LENS_DEVELOPER_MODE=1."
+        )
     issuer = input("Rock issuer URL (Public Application Root): ").strip()
     client_id = input("Rock OpenID client ID: ").strip()
     redirect_uri = (

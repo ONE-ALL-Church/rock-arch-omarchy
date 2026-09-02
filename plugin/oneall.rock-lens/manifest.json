@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "oneall.rock-lens",
   "name": "Rock Lens",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": "ONE&ALL",
   "license": "MIT",
   "description": "Read-only Magnus-backed Rock search, Personal Links, and Recent Links",
@@ -11,7 +11,7 @@
   "entryPoints": {"barWidget": "RockLens.qml"},
   "barWidget": {
     "displayName": "Rock Lens",
-    "description": "Explicit DEV/PROD context and secure read-only Rock discovery",
+    "description": "Secure production Rock discovery with a gated developer preview",
     "category": "Productivity",
     "aliases": ["rock", "lens", "launcher"],
     "allowMultiple": false

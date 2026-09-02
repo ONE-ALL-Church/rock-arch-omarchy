@@ -13,6 +13,7 @@ from .contracts import (
     Capability,
     Context,
     HealthState,
+    developer_mode_enabled,
     parse_search_query,
     sanitize_text,
 )
@@ -60,8 +61,12 @@ class Broker:
         quick_returns: QuickReturnStore | None = None,
         url_opener: Callable[[str], bool] | None = None,
         instance_file: Path | None = None,
+        developer_mode: bool | None = None,
     ) -> None:
         self._state_file = state_file
+        self._developer_mode = (
+            developer_mode_enabled() if developer_mode is None else developer_mode
+        )
         self._context = self._load_context()
         self._mock = MockAdapter()
         instance_path = instance_file or (
@@ -99,6 +104,8 @@ class Broker:
         self._store_context()
 
     def _load_context(self) -> Context:
+        if not self._developer_mode:
+            return Context.PROD
         if self._state_file:
             try:
                 value = self._state_file.read_text(encoding="utf-8").strip()
@@ -138,7 +145,13 @@ class Broker:
         )
         return [
             Capability(
-                "mock", HealthState.HEALTHY, "Synthetic data enabled"
+                "mock",
+                HealthState.HEALTHY if self._developer_mode else HealthState.UNKNOWN,
+                (
+                    "Synthetic data enabled"
+                    if self._developer_mode
+                    else "Developer mode disabled"
+                ),
             ).public_dict(),
             Capability("rock_oauth", oauth_health, auth["label"]).public_dict(),
             Capability(
@@ -157,6 +170,7 @@ class Broker:
             magnus = self._magnus.status()
             return self._ok(
                 context=self._context.value,
+                developerMode=self._developer_mode,
                 auth=auth,
                 instance=self._instance_status(),
                 magnus=magnus,
@@ -165,13 +179,17 @@ class Broker:
             )
         if op == "set_context":
             try:
-                self._context = Context(sanitize_text(raw.get("context"), 8))
+                requested_context = Context(sanitize_text(raw.get("context"), 8))
             except ValueError:
                 return self._error("invalid_context")
+            if requested_context is Context.DEV and not self._developer_mode:
+                return self._error("developer_mode_disabled")
+            self._context = requested_context
             self._store_context()
             self._live.clear()
             return self._ok(
                 context=self._context.value,
+                developerMode=self._developer_mode,
                 auth=self._auth.public_status(self._context),
                 instance=self._instance_status(),
                 magnus=self._magnus.status(),

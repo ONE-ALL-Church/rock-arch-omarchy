@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -8,6 +9,15 @@ from typing import Any
 class Context(StrEnum):
     DEV = "DEV"
     PROD = "PROD"
+
+
+DEVELOPER_MODE_ENV = "ROCK_LENS_DEVELOPER_MODE"
+
+
+def developer_mode_enabled() -> bool:
+    """Return whether the explicit process-level developer gate is enabled."""
+
+    return os.environ.get(DEVELOPER_MODE_ENV) == "1"
 
 
 class HealthState(StrEnum):

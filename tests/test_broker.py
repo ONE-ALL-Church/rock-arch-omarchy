@@ -1,15 +1,19 @@
 import json
+import os
 import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 from rock_lens_broker.broker import Broker
 from rock_lens_broker.contracts import (
     ALLOWED_PERSON_KEYS,
     ALLOWED_RESULT_KEYS,
     CATEGORIES,
+    DEVELOPER_MODE_ENV,
     SEARCH_SCOPE_ALIASES,
+    developer_mode_enabled,
     parse_search_query,
 )
 from rock_lens_broker.instance import InstanceStore
@@ -115,7 +119,11 @@ class BrokerContractTests(unittest.TestCase):
         self.state = Path(self.tmp.name) / "context"
         self.config = Path(self.tmp.name) / "oidc.json"
         self.instance = Path(self.tmp.name) / "instance.json"
-        self.broker = Broker(self.state, config_file=self.config)
+        self.broker = Broker(
+            self.state,
+            config_file=self.config,
+            developer_mode=True,
+        )
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -129,11 +137,51 @@ class BrokerContractTests(unittest.TestCase):
             "PROD",
         )
         self.assertEqual(
-            Broker(self.state, config_file=self.config).handle({"op": "status"})[
-                "context"
-            ],
+            Broker(
+                self.state,
+                config_file=self.config,
+                developer_mode=True,
+            ).handle({"op": "status"})["context"],
             "PROD",
         )
+
+    def test_normal_mode_forces_prod_and_rejects_dev_context(self):
+        self.state.write_text("DEV\n", encoding="utf-8")
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            developer_mode=False,
+        )
+        status = broker.handle({"op": "status"})
+        self.assertEqual(status["context"], "PROD")
+        self.assertFalse(status["developerMode"])
+        mock = next(
+            item for item in status["capabilities"] if item["name"] == "mock"
+        )
+        self.assertEqual(mock["state"], "unknown")
+        self.assertEqual(mock["detail"], "Developer mode disabled")
+        self.assertEqual(self.state.read_text(encoding="utf-8"), "PROD\n")
+        self.assertEqual(
+            broker.handle({"op": "set_context", "context": "DEV"}),
+            {"ok": False, "error": "developer_mode_disabled"},
+        )
+        response = broker.handle({"op": "search", "query": "Ada"})
+        self.assertEqual(response["source"], "unavailable")
+        self.assertEqual(response["results"], [])
+
+    def test_developer_mode_environment_flag_requires_exact_one(self):
+        with patch.dict(os.environ, {DEVELOPER_MODE_ENV: "1"}):
+            self.assertTrue(developer_mode_enabled())
+            status = Broker(self.state, config_file=self.config).handle(
+                {"op": "status"}
+            )
+            self.assertTrue(status["developerMode"])
+            self.assertEqual(status["context"], "DEV")
+        for value in ("true", "yes", "0", ""):
+            with self.subTest(value=value), patch.dict(
+                os.environ, {DEVELOPER_MODE_ENV: value}
+            ):
+                self.assertFalse(developer_mode_enabled())
 
     def test_invalid_context_fails_closed(self):
         self.assertEqual(
@@ -304,6 +352,7 @@ class BrokerContractTests(unittest.TestCase):
             live=live,
             url_opener=lambda url: opened.append(url) is None,
             instance_file=self.instance,
+            developer_mode=True,
         )
         broker.handle({"op": "set_context", "context": "PROD"})
         recent = broker.handle(

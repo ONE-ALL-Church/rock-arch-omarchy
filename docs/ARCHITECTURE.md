@@ -52,14 +52,18 @@ configured boolean. Detailed HTTP errors and response bodies are discarded.
 Authentication states are `unconfigured`, `signed_out`, `starting`, `waiting`,
 `refreshing`, `authenticated`, `expired`, and `failed`. Refresh failure deletes
 the unusable token set and fails closed. Disconnect deletes only the local token
-set. DEV and PROD use separate configuration and keyring records.
+set. Gated DEV and PROD use separate configuration and keyring records.
 
 ## Explicit context
 
-Context is a broker-owned enum: `DEV` or `PROD`. Startup defaults to `DEV`.
-Changing context requires an explicit `set_context` request; no environmental
-signal may change it. `PROD` is a visual safety context only and grants no new
-capabilities. Both contexts remain read-only.
+Context is a broker-owned enum: `DEV` or `PROD`. Normal startup is forced to
+PROD, including migration of a previously persisted DEV value. The QML omits
+the context control, and the broker rejects requests to enter DEV. Synthetic
+DEV data is available only when the broker process starts with the exact
+`ROCK_LENS_DEVELOPER_MODE=1` flag; values such as `true` or `yes` fail closed.
+When enabled, the UI restores the visibly labeled context control and explicit
+`set_context` requests may select either context. Both contexts remain
+read-only, and PROD never falls back to synthetic data.
 
 ## Live REST boundary
 

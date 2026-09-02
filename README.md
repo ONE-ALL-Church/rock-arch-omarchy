@@ -1,14 +1,14 @@
 # Rock Lens
 
-Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. DEV
-uses public-safe synthetic data. PROD uses the `.ROCK` session created by
-Magnus to search six fixed Rock REST v1 resources and load the current person's
-Personal Links. Group results include their Rock Group Type. The six category
-reads run concurrently, and a brief memory-only Magnus session cache keeps
-successive searches responsive without persisting the cookie. QML is only a
-view: search terms and opaque navigation IDs
-travel over an owner-only local Unix socket, while credentials, cookies, raw
-record IDs, URLs, and response bodies remain inside the Python broker.
+Rock Lens is a read-only Omarchy 4.0.2+ launcher for Rock RMS discovery. Normal
+use is locked to production and uses the `.ROCK` session created by Magnus to
+search six fixed Rock REST v1 resources and load the current person's Personal
+Links. Group results include their Rock Group Type. The six category reads run
+concurrently, and a brief memory-only Magnus session cache keeps successive
+searches responsive without persisting the cookie. QML is only a view: search
+terms and opaque navigation IDs travel over an owner-only local Unix socket,
+while credentials, cookies, raw record IDs, URLs, and response bodies remain
+inside the Python broker.
 
 For privileged Rock file inspection, Rock Lens also includes a hardened,
 read-only Magnus adapter. Setup first records the selected Rock instance's
@@ -32,7 +32,23 @@ python3 -m rock_lens_broker --socket /tmp/rock-lens-demo.sock
 
 The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-lens/broker.sock`
 and starts the broker without passing queries or credentials as arguments.
-Summon it with `Super+R` or click the explicit `DEV` / `PROD` bar indicator.
+Summon it with `Super+R` or click the Rock bar indicator.
+
+## Developer mode
+
+Synthetic preview data remains available for UI development and privacy-safe
+testing, but it is not exposed during normal use. The broker accepts DEV only
+when its process starts with this exact flag:
+
+```bash
+ROCK_LENS_DEVELOPER_MODE=1 python3 -m rock_lens_broker
+```
+
+The installed shell must receive the same environment flag before it starts.
+When enabled, the DEV/PROD badge and switch reappear. Without the flag, startup
+forces PROD, rewrites a previously saved DEV context to PROD, hides the switch,
+and rejects direct socket requests to enter DEV. Values such as `true` or `yes`
+do not enable it.
 
 ## Optional OpenID Connect client
 
@@ -54,12 +70,14 @@ documentation](https://community.rockrms.com/documentation/BookContent/9#openid-
 and the [current Rock authorization-provider
 source](https://github.com/SparkDevNetwork/Rock/blob/f0917ef9799aa433d8be7b648666ecd5239550b1/Rock.Oidc/Authorization/AuthorizationProvider.cs).
 
-Run the owner-local interactive setup separately for each configured context:
+Run the owner-local interactive setup for production:
 
 ```bash
-python3 -m rock_lens_broker configure --context DEV
-python3 -m rock_lens_broker configure --context PROD
+python3 -m rock_lens_broker configure
 ```
+
+Developer-mode OAuth metadata can still be configured with
+`ROCK_LENS_DEVELOPER_MODE=1` and `--context DEV`.
 
 Enter Rock's Public Application Root as the issuer, copy the client ID, accept
 the loopback URI, and leave the secret blank for a public client. The broker
@@ -80,10 +98,10 @@ stored there; Secret Service keys are separated by a hash of that origin.
 
 ## Configure Magnus
 
-Magnus is deliberately separate from end-user OpenID Connect login. In Rock
-Lens, switch to **PROD** and enter the Rock credentials in the displayed masked
-form. The broker sends them only over its owner-only socket and
-stores them in Secret Service. The equivalent terminal setup remains available:
+Magnus is deliberately separate from end-user OpenID Connect login. Enter the
+Rock credentials in the displayed masked form. The broker sends them only over
+its owner-only socket and stores them in Secret Service. The equivalent terminal
+setup remains available:
 
 ```bash
 python3 -m rock_lens_broker magnus configure
@@ -133,12 +151,13 @@ People results include compact duplicate-name context when Rock provides it:
 age, conservatively identified spouse, family campus, and connection status.
 Spouse is shown only for a married person with exactly one other active Adult
 in the family group. Email, phone, address, and full birth date are not fetched.
-DEV never opens a target and does not display the PROD Recent Link history.
+Gated DEV never opens a target and does not display the PROD Recent Link
+history.
 
 ## Safety guarantees
 
-- Context is stored explicitly as `DEV` or `PROD`; it is never inferred from a
-  path, host name, URL, or response.
+- Normal use is locked to PROD. DEV requires the exact process-level developer
+  flag and remains visibly labeled while enabled.
 - Rock login uses authorization code flow, S256 PKCE, exact callback state
   validation, HTTPS discovery, and same-origin authorization/token endpoints.
 - Client secrets and access/refresh tokens use Secret Service and never enter
