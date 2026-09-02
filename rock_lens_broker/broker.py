@@ -274,7 +274,11 @@ class Broker:
         return self._ok(
             personalLinks=personal_links,
             personalLinksAvailable=available,
-            quickReturns=self._quick_returns.public_items(),
+            quickReturns=(
+                self._quick_returns.public_items()
+                if self._context is Context.PROD
+                else []
+            ),
         )
 
     def _open_navigation(self, safe_id: str) -> dict[str, Any]:

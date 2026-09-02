@@ -84,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.3.1` after shell restart, registered the
+- Omarchy loaded plugin version `0.4.0` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -98,6 +98,15 @@
   Backspace deletion reach the focused native search field. The test query was
   cleared afterward, and the temporary capture was deleted because its crop
   included desktop edges.
+- Keyboard traversal was verified in the installed DEV panel: Down selected
+  successive results, Tab moved from the search field to the first result and
+  then to Links, and Shift+Tab returned to the final result. Selection remained
+  visible and the panel followed it automatically. Enter and Space dispatch the
+  selected verified live target through the existing opaque-ID navigation
+  operation; DEV remains non-opening.
+- The panel now uses a compact connection line, concise setup copy and footer,
+  a content-responsive list height, and a single selected row. DEV navigation
+  omits the per-origin PROD Quick Return history.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,

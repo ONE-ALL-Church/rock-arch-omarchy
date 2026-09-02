@@ -115,6 +115,6 @@ Successful user-requested opens are added to Quick Returns. The store keeps the
 title, type, order, target, and timestamp locally, but returns only another
 process-local opaque ID, title, and type to QML. Its directory is `0700`, its
 file is `0600`, writes are atomic, entries are validated on every read, and the
-oldest entries are removed beyond 20. Each origin receives a separate store.
-This intentionally emulates Rock's useful return list without importing
-browser-local Rock history.
+oldest entries are removed beyond 20. Each origin receives a separate store,
+and Quick Returns are omitted from DEV responses. This intentionally emulates
+Rock's useful return list without importing browser-local Rock history.

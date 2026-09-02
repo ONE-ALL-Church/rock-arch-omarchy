@@ -304,6 +304,14 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(
             broker.handle({"op": "open_navigation", "safeId": quick_id})["opened"]
         )
+        broker.handle({"op": "set_context", "context": "DEV"})
+        dev_navigation = broker.handle({"op": "navigation_status"})
+        self.assertEqual(dev_navigation["personalLinks"], [])
+        self.assertEqual(dev_navigation["quickReturns"], [])
+        self.assertEqual(
+            broker.handle({"op": "open_navigation", "safeId": quick_id})["error"],
+            "navigation_requires_prod",
+        )
 
 
 if __name__ == "__main__":

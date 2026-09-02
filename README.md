@@ -97,6 +97,11 @@ The **Links** tab loads Personal Links and local Quick Returns. **Open** is
 offered only for route shapes Rock Lens has verified (currently Person and Page
 results); Personal Links must resolve to the exact Rock origin.
 
+The search field keeps native editing behavior. Up and Down move through results
+and across the Search/Links boundary, Tab cycles search input, results, and
+links (Shift+Tab reverses), and Enter or Space opens the selected live target.
+DEV never opens a target and does not display the PROD Quick Return history.
+
 ## Safety guarantees
 
 - Context is stored explicitly as `DEV` or `PROD`; it is never inferred from a
@@ -114,8 +119,9 @@ results); Personal Links must resolve to the exact Rock origin.
   expression.
 - Personal Links are read-only, restricted to same-origin HTTPS targets, and
   represented outside the broker by opaque IDs.
-- Quick Returns contain only launcher-opened targets, are capped at 20, and are
-  stored under `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
+- Quick Returns contain only launcher-opened targets, are capped at 20, are
+  visible only in PROD, and are stored under `$XDG_STATE_HOME/rock-lens` with
+  owner-only permissions.
 - There is no mutation transport, SQL execution, job trigger, or Run Now UI.
 - Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
   and traversal paths, uses per-origin Secret Service records, and exposes no
