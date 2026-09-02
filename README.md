@@ -16,10 +16,10 @@ strict HTTPS origin, keeps that origin's credentials in Secret Service, and
 gives each command an ephemeral Magnus profile that is deleted immediately
 afterward.
 
-Rock Lens also emulates Rock's Quick Return behavior. It remembers only
-same-origin records or Personal Links that were opened from the launcher,
-deduplicates them, caps the list at 20, and stores private target data in an
-owner-only local file. It does not read or follow browser history.
+Rock Lens also emulates Rock's Quick Return behavior as **Recent Links**. It
+remembers only same-origin records or Personal Links that were opened from the
+launcher, deduplicates them, caps the list at 20, and stores private target data
+in an owner-only local file. It does not read or follow browser history.
 
 ![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
 
@@ -97,13 +97,13 @@ The adapter still exposes only bounded `ls`, `cat`, and
 `hash` file operations; it does not expose a generic REST client. See
 [docs/MAGNUS.md](docs/MAGNUS.md) for its exact restrictions.
 
-In the launcher, PROD search starts only after at least one character is typed.
-The **Links** tab loads Personal Links and local Quick Returns. **Open** is
-offered for every search category: People, Groups, Workflow Types, Scheduled
-Jobs, Pages, and Content Channel Items. Each target uses a fixed Rock route and
-must resolve to the exact configured Rock origin; Personal Links have the same
-origin restriction. Personal Links are fetched only when the Links tab is
-opened, so they cannot delay the initial Search view.
+In the launcher, an empty **Search** view shows local **Recent Links**. Typing
+immediately replaces them with search results. **Personal Links** has its own
+tab and is fetched only when that tab is opened, so its Rock network read cannot
+delay Search or Recent Links. **Open** is offered for every search category:
+People, Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel
+Items. Each target uses a fixed Rock route and must resolve to the exact
+configured Rock origin; Personal Links have the same origin restriction.
 
 Start a query with an entity prefix to search only that Rock category. A bare
 prefix such as `g:` lists the first three items in that category.
@@ -122,17 +122,18 @@ as a badge beside the search field. `Esc` clears the scope before closing the
 panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary search
 text; no slash-command mode is required.
 
-The search field keeps native editing behavior. Up and Down move through results
-and across the Search/Links boundary, Tab cycles search input, results, and
-links (Shift+Tab reverses), and Enter or Space opens the selected live target.
-Backspace on a highlighted item returns to the search field and deletes at the
-search cursor, so narrowing can continue without an extra navigation step.
+The search field keeps native editing behavior. Up and Down move through Recent
+Links or results and across the Search/Personal Links boundary. Tab cycles the
+search input, its displayed items, and Personal Links (Shift+Tab reverses), and
+Enter or Space opens the selected live target. Backspace on a highlighted item
+returns to the search field and deletes at the search cursor, so narrowing can
+continue without an extra navigation step.
 
 People results include compact duplicate-name context when Rock provides it:
 age, conservatively identified spouse, family campus, and connection status.
 Spouse is shown only for a married person with exactly one other active Adult
 in the family group. Email, phone, address, and full birth date are not fetched.
-DEV never opens a target and does not display the PROD Quick Return history.
+DEV never opens a target and does not display the PROD Recent Link history.
 
 ## Safety guarantees
 
@@ -151,9 +152,9 @@ DEV never opens a target and does not display the PROD Quick Return history.
   expression.
 - Personal Links are read-only, restricted to same-origin HTTPS targets, and
   represented outside the broker by opaque IDs.
-- Quick Returns contain only launcher-opened targets, are capped at 20, are
-  visible only in PROD, and are stored under `$XDG_STATE_HOME/rock-lens` with
-  owner-only permissions.
+- Recent Links (the local Quick Return store) contain only launcher-opened
+  targets, are capped at 20, are visible only in PROD, and are stored under
+  `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
 - There is no mutation transport, SQL execution, job trigger, or Run Now UI.
 - Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
   and traversal paths, uses per-origin Secret Service records, and exposes no

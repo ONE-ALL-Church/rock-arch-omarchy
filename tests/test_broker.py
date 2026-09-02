@@ -48,6 +48,7 @@ class FakeLive:
     def __init__(self):
         self.search_calls = []
         self.search_categories = []
+        self.personal_link_calls = 0
         self.cleared = False
         self.target = NavigationTarget(
             "Ada Rivera",
@@ -92,6 +93,7 @@ class FakeLive:
         }
 
     def personal_links(self):
+        self.personal_link_calls += 1
         return [
             {
                 "safeId": "rock-safe-link",
@@ -304,9 +306,29 @@ class BrokerContractTests(unittest.TestCase):
             instance_file=self.instance,
         )
         broker.handle({"op": "set_context", "context": "PROD"})
+        recent = broker.handle(
+            {"op": "navigation_status", "section": "quick_returns"}
+        )
+        self.assertEqual(recent, {"ok": True, "quickReturns": []})
+        self.assertEqual(live.personal_link_calls, 0)
+
+        personal = broker.handle({"op": "navigation_status", "section": "personal"})
+        self.assertNotIn("quickReturns", personal)
+        self.assertTrue(personal["personalLinksAvailable"])
+        self.assertEqual(live.personal_link_calls, 1)
+
         navigation = broker.handle({"op": "navigation_status"})
         self.assertTrue(navigation["personalLinksAvailable"])
         self.assertEqual(navigation["personalLinks"][0]["safeId"], "rock-safe-link")
+        self.assertEqual(live.personal_link_calls, 2)
+        self.assertEqual(
+            broker.handle({"op": "navigation_status", "section": "other"}),
+            {"ok": False, "error": "invalid_navigation_section"},
+        )
+        self.assertEqual(
+            broker.handle({"op": "navigation_status", "section": []}),
+            {"ok": False, "error": "invalid_navigation_section"},
+        )
         self.assertEqual(
             broker.handle(
                 {

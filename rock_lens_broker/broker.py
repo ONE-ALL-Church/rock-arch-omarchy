@@ -260,34 +260,45 @@ class Broker:
             )
             return self._ok(person=person) if person else self._error("not_found")
         if op == "navigation_status":
-            return self._navigation_status()
+            section = raw.get("section", "all")
+            if not isinstance(section, str) or section not in {
+                "all",
+                "personal",
+                "quick_returns",
+            }:
+                return self._error("invalid_navigation_section")
+            return self._navigation_status(section)
         if op == "open_navigation":
             return self._open_navigation(sanitize_text(raw.get("safeId"), 100))
         return self._error("unsupported_operation")
 
-    def _navigation_status(self) -> dict[str, Any]:
-        personal_links: list[dict[str, Any]] = []
-        available = False
-        if (
-            self._context is Context.PROD
-            and self._origin
-            and self._magnus.status()["configured"]
-        ):
-            try:
-                personal_links = self._live.personal_links()
-                self._live_health = HealthState.HEALTHY
-                available = True
-            except RockRestError:
-                self._live_health = HealthState.STALE
-        return self._ok(
-            personalLinks=personal_links,
-            personalLinksAvailable=available,
-            quickReturns=(
+    def _navigation_status(self, section: str) -> dict[str, Any]:
+        response: dict[str, Any] = {}
+        if section in {"all", "personal"}:
+            personal_links: list[dict[str, Any]] = []
+            available = False
+            if (
+                self._context is Context.PROD
+                and self._origin
+                and self._magnus.status()["configured"]
+            ):
+                try:
+                    personal_links = self._live.personal_links()
+                    self._live_health = HealthState.HEALTHY
+                    available = True
+                except RockRestError:
+                    self._live_health = HealthState.STALE
+            response.update(
+                personalLinks=personal_links,
+                personalLinksAvailable=available,
+            )
+        if section in {"all", "quick_returns"}:
+            response["quickReturns"] = (
                 self._quick_returns.public_items()
                 if self._context is Context.PROD
                 else []
-            ),
-        )
+            )
+        return self._ok(**response)
 
     def _open_navigation(self, safe_id: str) -> dict[str, Any]:
         if self._context is not Context.PROD:

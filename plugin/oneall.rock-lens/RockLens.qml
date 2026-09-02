@@ -36,8 +36,12 @@ Panel {
   property bool searchPending: false
   property string searchInFlightQuery: ""
   property int resultCursor: -1
+  property int recentCursor: -1
   property int linkCursor: -1
-  readonly property int navigationCount: personalLinks.length + quickReturns.length
+  readonly property int navigationCount: personalLinks.length
+  readonly property bool queryIsEmpty: query.trim().length === 0
+  readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
+  readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
@@ -54,7 +58,8 @@ Panel {
     var coalesce = payload.op === "search" || payload.op === "status" || payload.op === "navigation_status"
     for (var index = 0; index < requestQueue.length; index++) {
       var queued = requestQueue[index]
-      if (!coalesce || queued.op !== payload.op) next.push(queued)
+      var sameNavigationSection = payload.op !== "navigation_status" || queued.section === payload.section
+      if (!coalesce || queued.op !== payload.op || !sameNavigationSection) next.push(queued)
     }
     requestQueue = next.concat([payload])
     if (!brokerSocket.connected) brokerSocket.connected = true
@@ -97,6 +102,7 @@ Panel {
     viewMode = "search"
     query = key + ":" + (term ? " " + term : "")
     resultCursor = -1
+    recentCursor = -1
     linkCursor = -1
     quickLook = null
     feedbackText = ""
@@ -112,9 +118,11 @@ Panel {
     if (!scopeKey) return false
     query = queryWithoutScope(query)
     resultCursor = -1
+    recentCursor = -1
     quickLook = null
     feedbackText = ""
     scheduleSearch()
+    if (query.trim().length === 0) refreshQuickReturns()
     Qt.callLater(function() {
       searchField.cursorPosition = searchField.text.length
       searchField.forceActiveFocus()
@@ -155,9 +163,12 @@ Panel {
       if (resultCursor >= results.length) resultCursor = results.length - 1
     }
     if (Array.isArray(response.personalLinks)) personalLinks = response.personalLinks
-    if (Array.isArray(response.quickReturns)) quickReturns = response.quickReturns
+    if (Array.isArray(response.quickReturns)) {
+      quickReturns = response.quickReturns
+      if (recentCursor >= quickReturns.length) recentCursor = quickReturns.length - 1
+    }
     if (linkCursor >= navigationCount) linkCursor = navigationCount - 1
-    if (viewMode === "links" && linkCursor < 0 && navigationCount) linkCursor = 0
+    if (viewMode === "personal" && linkCursor < 0 && navigationCount) linkCursor = 0
     if (response.personalLinksAvailable !== undefined)
       personalLinksAvailable = response.personalLinksAvailable === true
     if (response.person) quickLook = response.person
@@ -168,14 +179,15 @@ Panel {
       feedbackText = "Magnus credentials saved securely"
       Qt.callLater(function() {
         root.refreshSearch()
-        if (root.viewMode === "links") root.refreshNavigation()
+        root.refreshQuickReturns()
+        if (root.viewMode === "personal") root.refreshPersonalLinks()
         searchField.forceActiveFocus()
       })
     }
     if (!staleSearch && Array.isArray(response.unavailable) && response.unavailable.length)
       feedbackText = "Unavailable: " + response.unavailable.join(", ")
     else if (response.opened === true)
-      feedbackText = "Opened in Rock and added to Quick Returns"
+      feedbackText = "Opened in Rock and added to Recent Links"
     else if (response.source === "unavailable" && !staleSearch)
       feedbackText = "Live Rock search needs Magnus setup"
     else if (response.source && !staleSearch)
@@ -194,7 +206,8 @@ Panel {
     request({op: "search", query: query})
   }
   function scheduleSearch() { searchTimer.restart() }
-  function refreshNavigation() { request({op: "navigation_status"}) }
+  function refreshQuickReturns() { request({op: "navigation_status", section: "quick_returns"}) }
+  function refreshPersonalLinks() { request({op: "navigation_status", section: "personal"}) }
   function revealItem(item) {
     if (!item) return
     var point = item.mapToItem(body, 0, 0)
@@ -211,6 +224,7 @@ Panel {
   function focusSearch() {
     viewMode = "search"
     resultCursor = -1
+    recentCursor = -1
     linkCursor = -1
     quickLook = null
     panelFlick.contentY = 0
@@ -234,7 +248,10 @@ Panel {
 
     feedbackText = ""
     focusSearch()
-    if (changed) scheduleSearch()
+    if (changed) {
+      scheduleSearch()
+      if (searchField.text.trim().length === 0) refreshQuickReturns()
+    }
   }
   function selectResult(index) {
     if (!results.length) {
@@ -243,6 +260,7 @@ Panel {
     }
     viewMode = "search"
     resultCursor = Math.max(0, Math.min(results.length - 1, index))
+    recentCursor = -1
     linkCursor = -1
     quickLook = null
     Qt.callLater(function() {
@@ -250,38 +268,55 @@ Panel {
       root.revealItem(resultRepeater.itemAt(root.resultCursor))
     })
   }
-  function selectLink(index) {
-    var changedView = viewMode !== "links"
-    viewMode = "links"
+  function selectRecent(index) {
+    if (!quickReturns.length) {
+      focusSearch()
+      return
+    }
+    viewMode = "search"
     resultCursor = -1
-    linkCursor = navigationCount ? Math.max(0, Math.min(navigationCount - 1, index)) : -1
+    recentCursor = Math.max(0, Math.min(quickReturns.length - 1, index))
+    linkCursor = -1
     quickLook = null
-    if (changedView) refreshNavigation()
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
-      var item = root.linkCursor < root.personalLinks.length ?
-        personalLinkRepeater.itemAt(root.linkCursor) :
-        quickReturnRepeater.itemAt(root.linkCursor - root.personalLinks.length)
-      root.revealItem(item)
+      root.revealItem(quickReturnRepeater.itemAt(root.recentCursor))
     })
+  }
+  function selectPersonalLink(index) {
+    var changedView = viewMode !== "personal"
+    viewMode = "personal"
+    resultCursor = -1
+    recentCursor = -1
+    linkCursor = navigationCount ? Math.max(0, Math.min(navigationCount - 1, index)) : -1
+    quickLook = null
+    if (changedView) refreshPersonalLinks()
+    Qt.callLater(function() {
+      keyCatcher.forceActiveFocus()
+      root.revealItem(personalLinkRepeater.itemAt(root.linkCursor))
+    })
+  }
+  function selectSearchItem(index) {
+    if (queryIsEmpty) selectRecent(index)
+    else selectResult(index)
   }
   function moveTab(direction) {
     if (direction >= 0) {
-      if (viewMode === "search" && resultCursor < 0 && results.length)
-        selectResult(0)
+      if (viewMode === "search" && resultCursor < 0 && recentCursor < 0 && activeSearchCount)
+        selectSearchItem(0)
       else if (viewMode === "search")
-        selectLink(0)
+        selectPersonalLink(0)
       else
         focusSearch()
       return
     }
-    if (viewMode === "links") {
-      if (results.length) selectResult(results.length - 1)
+    if (viewMode === "personal") {
+      if (activeSearchCount) selectSearchItem(activeSearchCount - 1)
       else focusSearch()
-    } else if (resultCursor >= 0) {
+    } else if (resultCursor >= 0 || recentCursor >= 0) {
       focusSearch()
     } else {
-      selectLink(navigationCount - 1)
+      selectPersonalLink(navigationCount - 1)
     }
   }
   function moveCursor(dx, dy) {
@@ -291,15 +326,16 @@ Panel {
     }
     if (dy === 0) return
     if (viewMode === "search") {
-      if (resultCursor < 0) {
-        if (dy > 0 && results.length) selectResult(0)
-        else if (dy < 0 && navigationCount) selectLink(navigationCount - 1)
+      var searchCursor = showRecentLinks ? recentCursor : resultCursor
+      if (searchCursor < 0) {
+        if (dy > 0 && activeSearchCount) selectSearchItem(0)
+        else if (dy < 0) selectPersonalLink(navigationCount - 1)
         return
       }
-      var nextResult = resultCursor + dy
-      if (nextResult < 0) focusSearch()
-      else if (nextResult >= results.length) selectLink(0)
-      else selectResult(nextResult)
+      var nextSearchItem = searchCursor + dy
+      if (nextSearchItem < 0) focusSearch()
+      else if (nextSearchItem >= activeSearchCount) selectPersonalLink(0)
+      else selectSearchItem(nextSearchItem)
       return
     }
     if (!navigationCount) {
@@ -308,12 +344,12 @@ Panel {
     }
     var nextLink = linkCursor < 0 ? (dy > 0 ? 0 : navigationCount - 1) : linkCursor + dy
     if (nextLink < 0) {
-      if (results.length) selectResult(results.length - 1)
+      if (activeSearchCount) selectSearchItem(activeSearchCount - 1)
       else focusSearch()
     } else if (nextLink >= navigationCount) {
       focusSearch()
     } else {
-      selectLink(nextLink)
+      selectPersonalLink(nextLink)
     }
   }
   function activateResult(index) {
@@ -326,13 +362,23 @@ Panel {
   }
   function activateCursor() {
     if (viewMode === "search") {
-      activateResult(resultCursor)
+      if (showRecentLinks) {
+        if (recentCursor >= 0 && recentCursor < quickReturns.length)
+          request({op: "open_navigation", safeId: quickReturns[recentCursor].safeId})
+      } else {
+        activateResult(resultCursor)
+      }
       return
     }
     if (linkCursor < 0 || linkCursor >= navigationCount) return
-    var item = linkCursor < personalLinks.length ?
-      personalLinks[linkCursor] : quickReturns[linkCursor - personalLinks.length]
-    request({op: "open_navigation", safeId: item.safeId})
+    request({op: "open_navigation", safeId: personalLinks[linkCursor].safeId})
+  }
+  function activateFirstSearchItem() {
+    if (showRecentLinks) {
+      if (quickReturns.length) request({op: "open_navigation", safeId: quickReturns[0].safeId})
+    } else {
+      activateResult(0)
+    }
   }
   function saveMagnusCredentials() {
     var username = setupUsername.trim()
@@ -347,14 +393,17 @@ Panel {
     contextName = contextName === "DEV" ? "PROD" : "DEV"
     results = []
     personalLinks = []
+    quickReturns = []
     resultCursor = -1
+    recentCursor = -1
     linkCursor = -1
     quickLook = null
     setupPassword = ""
     request({op: "set_context", context: contextName})
     request({op: "status"})
     refreshSearch()
-    if (viewMode === "links") refreshNavigation()
+    refreshQuickReturns()
+    if (viewMode === "personal") refreshPersonalLinks()
   }
   function resetPanel() {
     query = ""
@@ -363,6 +412,7 @@ Panel {
     feedbackText = ""
     request({op: "status"})
     refreshSearch()
+    refreshQuickReturns()
   }
 
   onOpenedChanged: if (opened) resetPanel()
@@ -441,7 +491,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus
-      backspaceEnabled: root.resultCursor >= 0 || root.linkCursor >= 0
+      backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
@@ -467,7 +517,7 @@ Panel {
           }
           Item { Layout.fillWidth: true }
           Repeater {
-            model: ["search", "links"]
+            model: ["search", "personal"]
             delegate: Rectangle {
               required property var modelData
               Layout.preferredWidth: tabText.implicitWidth + 20
@@ -477,7 +527,7 @@ Panel {
               Text {
                 id: tabText
                 anchors.centerIn: parent
-                text: modelData === "search" ? "Search" : "Links"
+                text: modelData === "search" ? "Search" : "Personal Links"
                 color: Color.foreground
                 font.bold: root.viewMode === modelData
               }
@@ -486,7 +536,7 @@ Panel {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   if (modelData === "search") root.focusSearch()
-                  else root.selectLink(0)
+                  else root.selectPersonalLink(0)
                 }
               }
             }
@@ -507,9 +557,12 @@ Panel {
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {
               root.resultCursor = -1
+              root.recentCursor = -1
+              root.results = []
               root.quickLook = null
               root.feedbackText = ""
               root.scheduleSearch()
+              if (text.trim().length === 0) root.refreshQuickReturns()
             }
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
@@ -525,7 +578,7 @@ Panel {
                 root.moveTab(backwards ? -1 : 1)
                 event.accepted = true
               } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                root.activateResult(0)
+                root.activateFirstSearchItem()
                 event.accepted = true
               }
             }
@@ -629,7 +682,7 @@ Panel {
             spacing: Style.spacing.sm
 
             Column {
-              visible: root.viewMode === "search"
+              visible: root.viewMode === "search" && !root.showRecentLinks
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
@@ -712,7 +765,52 @@ Panel {
             }
 
             Column {
-              visible: root.viewMode === "links"
+              visible: root.viewMode === "search" && root.showRecentLinks
+              width: body.width
+              height: visible ? implicitHeight : 0
+              spacing: Style.spacing.sm
+
+              Text { text: "Recent Links"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
+              Text {
+                visible: root.quickReturns.length === 0
+                width: body.width
+                text: root.contextName === "PROD" ?
+                  "Items opened from Rock Lens will appear here (up to 20)." :
+                  "Recent Links are available in PROD. Start typing to search preview data."
+                color: Color.foreground
+                opacity: 0.6
+                wrapMode: Text.WordWrap
+              }
+              Repeater {
+                id: quickReturnRepeater
+                model: root.quickReturns
+                delegate: Rectangle {
+                  required property var modelData
+                  required property int index
+                  width: body.width
+                  height: Style.space(42)
+                  radius: 7
+                  color: index === root.recentCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  Column {
+                    anchors.fill: parent
+                    anchors.margins: 7
+                    Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
+                    Text { width: parent.width; text: modelData.kind; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
+                  }
+                  MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      root.selectRecent(index)
+                      root.request({op: "open_navigation", safeId: modelData.safeId})
+                    }
+                  }
+                }
+              }
+            }
+
+            Column {
+              visible: root.viewMode === "personal"
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
@@ -747,36 +845,7 @@ Panel {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                      root.selectLink(index)
-                      root.request({op: "open_navigation", safeId: modelData.safeId})
-                    }
-                  }
-                }
-              }
-
-              Text { text: "Quick Returns"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
-              Text { visible: root.quickReturns.length === 0; width: body.width; text: "Items opened from Rock Lens will appear here (up to 20)."; color: Color.foreground; opacity: 0.6; wrapMode: Text.WordWrap }
-              Repeater {
-                id: quickReturnRepeater
-                model: root.quickReturns
-                delegate: Rectangle {
-                  required property var modelData
-                  required property int index
-                  width: body.width
-                  height: Style.space(42)
-                  radius: 7
-                  color: root.personalLinks.length + index === root.linkCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-                  Column {
-                    anchors.fill: parent
-                    anchors.margins: 7
-                    Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                    Text { width: parent.width; text: modelData.kind; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
-                  }
-                  MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                      root.selectLink(root.personalLinks.length + index)
+                      root.selectPersonalLink(index)
                       root.request({op: "open_navigation", safeId: modelData.safeId})
                     }
                   }
@@ -790,6 +859,7 @@ Panel {
           width: parent.width
           text: root.feedbackText || (root.searchInFlight ? "Searching…" :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
+            root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links" :
             "Try g: or Alt+G · ↑↓ navigate · Enter open")
           color: Color.foreground
           opacity: 0.55

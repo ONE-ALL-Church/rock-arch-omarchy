@@ -121,7 +121,7 @@ The cookie is yielded only inside the broker and is never persisted by Rock
 Lens. It is not exposed on the socket and there is no generic HTTP/URL
 operation.
 
-## Navigation, Personal Links, and Quick Returns
+## Navigation, Personal Links, and Recent Links
 
 Search results and Personal Links cross the socket with process-local HMAC IDs.
 Only the broker can resolve those IDs. Every search category maps to a fixed
@@ -132,10 +132,13 @@ Item (`/ContentChannelItem/{Id}`). Personal Link targets may be relative but
 must resolve to HTTPS on the selected Rock origin; external and malformed
 links are omitted.
 
-Successful user-requested opens are added to Quick Returns. The store keeps the
-title, type, order, target, and timestamp locally, but returns only another
-process-local opaque ID, title, and type to QML. Its directory is `0700`, its
-file is `0600`, writes are atomic, entries are validated on every read, and the
-oldest entries are removed beyond 20. Each origin receives a separate store,
-and Quick Returns are omitted from DEV responses. This intentionally emulates
-Rock's useful return list without importing browser-local Rock history.
+Successful user-requested opens are shown as Recent Links. The underlying Quick
+Return store keeps the title, type, order, target, and timestamp locally, but
+returns only another process-local opaque ID, title, and type to QML. Its
+directory is `0700`, its file is `0600`, writes are atomic, entries are
+validated on every read, and the oldest entries are removed beyond 20. Each
+origin receives a separate store, and Recent Links are omitted from DEV
+responses. The broker serves this local list independently from Personal Links,
+so showing the empty Search state never performs a Rock network request. This
+intentionally emulates Rock's useful return list without importing browser-local
+Rock history.

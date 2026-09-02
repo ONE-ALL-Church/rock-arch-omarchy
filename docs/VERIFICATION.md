@@ -73,9 +73,9 @@
 - The broker status contract returns exactly six categories and an explicit
   context. PROD is active after setup; it uses only live Rock responses and has
   no synthetic fallback.
-- The installed Links view exposes no raw URL transport. Current-user Personal
-  Links now load through the authenticated same-origin action; local Quick
-  Returns are owner-only, per-origin, deduplicated, and limited to 20.
+- The installed navigation views expose no raw URL transport. Current-user
+  Personal Links load through the authenticated same-origin action; local
+  Recent Links are owner-only, per-origin, deduplicated, and limited to 20.
 - Magnus setup is available inside the PROD panel with the Rock domain first,
   followed by username and masked password fields. The origin is HTTPS-only and
   owner-only; credentials are stored per origin by the broker in Secret Service,
@@ -84,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.6.1` after shell restart, registered the
+- Omarchy loaded plugin version `0.7.0` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -126,12 +126,23 @@
   targets. Adapter coverage asserts the canonical Person, Group, Workflow Type,
   Scheduled Job, Page, and Content Channel Item routes and requires `canOpen`
   for every transformed live result.
-- The panel now combines its title, environment badge, and Search/Links tabs in
-  one compact header; uses a shorter search prompt, tighter row spacing, a
-  concise connection line and footer, and shows the repeated Open control only
-  on the selected row. Personal Links load only when Links is selected, so that
-  network read cannot block the initial Search view. DEV navigation omits the
-  per-origin PROD Quick Return history.
+- The panel now combines its title, environment badge, and Search/Personal
+  Links tabs in one compact header; uses a shorter search prompt, tighter row
+  spacing, a concise connection line and footer, and shows the repeated Open
+  control only on the selected row. An empty Search shows local Recent Links;
+  Personal Links load only when their tab is selected. DEV navigation omits the
+  per-origin PROD Recent Link history.
+- Plugin version `0.7.0` replaces the combined Links view with a dedicated
+  Personal Links tab and shows the local Quick Return history as Recent Links
+  whenever Search is empty. Typing swaps Recent Links for results immediately.
+  The scoped broker contract returned six Recent Links in 0.0016 seconds with
+  no Personal Links fields; the independent live Personal Links request
+  returned 15 entries in 1.4136 seconds. Only counts and response keys were
+  printed. After a clean shell restart, opening the empty Search view left the
+  live REST health state `unknown`, confirming that it had not fetched Personal
+  Links. Installed-panel checks confirmed the two-tab layout, Tab/Shift+Tab
+  transitions, and Backspace returning from a selected Recent Link to an
+  editable search field. Temporary captures were deleted.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
