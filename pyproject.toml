@@ -1,0 +1,11 @@
+[project]
+name = "rock-lens"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Read-only Rock RMS lens for Omarchy"
+
+[project.scripts]
+rock-lens-broker = "rock_lens_broker.__main__:main"
+
+[tool.setuptools]
+packages = ["rock_lens_broker"]

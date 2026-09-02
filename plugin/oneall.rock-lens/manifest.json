@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "oneall.rock-lens",
+  "name": "Rock Lens",
+  "version": "0.1.0",
+  "author": "ONE&ALL",
+  "license": "MIT",
+  "description": "Read-only Rock context indicator and entity launcher",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {"barWidget": "RockLens.qml"},
+  "barWidget": {
+    "displayName": "Rock Lens",
+    "description": "Explicit DEV/PROD context and read-only Rock entity search",
+    "category": "Productivity",
+    "aliases": ["rock", "lens", "launcher"],
+    "allowMultiple": false
+  }
+}
