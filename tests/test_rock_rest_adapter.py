@@ -220,11 +220,36 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertEqual(batch.unavailable, ("Groups", "Jobs"))
 
     def test_search_starts_all_fixed_category_reads_concurrently(self):
-        batch = RockRestReadOnlyAdapter(
-            FakeCookieProvider(), ConcurrentHttp()
-        ).search("Ada")
+        batch = RockRestReadOnlyAdapter(FakeCookieProvider(), ConcurrentHttp()).search(
+            "Ada"
+        )
         self.assertEqual(batch.results, [])
         self.assertEqual(batch.unavailable, ())
+
+    def test_scoped_search_calls_only_one_endpoint_and_allows_an_empty_term(self):
+        http = FakeHttp(
+            {
+                "/api/Groups": [
+                    {
+                        "Id": 4,
+                        "Name": "Delta",
+                        "IsActive": True,
+                        "GroupType": {"Name": "Small Group"},
+                    }
+                ]
+            }
+        )
+        batch = RockRestReadOnlyAdapter(FakeCookieProvider(), http).search("", "Groups")
+        self.assertEqual([call[0] for call in http.calls], ["/api/Groups"])
+        self.assertNotIn("$filter", http.calls[0][1])
+        self.assertEqual(batch.results[0]["subtitle"], "Small Group")
+        self.assertEqual(batch.unavailable, ())
+
+    def test_scoped_search_rejects_unknown_internal_categories(self):
+        with self.assertRaisesRegex(RockRestError, "invalid_search_scope"):
+            RockRestReadOnlyAdapter(FakeCookieProvider(), FakeHttp()).search(
+                "Ada", "Unknown"
+            )
 
     def test_personal_links_are_same_origin_and_never_expose_urls(self):
         http = FakeHttp(

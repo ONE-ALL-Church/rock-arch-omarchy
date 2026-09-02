@@ -26,6 +26,29 @@ CATEGORIES = (
     "Content Channel Items",
 )
 
+SEARCH_SCOPE_ALIASES = {
+    "p": "People",
+    "person": "People",
+    "people": "People",
+    "g": "Groups",
+    "group": "Groups",
+    "groups": "Groups",
+    "w": "Workflows",
+    "workflow": "Workflows",
+    "workflows": "Workflows",
+    "j": "Jobs",
+    "job": "Jobs",
+    "jobs": "Jobs",
+    "pg": "Pages",
+    "page": "Pages",
+    "pages": "Pages",
+    "c": "Content Channel Items",
+    "content": "Content Channel Items",
+    "contents": "Content Channel Items",
+    "item": "Content Channel Items",
+    "items": "Content Channel Items",
+}
+
 ALLOWED_RESULT_KEYS = frozenset(
     {"category", "safeId", "title", "subtitle", "status", "canOpen"}
 )
@@ -47,6 +70,15 @@ class Capability:
 def sanitize_text(value: Any, limit: int) -> str:
     text = " ".join(str(value or "").replace("\x00", "").split())
     return text[:limit]
+
+
+def parse_search_query(value: Any) -> tuple[str, str | None]:
+    """Split a recognized entity prefix from a bounded search query."""
+
+    text = sanitize_text(value, 120)
+    prefix, separator, remainder = text.partition(":")
+    category = SEARCH_SCOPE_ALIASES.get(prefix.lower()) if separator else None
+    return (remainder.strip(), category) if category else (text, None)
 
 
 def allowlist(record: dict[str, Any], keys: frozenset[str]) -> dict[str, Any]:

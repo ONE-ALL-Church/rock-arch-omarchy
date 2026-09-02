@@ -69,13 +69,18 @@ _PERSONS = {
 
 
 class MockAdapter:
-    def search(self, query: str, limit: int = 18) -> list[dict[str, object]]:
+    def search(
+        self, query: str, limit: int = 18, category: str | None = None
+    ) -> list[dict[str, object]]:
         needle = " ".join(query.lower().split())[:120]
         rows = [
             r
             for r in _RECORDS
-            if not needle
-            or needle in " ".join(str(value) for value in r.values()).lower()
+            if (category is None or r["category"] == category)
+            and (
+                not needle
+                or needle in " ".join(str(value) for value in r.values()).lower()
+            )
         ]
         return [
             allowlist(dict(r), ALLOWED_RESULT_KEYS)

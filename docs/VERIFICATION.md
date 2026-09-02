@@ -33,7 +33,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/OAuth/Magnus/REST/navigation/instance tests: 43 passing via
+- Broker/OAuth/Magnus/REST/navigation/instance tests: 46 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -84,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.5.0` after shell restart, registered the
+- Omarchy loaded plugin version `0.6.0` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -96,6 +96,12 @@
   `Group.GroupType` and requests only `GroupType.Name`. A live privacy-bounded
   check returned three Group rows with three populated Group Type subtitles;
   only counts were printed.
+- Entity prefixes are broker-enforced scopes rather than display-only filters.
+  Contract coverage checks short/full aliases, literal handling of unknown
+  prefixes, empty scoped terms, invalid internal categories, and the single
+  fixed-endpoint boundary. A live privacy-bounded `g:` check returned only three
+  Groups; a warm Pages scope completed in 0.153 seconds. No record values were
+  printed.
 - The six fixed REST reads now start concurrently while retaining deterministic
   category ordering. A final clean-restart PROD socket measurement improved
   from the prior 2.432/2.197-second samples to 1.843 seconds cold and 0.315
@@ -126,6 +132,11 @@
   on the selected row. Personal Links load only when Links is selected, so that
   network read cannot block the initial Search view. DEV navigation omits the
   per-origin PROD Quick Return history.
+- The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
+  plus documented full aliases. It shows the active category as a removable
+  badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
+  mnemonic Alt shortcuts apply each scope without conflicting with current
+  Hyprland bindings.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,

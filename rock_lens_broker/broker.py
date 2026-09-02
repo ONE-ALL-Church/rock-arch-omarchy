@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .auth import AuthState, ConfigStore, OAuthManager, default_config_path
-from .contracts import Capability, Context, HealthState, sanitize_text
+from .contracts import (
+    CATEGORIES,
+    Capability,
+    Context,
+    HealthState,
+    parse_search_query,
+    sanitize_text,
+)
 from .instance import InstanceStore, default_instance_path
 from .magnus_adapter import MagnusError, MagnusReadOnlyAdapter
 from .mock_adapter import MockAdapter
@@ -31,7 +38,7 @@ class MagnusStatusProvider(Protocol):
 class LiveReadAdapter(Protocol):
     def clear(self) -> None: ...
 
-    def search(self, query: str) -> SearchBatch: ...
+    def search(self, query: str, category: str | None = None) -> SearchBatch: ...
 
     def person_quick_look(self, safe_id: str) -> dict[str, Any] | None: ...
 
@@ -202,11 +209,12 @@ class Broker:
                 refreshLive=True,
             )
         if op == "search":
-            query = sanitize_text(raw.get("query"), 120)
+            query, category = parse_search_query(raw.get("query"))
+            unavailable_categories = [category] if category else list(CATEGORIES)
             if self._context is Context.DEV:
                 return self._ok(
                     context=self._context.value,
-                    results=self._mock.search(query),
+                    results=self._mock.search(query, category=category),
                     source="synthetic",
                     unavailable=[],
                 )
@@ -215,9 +223,9 @@ class Broker:
                     context=self._context.value,
                     results=[],
                     source="unavailable",
-                    unavailable=list(self._mock.categories()),
+                    unavailable=unavailable_categories,
                 )
-            if not query:
+            if not query and category is None:
                 return self._ok(
                     context=self._context.value,
                     results=[],
@@ -225,14 +233,14 @@ class Broker:
                     unavailable=[],
                 )
             try:
-                batch = self._live.search(query)
+                batch = self._live.search(query, category)
             except RockRestError:
                 self._live_health = HealthState.FAILED
                 return self._ok(
                     context=self._context.value,
                     results=[],
                     source="unavailable",
-                    unavailable=list(self._mock.categories()),
+                    unavailable=unavailable_categories,
                 )
             self._live_health = (
                 HealthState.STALE if batch.unavailable else HealthState.HEALTHY

@@ -105,6 +105,23 @@ must resolve to the exact configured Rock origin; Personal Links have the same
 origin restriction. Personal Links are fetched only when the Links tab is
 opened, so they cannot delay the initial Search view.
 
+Start a query with an entity prefix to search only that Rock category. A bare
+prefix such as `g:` lists the first three items in that category.
+
+| Category | Short prefix | Full aliases | Shortcut |
+|---|---|---|---|
+| People | `p:` | `person:`, `people:` | `Alt+P` |
+| Groups | `g:` | `group:`, `groups:` | `Alt+G` |
+| Workflows | `w:` | `workflow:`, `workflows:` | `Alt+W` |
+| Jobs | `j:` | `job:`, `jobs:` | `Alt+J` |
+| Pages | `pg:` | `page:`, `pages:` | `Alt+Shift+P` |
+| Content Channel Items | `c:` | `content:`, `item:`, `items:` | `Alt+C` |
+
+For example, `g: youth` calls only the Groups endpoint. The active scope appears
+as a badge beside the search field. `Esc` clears the scope before closing the
+panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary search
+text; no slash-command mode is required.
+
 The search field keeps native editing behavior. Up and Down move through results
 and across the Search/Links boundary, Tab cycles search input, results, and
 links (Shift+Tab reverses), and Enter or Space opens the selected live target.

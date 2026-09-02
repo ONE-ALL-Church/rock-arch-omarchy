@@ -9,6 +9,8 @@ from rock_lens_broker.contracts import (
     ALLOWED_PERSON_KEYS,
     ALLOWED_RESULT_KEYS,
     CATEGORIES,
+    SEARCH_SCOPE_ALIASES,
+    parse_search_query,
 )
 from rock_lens_broker.instance import InstanceStore
 from rock_lens_broker.navigation import NavigationTarget
@@ -45,6 +47,7 @@ class FakeMagnus:
 class FakeLive:
     def __init__(self):
         self.search_calls = []
+        self.search_categories = []
         self.cleared = False
         self.target = NavigationTarget(
             "Ada Rivera",
@@ -61,8 +64,9 @@ class FakeLive:
     def clear(self):
         self.cleared = True
 
-    def search(self, query):
+    def search(self, query, category=None):
         self.search_calls.append(query)
+        self.search_categories.append(category)
         return SearchBatch(
             [
                 {
@@ -142,6 +146,17 @@ class BrokerContractTests(unittest.TestCase):
         )
         for row in response["results"]:
             self.assertLessEqual(set(row), ALLOWED_RESULT_KEYS)
+
+    def test_entity_prefixes_scope_dev_search_and_preserve_unknown_prefixes(self):
+        for prefix, category in SEARCH_SCOPE_ALIASES.items():
+            with self.subTest(prefix=prefix):
+                response = self.broker.handle({"op": "search", "query": f"{prefix}:"})
+                self.assertEqual(
+                    {row["category"] for row in response["results"]}, {category}
+                )
+
+        self.assertEqual(parse_search_query("g: youth"), ("youth", "Groups"))
+        self.assertEqual(parse_search_query("unknown: youth"), ("unknown: youth", None))
 
     def test_person_quick_look_is_privacy_minimal(self):
         person = self.broker.handle(
@@ -227,7 +242,12 @@ class BrokerContractTests(unittest.TestCase):
         response = broker.handle({"op": "search", "query": "Ada"})
         self.assertEqual(response["source"], "live")
         self.assertEqual(live.search_calls, ["Ada"])
+        self.assertEqual(live.search_categories, [None])
         self.assertEqual(response["results"][0]["safeId"], "rock-safe-person")
+
+        broker.handle({"op": "search", "query": "g: Delta"})
+        self.assertEqual(live.search_calls[-1], "Delta")
+        self.assertEqual(live.search_categories[-1], "Groups")
 
     def test_prod_without_magnus_fails_closed_without_live_call(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

@@ -79,6 +79,11 @@ controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
 fixed reads share one ephemeral Magnus-authenticated cookie and start in
 parallel; results are still transformed in a deterministic category order.
 The Groups projection also expands only `GroupType.Name` for its subtitle.
+Recognized leading entity prefixes are parsed into one canonical category and
+the remaining text; a scoped search runs only that category's existing fixed
+specification. Bare prefixes omit `$filter` but retain the fixed projection,
+ordering, and `$top=3`. Unknown prefixes stay in the search text and cannot
+select an API path.
 Personal Links use only `PersonalLinks/GetPersonalLinksData`. Responses are
 capped at 2 MiB and transformed immediately into display allowlists. A failed
 category is reported as unavailable; PROD never falls back to mock data. There

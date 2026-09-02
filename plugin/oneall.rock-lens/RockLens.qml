@@ -38,6 +38,10 @@ Panel {
   property int resultCursor: -1
   property int linkCursor: -1
   readonly property int navigationCount: personalLinks.length + quickReturns.length
+  readonly property string scopeKey: scopeKeyForQuery(query)
+  readonly property string scopeLabel: scopeLabelForKey(scopeKey)
+  readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
+    !domainField.activeFocus && !usernameField.activeFocus && !passwordField.activeFocus
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
     magnusConfigured ? "Magnus · " + instanceDomain :
     magnusAvailable ? "Rock login required" : "Magnus unavailable"
@@ -55,6 +59,71 @@ Panel {
     requestQueue = next.concat([payload])
     if (!brokerSocket.connected) brokerSocket.connected = true
     sendTimer.restart()
+  }
+
+  function scopeKeyForQuery(value) {
+    var text = String(value || "")
+    var colon = text.indexOf(":")
+    if (colon < 1) return ""
+    var prefix = text.substring(0, colon).trim().toLowerCase()
+    if (prefix === "p" || prefix === "person" || prefix === "people") return "p"
+    if (prefix === "g" || prefix === "group" || prefix === "groups") return "g"
+    if (prefix === "w" || prefix === "workflow" || prefix === "workflows") return "w"
+    if (prefix === "j" || prefix === "job" || prefix === "jobs") return "j"
+    if (prefix === "pg" || prefix === "page" || prefix === "pages") return "page"
+    if (prefix === "c" || prefix === "content" || prefix === "contents" ||
+        prefix === "item" || prefix === "items") return "c"
+    return ""
+  }
+
+  function scopeLabelForKey(key) {
+    if (key === "p") return "People"
+    if (key === "g") return "Groups"
+    if (key === "w") return "Workflows"
+    if (key === "j") return "Jobs"
+    if (key === "page") return "Pages"
+    if (key === "c") return "Content"
+    return ""
+  }
+
+  function queryWithoutScope(value) {
+    var text = String(value || "")
+    if (!scopeKeyForQuery(text)) return text.trim()
+    return text.substring(text.indexOf(":") + 1).trim()
+  }
+
+  function applyScope(key) {
+    var term = scopeKey ? queryWithoutScope(query) : query.trim()
+    viewMode = "search"
+    query = key + ":" + (term ? " " + term : "")
+    resultCursor = -1
+    linkCursor = -1
+    quickLook = null
+    feedbackText = ""
+    panelFlick.contentY = 0
+    scheduleSearch()
+    Qt.callLater(function() {
+      searchField.cursorPosition = searchField.text.length
+      searchField.forceActiveFocus()
+    })
+  }
+
+  function clearScope() {
+    if (!scopeKey) return false
+    query = queryWithoutScope(query)
+    resultCursor = -1
+    quickLook = null
+    feedbackText = ""
+    scheduleSearch()
+    Qt.callLater(function() {
+      searchField.cursorPosition = searchField.text.length
+      searchField.forceActiveFocus()
+    })
+    return true
+  }
+
+  function escapePanel() {
+    if (!clearScope()) close()
   }
 
   function accept(line) {
@@ -320,6 +389,14 @@ Panel {
     function toggle(): void { root.toggle() }
   }
 
+  Shortcut { sequence: "Alt+P"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("p") }
+  Shortcut { sequence: "Alt+G"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("g") }
+  Shortcut { sequence: "Alt+W"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("w") }
+  Shortcut { sequence: "Alt+J"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("j") }
+  Shortcut { sequence: "Alt+Shift+P"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("page") }
+  Shortcut { sequence: "Alt+C"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("c") }
+  Shortcut { sequence: "Alt+0"; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
+
   WidgetButton {
     id: button
     anchors.fill: parent
@@ -344,7 +421,7 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus
-      onCloseRequested: root.close()
+      onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
       onActivateRequested: root.activateCursor()
@@ -394,36 +471,61 @@ Panel {
           }
         }
 
-        TextField {
-          id: searchField
+        RowLayout {
           visible: root.viewMode === "search"
           width: parent.width
-          maximumLength: 120
-          placeholderText: "Search Rock…"
-          selectByMouse: true
-          inputMethodHints: Qt.ImhNoPredictiveText
-          onTextEdited: {
-            root.resultCursor = -1
-            root.quickLook = null
-            root.feedbackText = ""
-            root.scheduleSearch()
+          spacing: Style.spacing.sm
+
+          TextField {
+            id: searchField
+            Layout.fillWidth: true
+            maximumLength: 120
+            placeholderText: "Search Rock… (try g:)"
+            selectByMouse: true
+            inputMethodHints: Qt.ImhNoPredictiveText
+            onTextEdited: {
+              root.resultCursor = -1
+              root.quickLook = null
+              root.feedbackText = ""
+              root.scheduleSearch()
+            }
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_Escape) {
+                root.escapePanel()
+                event.accepted = true
+              } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
+                root.moveCursor(0, event.key === Qt.Key_Down ? 1 : -1)
+                event.accepted = true
+              } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+                if (root.contextName === "PROD" && !root.magnusConfigured) return
+                var backwards = event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier)
+                root.moveTab(backwards ? -1 : 1)
+                event.accepted = true
+              } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                root.activateResult(0)
+                event.accepted = true
+              }
+            }
           }
-          Keys.priority: Keys.BeforeItem
-          Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) {
-              root.close()
-              event.accepted = true
-            } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
-              root.moveCursor(0, event.key === Qt.Key_Down ? 1 : -1)
-              event.accepted = true
-            } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-              if (root.contextName === "PROD" && !root.magnusConfigured) return
-              var backwards = event.key === Qt.Key_Backtab || (event.modifiers & Qt.ShiftModifier)
-              root.moveTab(backwards ? -1 : 1)
-              event.accepted = true
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-              root.activateResult(0)
-              event.accepted = true
+
+          Rectangle {
+            visible: root.scopeKey !== ""
+            Layout.preferredWidth: scopeBadgeLabel.implicitWidth + 20
+            Layout.preferredHeight: searchField.implicitHeight
+            radius: 7
+            color: Style.selectedFillFor(Color.foreground, Color.accent)
+            Text {
+              id: scopeBadgeLabel
+              anchors.centerIn: parent
+              text: root.scopeLabel
+              color: Color.foreground
+              font.bold: true
+            }
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.clearScope()
             }
           }
         }
@@ -664,7 +766,9 @@ Panel {
 
         Text {
           width: parent.width
-          text: root.feedbackText || (root.searchInFlight ? "Searching…" : "↑↓ navigate · Tab switch · Enter open")
+          text: root.feedbackText || (root.searchInFlight ? "Searching…" :
+            root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
+            "Try g: or Alt+G · ↑↓ navigate · Enter open")
           color: Color.foreground
           opacity: 0.55
           wrapMode: Text.WordWrap

@@ -1,6 +1,6 @@
 [project]
 name = "rock-lens"
-version = "0.5.0"
+version = "0.6.0"
 requires-python = ">=3.11"
 description = "Read-only Rock RMS lens for Omarchy"
 

@@ -263,9 +263,16 @@ class RockRestReadOnlyAdapter:
     def clear(self) -> None:
         self._registry.clear()
 
-    def search(self, query: str) -> SearchBatch:
+    def search(self, query: str, category: str | None = None) -> SearchBatch:
         normalized = sanitize_text(query, 120)
-        if not normalized:
+        specs = (
+            SEARCH_SPECS
+            if category is None
+            else tuple(spec for spec in SEARCH_SPECS if spec.category == category)
+        )
+        if not specs:
+            raise RockRestError("invalid_search_scope")
+        if not normalized and category is None:
             return SearchBatch([], ())
 
         results: list[dict[str, Any]] = []
@@ -274,7 +281,7 @@ class RockRestReadOnlyAdapter:
             with (
                 self._cookie_provider.authenticated_cookie() as cookie,
                 ThreadPoolExecutor(
-                    max_workers=len(SEARCH_SPECS),
+                    max_workers=len(specs),
                     thread_name_prefix="rock-lens-rest",
                 ) as executor,
             ):
@@ -285,11 +292,11 @@ class RockRestReadOnlyAdapter:
                         self._params(spec, normalized),
                         cookie,
                     )
-                    for spec in SEARCH_SPECS
+                    for spec in specs
                 ]
                 # Consume in the fixed category order so presentation and
                 # partial-failure reporting remain deterministic.
-                for spec, request in zip(SEARCH_SPECS, requests, strict=True):
+                for spec, request in zip(specs, requests, strict=True):
                     try:
                         value = request.result()
                         results.extend(self._transform_rows(spec, value))
@@ -298,7 +305,7 @@ class RockRestReadOnlyAdapter:
         except MagnusError as error:
             raise RockRestError("rock_login_failed") from error
 
-        if len(unavailable) == len(SEARCH_SPECS):
+        if len(unavailable) == len(specs):
             self._invalidate_cookie()
             raise RockRestError("rock_search_failed")
         return SearchBatch(results, tuple(unavailable))
@@ -373,7 +380,9 @@ class RockRestReadOnlyAdapter:
         return allowlist(dict(entry.person), ALLOWED_PERSON_KEYS)
 
     def _params(self, spec: _SearchSpec, query: str) -> dict[str, str]:
-        tokens = query.split() if spec.category == "People" else [query]
+        tokens = (
+            query.split() if spec.category == "People" else ([query] if query else [])
+        )
         clauses: list[str] = []
         for token in tokens:
             escaped = token.replace("'", "''")
@@ -386,11 +395,12 @@ class RockRestReadOnlyAdapter:
                 else "(" + " or ".join(alternatives) + ")"
             )
         params = {
-            "$filter": " and ".join(clauses),
             "$select": spec.select,
             "$orderby": spec.order_by,
             "$top": str(ROWS_PER_CATEGORY),
         }
+        if clauses:
+            params["$filter"] = " and ".join(clauses)
         if spec.expand:
             params["$expand"] = spec.expand
         return params
