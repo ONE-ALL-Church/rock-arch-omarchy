@@ -174,6 +174,7 @@ class MagnusReadOnlyAdapter:
     ) -> None:
         self.cookie_provider = cookie_provider
         self.server = validate_magnus_server(server) if server else ""
+        self.profile_id = ""
         self.http = http or MagnusHttpClient()
         self._access = "unknown"
         self._key = secrets.token_bytes(32)
@@ -201,10 +202,15 @@ class MagnusReadOnlyAdapter:
             self._reset()
         self.server = server
 
-    def set_profile(self, _profile_id: str, server: str) -> None:
-        self.set_server(server)
+    def set_profile(self, profile_id: str, server: str) -> None:
+        safe_server = validate_magnus_server(server)
+        if profile_id != self.profile_id or safe_server != self.server:
+            self._reset()
+        self.profile_id = profile_id
+        self.server = safe_server
 
     def clear_profile(self) -> None:
+        self.profile_id = ""
         self.server = ""
         self._reset()
 

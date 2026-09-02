@@ -17,7 +17,8 @@ disabled.
 
 A compact Settings view supports multiple Rock instances or accounts,
 connection testing, sign-out, profile removal, per-profile Recent Links,
-category controls, person-context visibility, and close-after-open behavior.
+category controls, person-context visibility, and close-after-open behavior
+(enabled by default).
 Search terms and opaque navigation or Magnus IDs travel over an owner-only local
 Unix socket. Credentials, cookies, raw Rock record IDs, and raw server URLs do
 not cross that boundary; only a user-requested bounded Magnus text preview is

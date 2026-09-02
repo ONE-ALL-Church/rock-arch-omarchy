@@ -29,7 +29,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/auth/Magnus/REST/navigation/instance tests: 63 passing via
+- Broker/auth/Magnus/REST/navigation/instance tests: 65 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -198,6 +198,15 @@
   empty `hyprctl configerrors` check also pass. A full shell restart was not
   repeated because the session was locked; plugin rescan, installed-path broker
   execution, and live summon provided the non-disruptive checks.
+- Plugin version `0.10.1` makes initial status and Rock login independent from
+  the optional Magnus probe. PROD search cannot enter an in-flight state before
+  the saved-login status is known, error and malformed-response paths clear all
+  pending UI flags, and sign-in now shows progressive slow-response feedback
+  with an 18-second UI watchdog. Magnus detection runs after the core response
+  and no longer holds the login button on Saving. Switching accounts on the
+  same Rock origin also resets Magnus entitlement state. Close-after-open is
+  enabled for new preference stores by default. Sixty-five tests cover the
+  updated status, account-switch, and preference behavior.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and

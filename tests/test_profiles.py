@@ -51,6 +51,7 @@ class ProfileStoreTests(unittest.TestCase):
             }
         )
         self.assertFalse(updated["showPersonContext"])
+        self.assertTrue(updated["closeAfterOpen"])
         self.assertEqual(updated["enabledCategories"], ["People", "Groups"])
         with self.assertRaisesRegex(ProfileError, "invalid_preferences"):
             store.update_preferences({"rawCookie": True})

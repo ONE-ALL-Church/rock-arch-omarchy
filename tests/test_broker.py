@@ -80,6 +80,7 @@ class FakeMagnus:
         self.available = available
         self.server = DEFAULT_ROCK_ORIGIN
         self.state = "available" if available else "unavailable"
+        self.probe_calls = 0
 
     def status(self):
         return {
@@ -109,6 +110,7 @@ class FakeMagnus:
         self.state = "unknown"
 
     def probe(self):
+        self.probe_calls += 1
         if self.state == "unknown":
             self.state = "unavailable"
         self.available = self.state == "available"
@@ -404,6 +406,30 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(links["personalLinksAvailable"])
         self.assertEqual(links["personalLinks"][0]["safeId"], "rock-safe-link")
 
+    def test_core_status_does_not_wait_for_optional_magnus_probe(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        magnus = FakeMagnus(False)
+        magnus.state = "unknown"
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            session=FakeSession(True),
+            magnus=magnus,
+            live=FakeLive(),
+            instance_file=self.instance,
+        )
+
+        status = broker.handle({"op": "status"})
+        self.assertTrue(status["rock"]["configured"])
+        self.assertEqual(magnus.probe_calls, 0)
+
+        broker.handle({"op": "status", "probeMagnus": True})
+        self.assertEqual(magnus.probe_calls, 1)
+
+        magnus.state = "unknown"
+        broker.handle({"op": "magnus_status"})
+        self.assertEqual(magnus.probe_calls, 2)
+
     def test_magnus_browse_and_preview_use_bounded_read_only_operations(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
         broker = Broker(
@@ -466,6 +492,7 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(response["refreshLive"])
         self.assertEqual(session.saved, ("rock-user", "private-password"))
         self.assertEqual(magnus.server, DEFAULT_ROCK_ORIGIN)
+        self.assertEqual(magnus.probe_calls, 0)
         self.assertEqual(InstanceStore(self.instance).get(), DEFAULT_ROCK_ORIGIN)
         serialized = json.dumps(response)
         self.assertNotIn("rock-user", serialized)

@@ -24,6 +24,7 @@ Panel {
   property var quickReturns: []
   property var profiles: []
   property bool profilesLoaded: false
+  property bool statusLoaded: false
   property string activeProfileId: ""
   property bool preferencePersonContext: true
   property bool preferenceRecentLinks: true
@@ -48,6 +49,7 @@ Panel {
   property bool rockConfigured: false
   property bool magnusAvailable: false
   property string magnusState: "unknown"
+  property bool magnusProbeInFlight: false
   property var magnusItems: []
   property var magnusPreview: null
   property var magnusHistory: []
@@ -57,6 +59,8 @@ Panel {
   property bool magnusBusy: false
   property bool personalLinksAvailable: false
   property bool setupBusy: false
+  property bool setupSlow: false
+  property string setupBusyText: "Working…"
   property bool searchInFlight: false
   property bool searchPending: false
   property string searchInFlightQuery: ""
@@ -89,8 +93,18 @@ Panel {
       if (!coalesce || queued.op !== payload.op || !sameNavigationSection) next.push(queued)
     }
     requestQueue = next.concat([payload])
-    if (!brokerSocket.connected) brokerSocket.connected = true
-    sendTimer.restart()
+    if (brokerSocket.connected) flushRequests()
+    else brokerReconnectTimer.restart()
+  }
+
+  function flushRequests() {
+    if (!brokerSocket.connected || !requestQueue.length) return
+    while (brokerSocket.connected && requestQueue.length) {
+      var payload = requestQueue[0]
+      requestQueue = requestQueue.slice(1)
+      brokerSocket.write(JSON.stringify(payload) + "\n")
+    }
+    brokerSocket.flush()
   }
 
   function scopeKeyForQuery(value) {
@@ -197,14 +211,27 @@ Panel {
 
   function accept(line) {
     var response
-    try { response = JSON.parse(line) } catch (e) { return }
+    try { response = JSON.parse(line) } catch (e) {
+      finishSetup()
+      searchInFlight = false
+      searchPending = false
+      searchInFlightQuery = ""
+      feedbackText = "Rock Lens received an invalid response"
+      return
+    }
     if (!response || response.ok !== true) {
-      setupBusy = false
+      finishSetup()
+      searchInFlight = false
+      searchPending = false
+      searchInFlightQuery = ""
       magnusBusy = false
+      magnusProbeInFlight = false
+      if (magnusState === "checking") magnusState = "error"
       pendingSuccessText = ""
       feedbackText = response && response.error ? String(response.error).split("_").join(" ") : "Request failed"
       return
     }
+    var isStatusResponse = response.categories !== undefined && response.rock !== undefined
     var isSearchResponse = Array.isArray(response.results)
     var staleSearch = isSearchResponse && searchInFlight &&
       (searchPending || query !== searchInFlightQuery)
@@ -226,6 +253,7 @@ Panel {
     if (response.magnus) {
       magnusAvailable = response.magnus.available === true
       magnusState = String(response.magnus.state || "unknown")
+      magnusProbeInFlight = false
       if (!magnusAvailable && viewMode === "magnus") focusSearch()
     }
     if (response.magnusBrowser) {
@@ -255,6 +283,19 @@ Panel {
         addProfileMode = true
       }
     }
+    if (isStatusResponse) {
+      statusLoaded = true
+      if (contextName === "PROD" && !rockConfigured) {
+        searchInFlight = false
+        searchPending = false
+        searchInFlightQuery = ""
+      } else if (query.trim().length > 0) {
+        Qt.callLater(function() { root.refreshSearch() })
+      }
+      if (contextName === "PROD" && rockConfigured &&
+          (magnusState === "unknown" || magnusState === "error"))
+        Qt.callLater(function() { root.probeMagnus() })
+    }
     if (isSearchResponse && !staleSearch) {
       results = response.results
       if (resultCursor >= results.length) resultCursor = results.length - 1
@@ -271,7 +312,7 @@ Panel {
     if (response.person) quickLook = response.person
     if (response.source && !staleSearch) searchSource = String(response.source)
     if (response.refreshLive === true) {
-      setupBusy = false
+      finishSetup()
       setupPassword = ""
       newProfileName = ""
       newProfileDomain = ""
@@ -286,13 +327,15 @@ Panel {
         root.refreshQuickReturns()
         if (root.viewMode === "personal") root.refreshPersonalLinks()
         if (root.viewMode === "search") searchField.forceActiveFocus()
+        root.request({op: "status", probeMagnus: true})
       })
     }
     if (response.connection === "connected") {
-      setupBusy = false
+      finishSetup()
       feedbackText = "Connection successful"
+      Qt.callLater(function() { root.request({op: "status", probeMagnus: true}) })
     } else if (response.connection === "signed_out") {
-      setupBusy = false
+      finishSetup()
       pendingSignOut = false
       editLoginMode = true
       setupPassword = ""
@@ -312,6 +355,13 @@ Panel {
   }
 
   function refreshSearch() {
+    if (contextName === "PROD" && (!statusLoaded || !rockConfigured)) {
+      searchInFlight = false
+      searchPending = false
+      searchInFlightQuery = ""
+      results = []
+      return
+    }
     if (searchInFlight) {
       searchPending = true
       return
@@ -322,6 +372,17 @@ Panel {
     request({op: "search", query: query})
   }
   function scheduleSearch() { searchTimer.restart() }
+  function probeMagnus() {
+    if (contextName !== "PROD" || !statusLoaded || !rockConfigured || magnusProbeInFlight)
+      return
+    if (setupBusy || searchInFlight) {
+      magnusProbeTimer.restart()
+      return
+    }
+    magnusProbeInFlight = true
+    magnusState = "checking"
+    request({op: "magnus_status"})
+  }
   function refreshQuickReturns() { request({op: "navigation_status", section: "quick_returns"}) }
   function refreshPersonalLinks() { request({op: "navigation_status", section: "personal"}) }
   function revealItem(item) {
@@ -585,7 +646,7 @@ Panel {
   function saveRockCredentials() {
     var username = setupUsername.trim()
     if (!username || !setupPassword || setupBusy || !activeProfileId) return
-    setupBusy = true
+    beginSetup("Signing in…")
     var password = setupPassword
     pendingSuccessText = "Login updated securely"
     request({op: "profile_credentials_update", username: username, password: password})
@@ -595,7 +656,7 @@ Panel {
     var username = setupUsername.trim()
     var domain = newProfileDomain.trim()
     if (!domain || !username || !setupPassword || setupBusy) return
-    setupBusy = true
+    beginSetup("Signing in…")
     var password = setupPassword
     pendingSuccessText = "Profile added"
     request({op: "profile_add", name: newProfileName.trim(), domain: domain, username: username, password: password})
@@ -603,7 +664,7 @@ Panel {
   }
   function switchProfile(profileId) {
     if (!profileId || profileId === activeProfileId || setupBusy) return
-    setupBusy = true
+    beginSetup("Switching profile…")
     editLoginMode = false
     magnusItems = []
     magnusPreview = null
@@ -617,7 +678,7 @@ Panel {
       feedbackText = "Press Remove again to confirm"
       return
     }
-    setupBusy = true
+    beginSetup("Removing profile…")
     pendingSuccessText = "Profile removed from this computer"
     request({op: "profile_remove", profileId: profileId})
   }
@@ -627,8 +688,21 @@ Panel {
       feedbackText = "Press Sign out again to clear the saved login"
       return
     }
-    setupBusy = true
+    beginSetup("Signing out…")
     request({op: "profile_sign_out"})
+  }
+  function beginSetup(label) {
+    setupBusyText = label || "Working…"
+    setupSlow = false
+    setupBusy = true
+    setupSlowTimer.restart()
+    setupTimeoutTimer.restart()
+  }
+  function finishSetup() {
+    setupBusy = false
+    setupSlow = false
+    setupSlowTimer.stop()
+    setupTimeoutTimer.stop()
   }
   function updatePreference(name, value) {
     var values = {}
@@ -661,7 +735,7 @@ Panel {
     magnusHistory = []
     setupPassword = ""
     request({op: "set_context", context: contextName})
-    request({op: "status"})
+    request({op: "status", probeMagnus: true})
     refreshSearch()
     refreshQuickReturns()
     if (viewMode === "personal") refreshPersonalLinks()
@@ -671,8 +745,11 @@ Panel {
     focusSearch()
     quickLook = null
     feedbackText = ""
+    statusLoaded = false
+    searchInFlight = false
+    searchPending = false
+    searchInFlightQuery = ""
     request({op: "status"})
-    refreshSearch()
     refreshQuickReturns()
   }
 
@@ -683,33 +760,57 @@ Panel {
     command: ["python3", "-m", "rock_lens_broker"]
     workingDirectory: root.packageRoot
     running: true
+    onStarted: if (root.requestQueue.length) brokerReconnectTimer.restart()
   }
 
   Timer {
-    id: sendTimer
-    interval: 40
+    id: brokerReconnectTimer
+    interval: 150
     onTriggered: {
-      if (!brokerSocket.connected) {
-        brokerSocket.connected = true
-        retryTimer.restart()
+      if (!root.requestQueue.length) return
+      if (brokerSocket.connected) {
+        root.flushRequests()
         return
       }
-      if (!root.requestQueue.length) return
-      var payload = root.requestQueue[0]
-      root.requestQueue = root.requestQueue.slice(1)
-      brokerSocket.write(JSON.stringify(payload) + "\n")
-      brokerSocket.flush()
-      if (root.requestQueue.length) sendTimer.restart()
+      brokerSocket.connected = false
+      brokerSocket.connected = true
     }
   }
-  Timer { id: retryTimer; interval: 120; onTriggered: sendTimer.restart() }
   Timer { id: searchTimer; interval: 250; onTriggered: root.refreshSearch() }
+  Timer {
+    id: startupStatusTimer
+    interval: 300
+    running: true
+    onTriggered: root.request({op: "status", probeMagnus: true})
+  }
+  Timer { id: magnusProbeTimer; interval: 800; onTriggered: root.probeMagnus() }
+  Timer {
+    id: setupSlowTimer
+    interval: 3000
+    onTriggered: if (root.setupBusy) root.setupSlow = true
+  }
+  Timer {
+    id: setupTimeoutTimer
+    interval: 18000
+    onTriggered: if (root.setupBusy) {
+      root.finishSetup()
+      root.pendingSuccessText = ""
+      root.feedbackText = "Rock did not respond. Check the connection and try again."
+    }
+  }
 
   Socket {
     id: brokerSocket
     path: root.socketPath
     connected: false
-    onConnectedChanged: if (connected && root.requestQueue.length) sendTimer.restart()
+    onConnectedChanged: {
+      if (connected && root.requestQueue.length) root.flushRequests()
+      else if (!connected && root.requestQueue.length) brokerReconnectTimer.restart()
+    }
+    onError: function(error) {
+      connected = false
+      if (root.requestQueue.length) brokerReconnectTimer.restart()
+    }
     parser: SplitParser { onRead: function(line) { root.accept(line) } }
   }
 
@@ -841,8 +942,9 @@ Panel {
           TextField {
             id: searchField
             Layout.fillWidth: true
+            enabled: root.contextName === "DEV" || (root.statusLoaded && root.rockConfigured)
             maximumLength: 120
-            placeholderText: "Search Rock… (try g:)"
+            placeholderText: root.contextName === "PROD" && root.statusLoaded && !root.rockConfigured ? "Save a Rock login to search" : "Search Rock… (try g:)"
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {
@@ -1384,7 +1486,7 @@ Panel {
                   onAccepted: root.addProfile()
                 }
                 Button {
-                  text: root.setupBusy ? "Saving…" : "Add and connect"
+                  text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
                   enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
                   onClicked: root.addProfile()
                 }
@@ -1437,7 +1539,7 @@ Panel {
                     text: "Test"
                     enabled: root.rockConfigured && !root.setupBusy
                     onClicked: {
-                      root.setupBusy = true
+                      root.beginSetup("Testing connection…")
                       root.feedbackText = "Testing connection…"
                       root.request({op: "profile_test"})
                     }
@@ -1475,7 +1577,7 @@ Panel {
                     onAccepted: root.saveRockCredentials()
                   }
                   Button {
-                    text: root.setupBusy ? "Saving…" : "Save login"
+                    text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Save login"
                     enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
                     onClicked: root.saveRockCredentials()
                   }
@@ -1533,7 +1635,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.10.0 · Ctrl+, opens Settings"
+                text: "Rock Lens 0.10.1 · Ctrl+, opens Settings"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall
@@ -1545,7 +1647,10 @@ Panel {
 
         Text {
           width: parent.width
-          text: root.feedbackText || (root.searchInFlight ? "Searching…" :
+          text: root.feedbackText || (root.setupBusy ? (root.setupSlow ? root.setupBusyText + " Rock is taking longer than usual." : root.setupBusyText) :
+            ((root.contextName === "DEV" || root.rockConfigured) && root.searchInFlight) ? "Searching…" :
+            !root.statusLoaded ? "Checking saved Rock login…" :
+            root.contextName === "PROD" && !root.rockConfigured ? "Open Settings to save a Rock login." :
             root.viewMode === "settings" ? "Esc returns to Search · Changes save automatically" :
             root.viewMode === "magnus" ? (root.magnusPreview ? "Esc or Back returns to files" : "↑↓ browse · Enter preview · Esc back") :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :

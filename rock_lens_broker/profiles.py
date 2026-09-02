@@ -21,7 +21,7 @@ PROFILE_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 DEFAULT_PREFERENCES: dict[str, Any] = {
     "showPersonContext": True,
     "recentLinks": True,
-    "closeAfterOpen": False,
+    "closeAfterOpen": True,
     "enabledCategories": list(CATEGORIES),
 }
 

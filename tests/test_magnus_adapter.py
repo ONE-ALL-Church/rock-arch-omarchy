@@ -147,6 +147,19 @@ class MagnusAdapterTests(unittest.TestCase):
         self.assertFalse(denied.probe())
         self.assertEqual(denied.status()["state"], "unavailable")
 
+    def test_switching_accounts_on_one_origin_resets_magnus_access(self):
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(),
+            CANONICAL_MAGNUS_SERVER,
+            FakeMagnusHttp({MAGNUS_API_PREFIX + "/GetServer": {"ok": True}}),
+        )
+        adapter.set_profile("first-profile", CANONICAL_MAGNUS_SERVER)
+        self.assertTrue(adapter.probe())
+        self.assertEqual(adapter.status()["state"], "available")
+
+        adapter.set_profile("second-profile", CANONICAL_MAGNUS_SERVER)
+        self.assertEqual(adapter.status()["state"], "unknown")
+
     def test_tree_descriptors_drive_read_only_capabilities_and_use_opaque_ids(self):
         tree = [
             {

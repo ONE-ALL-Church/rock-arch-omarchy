@@ -248,7 +248,8 @@ class Broker:
     def handle(self, raw: dict[str, Any]) -> dict[str, Any]:
         op = sanitize_text(raw.get("op"), 40)
         if op == "status":
-            self._probe_magnus()
+            if raw.get("probeMagnus") is True:
+                self._probe_magnus()
             auth = self._auth.public_status(self._context)
             rock = self._session.status()
             magnus = self._magnus.status()
@@ -314,7 +315,6 @@ class Broker:
                     return self._error("profile_domain_mismatch")
                 self._session.configure(username, password)
                 self._reset_magnus_access()
-                self._probe_magnus(force=True)
             except OriginError:
                 return self._error("invalid_rock_origin")
             except (RockSessionError, ProfileError) as error:
@@ -337,7 +337,6 @@ class Broker:
             try:
                 profile = self._profile_store.set_active(raw.get("profileId"))
                 self._activate_profile(profile)
-                self._probe_magnus()
             except (ProfileError, RockSessionError, MagnusError) as error:
                 return self._error(str(error))
             return self._profile_response(refreshLive=True)
@@ -357,7 +356,6 @@ class Broker:
             try:
                 self._session.configure(username, password)
                 self._reset_magnus_access()
-                self._probe_magnus(force=True)
             except RockSessionError as error:
                 return self._error(str(error))
             self._live.clear()
@@ -368,7 +366,6 @@ class Broker:
             try:
                 self._session.test_connection()
                 self._reset_magnus_access()
-                self._probe_magnus(force=True)
             except RockSessionError as error:
                 return self._error(str(error))
             return self._profile_response(connection="connected")
@@ -603,7 +600,6 @@ class Broker:
             self._activate_profile(added)
             self._session.configure(username, password)
             self._reset_magnus_access()
-            self._probe_magnus(force=True)
         except (ProfileError, RockSessionError) as error:
             if added:
                 self._rollback_profile_add(added, previous)
