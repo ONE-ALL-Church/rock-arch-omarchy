@@ -110,6 +110,23 @@ class QuickReturnStore:
                     return None
         return None
 
+    def clear(self) -> None:
+        """Clear the active profile's local history."""
+
+        try:
+            self.path.unlink(missing_ok=True)
+        except OSError:
+            return
+
+    def migrate_from(self, path: Path) -> None:
+        """Copy validated legacy history while retaining the source as rollback."""
+
+        if self.path.exists() or path == self.path:
+            return
+        rows = QuickReturnStore(path, self.origin)._read()
+        if rows:
+            self._write(rows)
+
     def _safe_id(self, row: dict[str, Any]) -> str:
         message = f"{row['kind']}\0{row['url']}".encode()
         return "quick-" + hmac.new(self._key, message, hashlib.sha256).hexdigest()[:32]

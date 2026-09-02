@@ -276,15 +276,31 @@ class RockRestReadOnlyAdapter:
         self._registry.clear()
         self._family_contexts.clear()
 
-    def search(self, query: str, category: str | None = None) -> SearchBatch:
+    def search(
+        self,
+        query: str,
+        category: str | None = None,
+        categories: list[str] | None = None,
+        include_person_context: bool = True,
+    ) -> SearchBatch:
         normalized = sanitize_text(query, 120)
+        known_categories = {spec.category for spec in SEARCH_SPECS}
+        if category is not None and category not in known_categories:
+            raise RockRestError("invalid_search_scope")
+        enabled = set(categories) if categories is not None else {
+            spec.category for spec in SEARCH_SPECS
+        }
         specs = (
-            SEARCH_SPECS
+            tuple(spec for spec in SEARCH_SPECS if spec.category in enabled)
             if category is None
-            else tuple(spec for spec in SEARCH_SPECS if spec.category == category)
+            else tuple(
+                spec
+                for spec in SEARCH_SPECS
+                if spec.category == category and spec.category in enabled
+            )
         )
         if not specs:
-            raise RockRestError("invalid_search_scope")
+            return SearchBatch([], ())
         if not normalized and category is None:
             return SearchBatch([], ())
 
@@ -302,7 +318,7 @@ class RockRestReadOnlyAdapter:
                     executor.submit(
                         self._http.get_json,
                         spec.path,
-                        self._params(spec, normalized),
+                        self._params(spec, normalized, include_person_context),
                         cookie,
                     )
                     for spec in specs
@@ -314,11 +330,16 @@ class RockRestReadOnlyAdapter:
                         value = request.result()
                         family_contexts = (
                             self._load_family_contexts(value, cookie)
-                            if spec.category == "People"
+                            if spec.category == "People" and include_person_context
                             else {}
                         )
                         results.extend(
-                            self._transform_rows(spec, value, family_contexts)
+                            self._transform_rows(
+                                spec,
+                                value,
+                                family_contexts,
+                                include_person_context,
+                            )
                         )
                     except RockRestError:
                         unavailable.append(spec.category)
@@ -399,7 +420,9 @@ class RockRestReadOnlyAdapter:
             return None
         return allowlist(dict(entry.person), ALLOWED_PERSON_KEYS)
 
-    def _params(self, spec: _SearchSpec, query: str) -> dict[str, str]:
+    def _params(
+        self, spec: _SearchSpec, query: str, include_person_context: bool = True
+    ) -> dict[str, str]:
         tokens = (
             query.split() if spec.category == "People" else ([query] if query else [])
         )
@@ -414,14 +437,19 @@ class RockRestReadOnlyAdapter:
                 if len(alternatives) == 1
                 else "(" + " or ".join(alternatives) + ")"
             )
+        people_without_context = (
+            spec.category == "People" and not include_person_context
+        )
         params = {
-            "$select": spec.select,
+            "$select": (
+                "Id,NickName,LastName" if people_without_context else spec.select
+            ),
             "$orderby": spec.order_by,
             "$top": str(ROWS_PER_CATEGORY),
         }
         if clauses:
             params["$filter"] = " and ".join(clauses)
-        if spec.expand:
+        if spec.expand and not people_without_context:
             params["$expand"] = spec.expand
         return params
 
@@ -430,6 +458,7 @@ class RockRestReadOnlyAdapter:
         spec: _SearchSpec,
         value: Any,
         family_contexts: dict[str, _FamilyContext] | None = None,
+        include_person_context: bool = True,
     ) -> list[dict[str, Any]]:
         if not isinstance(value, list) or len(value) > 1_000:
             raise RockRestError("invalid_rock_response")
@@ -454,7 +483,7 @@ class RockRestReadOnlyAdapter:
             subtitle = spec.subtitle
             person_quick_subtitle = "Live Rock record · read-only"
             person_campus = "Campus not available"
-            if spec.category == "People":
+            if spec.category == "People" and include_person_context:
                 family_id = self._positive_id(self._field(row, "GivingGroupId"))
                 family = family_contexts.get(family_id)
                 identity_parts: list[str] = []

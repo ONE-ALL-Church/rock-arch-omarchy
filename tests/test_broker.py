@@ -47,6 +47,33 @@ class FakeMagnus:
     def set_server(self, value):
         self.server = value
 
+    def set_profile(self, profile_id, value):
+        self.profile_id = profile_id
+        self.server = value
+
+    def clear_profile(self):
+        self.profile_id = ""
+        self.server = ""
+        self.configured = False
+
+    def migrate_legacy_credentials(self):
+        return False
+
+    def sign_out(self):
+        self.saved = None
+        self.configured = False
+
+    def remove_profile_credentials(self, profile_id):
+        if getattr(self, "profile_id", "") == profile_id:
+            self.saved = None
+            self.configured = False
+
+    def test_connection(self):
+        if not self.configured:
+            from rock_lens_broker.magnus_adapter import MagnusError
+
+            raise MagnusError("magnus_not_configured")
+
 
 class FakeLive:
     def __init__(self):
@@ -69,7 +96,13 @@ class FakeLive:
     def clear(self):
         self.cleared = True
 
-    def search(self, query, category=None):
+    def search(
+        self,
+        query,
+        category=None,
+        categories=None,
+        include_person_context=True,
+    ):
         self.search_calls.append(query)
         self.search_categories.append(category)
         return SearchBatch(
@@ -340,6 +373,87 @@ class BrokerContractTests(unittest.TestCase):
         serialized = json.dumps(response)
         self.assertNotIn("rock-user", serialized)
         self.assertNotIn("private-password", serialized)
+
+    def test_profile_lifecycle_and_preferences_are_broker_managed(self):
+        magnus = FakeMagnus(False)
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            magnus=magnus,
+            live=live,
+        )
+        added = broker.handle(
+            {
+                "op": "profile_add",
+                "name": "Main Campus",
+                "domain": "rock.example.org",
+                "username": "rock-user",
+                "password": "private-password",
+            }
+        )
+        self.assertTrue(added["ok"])
+        profile_id = added["profiles"]["activeProfileId"]
+        self.assertEqual(added["profiles"]["profiles"][0]["name"], "Main Campus")
+        self.assertNotIn("rock-user", json.dumps(added))
+        self.assertNotIn("private-password", json.dumps(added))
+
+        preferences = broker.handle(
+            {
+                "op": "preferences_update",
+                "preferences": {
+                    "showPersonContext": False,
+                    "enabledCategories": ["Groups"],
+                },
+            }
+        )
+        self.assertEqual(
+            preferences["profiles"]["preferences"]["enabledCategories"],
+            ["Groups"],
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+        search = broker.handle({"op": "search", "query": "Ada"})
+        self.assertTrue(search["ok"])
+        self.assertEqual(live.search_categories[-1], None)
+
+        signed_out = broker.handle({"op": "profile_sign_out"})
+        self.assertEqual(signed_out["connection"], "signed_out")
+        self.assertFalse(signed_out["magnus"]["configured"])
+        removed = broker.handle({"op": "profile_remove", "profileId": profile_id})
+        self.assertEqual(removed["profiles"]["profiles"], [])
+        self.assertFalse(removed["instance"]["configured"])
+
+    def test_profiles_with_same_domain_have_distinct_ids_and_switch(self):
+        magnus = FakeMagnus(False)
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            magnus=magnus,
+            live=FakeLive(),
+        )
+        first = broker.handle(
+            {
+                "op": "profile_add",
+                "name": "Staff",
+                "domain": DEFAULT_ROCK_ORIGIN,
+                "username": "staff",
+                "password": "first-password",
+            }
+        )
+        first_id = first["profiles"]["activeProfileId"]
+        second = broker.handle(
+            {
+                "op": "profile_add",
+                "name": "Volunteer",
+                "domain": DEFAULT_ROCK_ORIGIN,
+                "username": "volunteer",
+                "password": "second-password",
+            }
+        )
+        second_id = second["profiles"]["activeProfileId"]
+        self.assertNotEqual(first_id, second_id)
+        switched = broker.handle({"op": "profile_switch", "profileId": first_id})
+        self.assertEqual(switched["profiles"]["activeProfileId"], first_id)
 
     def test_personal_links_and_quick_returns_open_only_by_safe_id(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

@@ -153,6 +153,19 @@
   state file remained `0600`; the runtime directory/socket remained
   `0700`/`0600`. A panel-only visual check confirmed that the context badge and
   switch are absent, and its temporary capture was deleted.
+- Plugin version `0.9.0` adds an in-panel Settings view and owner-only
+  multi-profile metadata. Stable random profile IDs isolate credentials and
+  Recent Links even when two accounts share one Rock origin. The broker supports
+  add, switch, connection test, login update, sign-out, removal, category
+  selection, person-context visibility, recent-history control, and
+  close-after-open. Existing single-instance metadata and validated Recent Links
+  migrate without deleting the rollback source. Unit tests cover migration,
+  permissions, same-origin isolation, preferences, sign-out, and removal. The
+  installed v0.9.0 panel loaded without QML errors, the migrated profile passed
+  a credential-only connection test, and a post-migration scoped Groups read
+  returned three live rows with no unavailable category in 0.545 seconds. Only
+  counts and category names were printed. The temporary Settings capture was
+  deleted after inspection.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and

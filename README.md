@@ -5,7 +5,10 @@ use is locked to production and uses the `.ROCK` session created by Magnus to
 search six fixed Rock REST v1 resources and load the current person's Personal
 Links. Group results include their Rock Group Type. The six category reads run
 concurrently, and a brief memory-only Magnus session cache keeps successive
-searches responsive without persisting the cookie. QML is only a view: search
+searches responsive without persisting the cookie. A compact Settings view
+supports multiple Rock instances or accounts, connection testing, sign-out,
+profile removal, per-profile Recent Links, category controls, person-context
+visibility, and close-after-open behavior. QML is only a view: search
 terms and opaque navigation IDs travel over an owner-only local Unix socket,
 while credentials, cookies, raw record IDs, URLs, and response bodies remain
 inside the Python broker.
@@ -92,14 +95,18 @@ The client metadata file is owner-only at
 desktop Secret Service. The launcher receives only `configured`, state, and a
 fixed display label.
 
-The selected Rock origin is non-secret metadata stored owner-only at
-`$XDG_CONFIG_HOME/rock-lens/instance.json`. Usernames and passwords are not
-stored there; Secret Service keys are separated by a hash of that origin.
+Rock profile names, strict origins, the active profile ID, and allowlisted
+preferences are non-secret metadata stored owner-only at
+`$XDG_CONFIG_HOME/rock-lens/profiles.json`. Usernames and passwords are never
+stored there; Secret Service keys use stable random profile IDs, so two accounts
+on the same Rock instance remain separate. Existing single-instance setup and
+Recent Links migrate automatically, with the old history retained as rollback.
 
 ## Configure Magnus
 
-Magnus is deliberately separate from end-user OpenID Connect login. Enter the
-Rock credentials in the displayed masked form. The broker sends them only over
+Magnus is deliberately separate from end-user OpenID Connect login. Open
+**Settings** (or press `Ctrl+,`) and enter Rock credentials in the masked form.
+The broker sends them only over
 its owner-only socket and stores them in Secret Service. The equivalent terminal
 setup remains available:
 
@@ -114,6 +121,11 @@ validated cookie is retained in broker memory with a 15-minute idle timeout.
 The adapter still exposes only bounded `ls`, `cat`, and
 `hash` file operations; it does not expose a generic REST client. See
 [docs/MAGNUS.md](docs/MAGNUS.md) for its exact restrictions.
+
+**Sign out** clears the selected profile's password, username, and in-memory
+cookie while keeping its profile metadata and local Recent Links. **Remove**
+also deletes that profile's local metadata and Recent Links. Both actions
+require a second click in the launcher and never modify the Rock server.
 
 In the launcher, an empty **Search** view shows local **Recent Links**. Typing
 immediately replaces them with search results. **Personal Links** has its own

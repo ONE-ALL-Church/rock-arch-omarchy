@@ -13,8 +13,9 @@ Rock Lens uses the installed `rock-magnus-cli` only through
 - traversal, URL-shaped paths, control characters, and oversized responses are
   rejected;
 - only `status`, `ls`, `cat`, and SHA-256 `hash` operations are exposed;
-- Rock credentials are stored in Secret Service under a hash of the configured
-  origin, so different Rock instances do not share credentials;
+- Rock credentials are stored in Secret Service under a stable random profile
+  ID, so different instances and multiple accounts on one instance do not share
+  credentials;
 - each login creates an isolated mode-`0700` temporary configuration, hardens
   temporary files to `0600`, and destroys it afterward;
 - the validated cookie may be reused from broker memory with a 15-minute idle
@@ -42,12 +43,12 @@ never placed in argv. Cookie records are then selected by their exact
 `serverUrl`, independent of the nested JSON layout produced by Magnus's `Conf`
 dependency.
 
-Configure credentials through the masked form shown in Rock Lens **PROD**.
-The domain field comes first. The QML form clears its password immediately
-after serializing the owner-local request, the broker stores the origin in an
-owner-only configuration and both credentials in Secret Service, and neither
-credential is returned over the socket. The equivalent hidden terminal prompt
-is:
+Configure credentials through the masked form in Rock Lens **Settings**.
+The profile name and domain come first. The QML form clears its password
+immediately after serializing the owner-local request, the broker stores the
+origin in an owner-only configuration and both credentials in Secret Service,
+and neither credential is returned over the socket. The equivalent hidden
+terminal prompt is:
 
 ```bash
 python3 -m rock_lens_broker magnus configure

@@ -119,6 +119,25 @@ class MagnusAdapterTests(unittest.TestCase):
         self.adapter.set_server(CANONICAL_MAGNUS_SERVER)
         self.assertTrue(self.adapter.status()["configured"])
 
+    def test_profile_credentials_can_share_an_origin_and_sign_out_independently(self):
+        first_id = "a" * 32
+        second_id = "b" * 32
+        self.adapter.set_profile(first_id, CANONICAL_MAGNUS_SERVER)
+        self.adapter.configure("first-user", "first-password")
+        self.adapter.set_profile(second_id, CANONICAL_MAGNUS_SERVER)
+        self.assertFalse(self.adapter.status()["configured"])
+        self.adapter.configure("second-user", "second-password")
+        self.adapter.sign_out()
+        self.assertFalse(self.adapter.status()["configured"])
+        self.adapter.set_profile(first_id, CANONICAL_MAGNUS_SERVER)
+        self.assertTrue(self.adapter.status()["configured"])
+
+    def test_legacy_credentials_migrate_without_returning_secret_values(self):
+        self.adapter.configure("legacy-user", "legacy-password")
+        self.adapter.set_profile("c" * 32, CANONICAL_MAGNUS_SERVER)
+        self.assertTrue(self.adapter.migrate_legacy_credentials())
+        self.assertTrue(self.adapter.status()["configured"])
+
     @patch("rock_lens_broker.magnus_adapter.subprocess.run")
     def test_cli_runs_in_ephemeral_config_and_never_puts_password_in_argv(self, run):
         self.adapter.configure("rock-user", "private-password")

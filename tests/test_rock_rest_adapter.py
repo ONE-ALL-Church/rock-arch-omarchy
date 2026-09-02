@@ -313,6 +313,29 @@ class RockRestAdapterTests(unittest.TestCase):
         ambiguous = adapter.search("Jamie", "People").results[0]
         self.assertNotIn("Spouse", ambiguous["subtitle"])
 
+    def test_person_context_can_be_disabled_before_the_request(self):
+        http = FakeHttp(
+            {
+                "/api/People": [
+                    {
+                        "Id": 17,
+                        "NickName": "Jamie",
+                        "LastName": "Stone",
+                        "Age": 33,
+                        "GivingGroupId": 91,
+                    }
+                ]
+            }
+        )
+        batch = RockRestReadOnlyAdapter(FakeCookieProvider(), http).search(
+            "Jamie", "People", include_person_context=False
+        )
+        self.assertEqual([call[0] for call in http.calls], ["/api/People"])
+        self.assertEqual(http.calls[0][1]["$select"], "Id,NickName,LastName")
+        self.assertNotIn("$expand", http.calls[0][1])
+        self.assertEqual(batch.results[0]["subtitle"], "Person")
+        self.assertNotIn("Age", json.dumps(batch.results))
+
     def test_search_returns_partial_results_without_falling_back(self):
         failed = {"/api/Groups", "/api/ServiceJobs"}
         http = FakeHttp({"/api/People": []}, failures=failed)

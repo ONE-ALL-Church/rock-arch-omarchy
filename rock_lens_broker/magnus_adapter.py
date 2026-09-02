@@ -18,6 +18,7 @@ from typing import Any
 from .auth import SecretStore, SecretToolStore
 from .contracts import Context, sanitize_text
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
+from .profiles import ProfileError, validate_profile_id
 
 CANONICAL_MAGNUS_SERVER = DEFAULT_ROCK_ORIGIN
 DEFAULT_TREE_PATH = "api/TriumphTech/Magnus/GetTreeItems/root"
@@ -91,11 +92,16 @@ class MagnusReadOnlyAdapter:
         executable: str | None = None,
         secret_store: SecretStore | None = None,
         context: Context = Context.PROD,
+        profile_id: str | None = None,
     ) -> None:
         self.server = validate_magnus_server(server) if server else ""
         self.executable = executable or shutil.which("magnus") or ""
         self.secret_store = secret_store or SecretToolStore()
         self.context = context
+        try:
+            self.profile_id = validate_profile_id(profile_id) if profile_id else ""
+        except ProfileError as error:
+            raise MagnusError("invalid_profile") from error
         self._cached_cookie = ""
         self._cached_cookie_deadline = 0.0
         self._cache_generation = 0
@@ -121,6 +127,22 @@ class MagnusReadOnlyAdapter:
         if server != self.server:
             self._clear_cached_cookie()
         self.server = server
+
+    def set_profile(self, profile_id: str, server: str) -> None:
+        try:
+            safe_profile_id = validate_profile_id(profile_id)
+        except ProfileError as error:
+            raise MagnusError("invalid_profile") from error
+        safe_server = validate_magnus_server(server)
+        if safe_profile_id != self.profile_id or safe_server != self.server:
+            self._clear_cached_cookie()
+        self.profile_id = safe_profile_id
+        self.server = safe_server
+
+    def clear_profile(self) -> None:
+        self._clear_cached_cookie()
+        self.profile_id = ""
+        self.server = ""
 
     def configure(self, username: str, password: str) -> None:
         if not self.server:
@@ -154,6 +176,61 @@ class MagnusReadOnlyAdapter:
             self.secret_store.clear(self.context, self._secret_kind("magnus_password"))
             raise MagnusError("secure_storage_failed") from error
         self._clear_cached_cookie()
+
+    def migrate_legacy_credentials(self) -> bool:
+        """Copy origin-keyed credentials into the active profile key once."""
+
+        if not self.profile_id or not self.server or not self.secret_store.available():
+            return False
+        if self._credentials():
+            return False
+        username = self.secret_store.lookup(
+            self.context, self._legacy_secret_kind("magnus_username")
+        )
+        password = self.secret_store.lookup(
+            self.context, self._legacy_secret_kind("magnus_password")
+        )
+        if not username or not password:
+            return False
+        try:
+            self.secret_store.store(
+                self.context, self._secret_kind("magnus_username"), username
+            )
+            self.secret_store.store(
+                self.context, self._secret_kind("magnus_password"), password
+            )
+        except Exception as error:
+            self._clear_profile_keys(self.profile_id)
+            raise MagnusError("secure_storage_failed") from error
+        if self._credentials() != (username, password):
+            self._clear_profile_keys(self.profile_id)
+            raise MagnusError("secure_storage_failed")
+        return True
+
+    def sign_out(self) -> None:
+        """Clear credentials and the memory-only cookie for the active profile."""
+
+        if self.profile_id:
+            self._clear_profile_keys(self.profile_id)
+        if self.server:
+            for kind in ("magnus_username", "magnus_password"):
+                self.secret_store.clear(self.context, self._legacy_secret_kind(kind))
+        self._clear_cached_cookie()
+
+    def remove_profile_credentials(self, profile_id: str) -> None:
+        try:
+            safe_profile_id = validate_profile_id(profile_id)
+        except ProfileError as error:
+            raise MagnusError("invalid_profile") from error
+        self._clear_profile_keys(safe_profile_id)
+        if safe_profile_id == self.profile_id:
+            self._clear_cached_cookie()
+
+    def test_connection(self) -> None:
+        """Authenticate without reading a Rock API entity."""
+
+        with self.authenticated_cookie():
+            return
 
     def list_tree(self, path: str = DEFAULT_TREE_PATH) -> list[dict[str, Any]]:
         safe_path = validate_tree_path(path)
@@ -254,8 +331,17 @@ class MagnusReadOnlyAdapter:
         return (username, password) if username and password else None
 
     def _secret_kind(self, kind: str) -> str:
+        if self.profile_id:
+            return f"{kind}:profile:{self.profile_id}"
+        return self._legacy_secret_kind(kind)
+
+    def _legacy_secret_kind(self, kind: str) -> str:
         origin_key = hashlib.sha256(self.server.encode()).hexdigest()[:16]
         return f"{kind}:{origin_key}"
+
+    def _clear_profile_keys(self, profile_id: str) -> None:
+        for kind in ("magnus_username", "magnus_password"):
+            self.secret_store.clear(self.context, f"{kind}:profile:{profile_id}")
 
     def _run(self, command: list[str], maximum_bytes: int) -> bytes:
         with self._session() as (environment, _):

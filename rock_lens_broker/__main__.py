@@ -24,6 +24,7 @@ from .magnus_adapter import (
     MagnusReadOnlyAdapter,
 )
 from .origin import OriginError
+from .profiles import ProfileError, ProfileStore
 from .server import BrokerServer
 
 
@@ -93,17 +94,35 @@ def magnus(argv: list[str]) -> None:
     hash_parser.add_argument("path")
     args = parser.parse_args(argv)
     instance_store = InstanceStore(default_instance_path())
-    adapter = MagnusReadOnlyAdapter(server=instance_store.get())
-
+    profile_store = ProfileStore(
+        default_instance_path().with_name("profiles.json"), instance_store
+    )
+    active_profile = profile_store.active()
+    adapter = MagnusReadOnlyAdapter(
+        server=active_profile.origin if active_profile else None,
+        profile_id=active_profile.profile_id if active_profile else None,
+    )
     try:
+        if profile_store.migrated_profile_id:
+            adapter.migrate_legacy_credentials()
         if args.command == "status":
             print(json.dumps(adapter.status(), sort_keys=True))
             return
         if args.command == "configure":
             try:
-                domain = input("Rock domain (for example rock.example.org): ")
-                origin = instance_store.set(domain)
-                adapter.set_server(origin)
+                default_domain = active_profile.origin if active_profile else ""
+                suffix = f" [{default_domain}]" if default_domain else ""
+                domain = input(
+                    f"Rock domain (for example rock.example.org){suffix}: "
+                ).strip() or default_domain
+                if not active_profile or domain != active_profile.origin:
+                    name = input("Profile name (blank uses the domain): ").strip()
+                    active_profile = profile_store.add(name, domain)
+                else:
+                    active_profile = profile_store.set_active(
+                        active_profile.profile_id
+                    )
+                adapter.set_profile(active_profile.profile_id, active_profile.origin)
                 username = input("Rock username: ")
                 password = getpass.getpass("Rock password: ")
             except (EOFError, KeyboardInterrupt):
@@ -128,7 +147,7 @@ def magnus(argv: list[str]) -> None:
             print(f"Saved {len(content)} bytes with owner-only permissions.")
         else:
             sys.stdout.buffer.write(content)
-    except (MagnusError, OriginError) as error:
+    except (MagnusError, OriginError, ProfileError) as error:
         raise SystemExit(str(error)) from error
 
 

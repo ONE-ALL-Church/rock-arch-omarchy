@@ -21,7 +21,8 @@ from .instance import InstanceStore, default_instance_path
 from .magnus_adapter import MagnusError, MagnusReadOnlyAdapter
 from .mock_adapter import MockAdapter
 from .navigation import NavigationTarget, open_rock_url
-from .origin import DEFAULT_ROCK_ORIGIN, OriginError
+from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
+from .profiles import ProfileError, ProfileStore, RockProfile, default_profile_name
 from .quick_return import QuickReturnStore
 from .rock_rest_adapter import RockRestError, RockRestReadOnlyAdapter, SearchBatch
 
@@ -35,11 +36,29 @@ class MagnusStatusProvider(Protocol):
 
     def set_server(self, value: str) -> None: ...
 
+    def set_profile(self, profile_id: str, server: str) -> None: ...
+
+    def clear_profile(self) -> None: ...
+
+    def migrate_legacy_credentials(self) -> bool: ...
+
+    def sign_out(self) -> None: ...
+
+    def remove_profile_credentials(self, profile_id: str) -> None: ...
+
+    def test_connection(self) -> None: ...
+
 
 class LiveReadAdapter(Protocol):
     def clear(self) -> None: ...
 
-    def search(self, query: str, category: str | None = None) -> SearchBatch: ...
+    def search(
+        self,
+        query: str,
+        category: str | None = None,
+        categories: list[str] | None = None,
+        include_person_context: bool = True,
+    ) -> SearchBatch: ...
 
     def person_quick_look(self, safe_id: str) -> dict[str, Any] | None: ...
 
@@ -61,6 +80,7 @@ class Broker:
         quick_returns: QuickReturnStore | None = None,
         url_opener: Callable[[str], bool] | None = None,
         instance_file: Path | None = None,
+        profile_file: Path | None = None,
         developer_mode: bool | None = None,
     ) -> None:
         self._state_file = state_file
@@ -75,10 +95,30 @@ class Broker:
             else default_instance_path()
         )
         self._instance_store = InstanceStore(instance_path)
-        self._origin = self._instance_store.get()
-        self._magnus = magnus or MagnusReadOnlyAdapter(server=self._origin)
-        if magnus and self._origin:
-            self._magnus.set_server(self._origin)
+        self._profile_store = ProfileStore(
+            profile_file or instance_path.with_name("profiles.json"),
+            self._instance_store,
+        )
+        active_profile = self._profile_store.active()
+        self._active_profile_id = active_profile.profile_id if active_profile else ""
+        self._origin = active_profile.origin if active_profile else None
+        self._magnus = magnus or MagnusReadOnlyAdapter(
+            server=self._origin,
+            profile_id=self._active_profile_id or None,
+        )
+        if magnus and active_profile:
+            setter = getattr(self._magnus, "set_profile", None)
+            if callable(setter):
+                setter(active_profile.profile_id, active_profile.origin)
+            else:
+                self._magnus.set_server(active_profile.origin)
+        if self._profile_store.migrated_profile_id:
+            migrate = getattr(self._magnus, "migrate_legacy_credentials", None)
+            if callable(migrate):
+                try:
+                    migrate()
+                except MagnusError:
+                    pass
         self._live = live or RockRestReadOnlyAdapter(
             self._magnus, origin=self._origin or DEFAULT_ROCK_ORIGIN
         )
@@ -94,6 +134,12 @@ class Broker:
         self._quick_returns = quick_returns or QuickReturnStore(
             self._quick_return_path(), self._origin
         )
+        if (
+            not quick_returns
+            and self._profile_store.migrated_profile_id
+            and self._origin
+        ):
+            self._quick_returns.migrate_from(self._legacy_quick_return_path(self._origin))
         if quick_returns and self._origin:
             self._quick_returns.set_origin(self._origin)
         self._url_opener = url_opener
@@ -174,6 +220,7 @@ class Broker:
                 auth=auth,
                 instance=self._instance_status(),
                 magnus=magnus,
+                profiles=self._profile_store.snapshot(),
                 capabilities=self.capabilities(auth, magnus),
                 categories=list(self._mock.categories()),
             )
@@ -193,6 +240,7 @@ class Broker:
                 auth=self._auth.public_status(self._context),
                 instance=self._instance_status(),
                 magnus=self._magnus.status(),
+                profiles=self._profile_store.snapshot(),
             )
         if op == "auth_status":
             return self._ok(auth=self._auth.public_status(self._context))
@@ -212,27 +260,114 @@ class Broker:
                 or not isinstance(password, str)
             ):
                 return self._error("invalid_magnus_credentials")
+            added_profile: RockProfile | None = None
             try:
-                origin = self._instance_store.set(domain)
-                self._set_origin(origin)
+                origin = validate_rock_origin(domain)
+                active = self._profile_store.active()
+                if active is None:
+                    added_profile = self._profile_store.add(
+                        default_profile_name(origin), origin
+                    )
+                    self._activate_profile(added_profile)
+                elif active.origin != origin:
+                    return self._error("profile_domain_mismatch")
                 self._magnus.configure(username, password)
             except OriginError:
                 return self._error("invalid_rock_origin")
-            except MagnusError as error:
+            except (MagnusError, ProfileError) as error:
+                if added_profile:
+                    self._rollback_profile_add(added_profile)
                 return self._error(str(error))
             self._live.clear()
             return self._ok(
                 instance=self._instance_status(),
                 magnus=self._magnus.status(),
                 refreshLive=True,
+                profiles=self._profile_store.snapshot(),
             )
+        if op == "profiles_status":
+            return self._profile_response()
+        if op == "profile_add":
+            return self._profile_add(raw)
+        if op == "profile_switch":
+            try:
+                profile = self._profile_store.set_active(raw.get("profileId"))
+                self._activate_profile(profile)
+            except (ProfileError, MagnusError) as error:
+                return self._error(str(error))
+            return self._profile_response(refreshLive=True)
+        if op == "profile_rename":
+            try:
+                self._profile_store.rename(raw.get("profileId"), raw.get("name"))
+            except ProfileError as error:
+                return self._error(str(error))
+            return self._profile_response()
+        if op == "profile_credentials_update":
+            username = raw.get("username")
+            password = raw.get("password")
+            if not isinstance(username, str) or not isinstance(password, str):
+                return self._error("invalid_magnus_credentials")
+            if not self._profile_store.active():
+                return self._error("profile_not_found")
+            try:
+                self._magnus.configure(username, password)
+            except MagnusError as error:
+                return self._error(str(error))
+            self._live.clear()
+            return self._profile_response(refreshLive=True)
+        if op == "profile_test":
+            if not self._profile_store.active():
+                return self._error("profile_not_found")
+            try:
+                tester = getattr(self._magnus, "test_connection", None)
+                if callable(tester):
+                    tester()
+                else:
+                    with self._magnus.authenticated_cookie():
+                        pass
+            except MagnusError as error:
+                return self._error(str(error))
+            return self._profile_response(connection="connected")
+        if op == "profile_sign_out":
+            if not self._profile_store.active():
+                return self._error("profile_not_found")
+            try:
+                self._magnus.sign_out()
+            except MagnusError as error:
+                return self._error(str(error))
+            self._live.clear()
+            return self._profile_response(connection="signed_out")
+        if op == "profile_remove":
+            return self._profile_remove(raw.get("profileId"))
+        if op == "preferences_update":
+            try:
+                self._profile_store.update_preferences(raw.get("preferences"))
+            except ProfileError as error:
+                return self._error(str(error))
+            return self._profile_response()
+        if op == "recent_links_clear":
+            self._quick_returns.clear()
+            return self._ok(quickReturns=[])
         if op == "search":
             query, category = parse_search_query(raw.get("query"))
-            unavailable_categories = [category] if category else list(CATEGORIES)
+            preferences = self._profile_store.preferences()
+            enabled_categories = preferences["enabledCategories"]
+            unavailable_categories = [category] if category else enabled_categories
+            if category and category not in enabled_categories:
+                return self._ok(
+                    context=self._context.value,
+                    results=[],
+                    source="disabled",
+                    unavailable=[],
+                )
             if self._context is Context.DEV:
                 return self._ok(
                     context=self._context.value,
-                    results=self._mock.search(query, category=category),
+                    results=[
+                        row
+                        for row in self._mock.search(query, category=category)
+                        if row["category"] in enabled_categories
+                    ],
                     source="synthetic",
                     unavailable=[],
                 )
@@ -251,7 +386,12 @@ class Broker:
                     unavailable=[],
                 )
             try:
-                batch = self._live.search(query, category)
+                batch = self._live.search(
+                    query,
+                    category,
+                    categories=enabled_categories,
+                    include_person_context=preferences["showPersonContext"],
+                )
             except RockRestError:
                 self._live_health = HealthState.FAILED
                 return self._ok(
@@ -314,6 +454,7 @@ class Broker:
             response["quickReturns"] = (
                 self._quick_returns.public_items()
                 if self._context is Context.PROD
+                and self._profile_store.preferences()["recentLinks"]
                 else []
             )
         return self._ok(**response)
@@ -331,25 +472,108 @@ class Broker:
         )
         if not opened:
             return self._error("open_failed")
-        self._quick_returns.add(target)
-        return self._ok(opened=True, quickReturns=self._quick_returns.public_items())
+        recent_links_enabled = self._profile_store.preferences()["recentLinks"]
+        if recent_links_enabled:
+            self._quick_returns.add(target)
+        return self._ok(
+            opened=True,
+            quickReturns=(
+                self._quick_returns.public_items() if recent_links_enabled else []
+            ),
+        )
 
-    def _set_origin(self, origin: str) -> None:
-        self._origin = origin
-        self._magnus.set_server(origin)
-        self._live.set_origin(origin)
-        if self._quick_returns_injected:
-            self._quick_returns.set_origin(origin)
+    def _activate_profile(self, profile: RockProfile | None) -> None:
+        if profile is None:
+            self._active_profile_id = ""
+            self._origin = None
+            clearer = getattr(self._magnus, "clear_profile", None)
+            if callable(clearer):
+                clearer()
+            self._live.clear()
+            self._quick_returns = QuickReturnStore(
+                self._quick_root / "quick-returns-unconfigured.json"
+            )
+            self._live_health = HealthState.UNKNOWN
+            return
+        self._active_profile_id = profile.profile_id
+        self._origin = profile.origin
+        setter = getattr(self._magnus, "set_profile", None)
+        if callable(setter):
+            setter(profile.profile_id, profile.origin)
         else:
-            self._quick_returns = QuickReturnStore(self._quick_return_path(), origin)
+            self._magnus.set_server(profile.origin)
+        self._live.set_origin(profile.origin)
+        if self._quick_returns_injected:
+            self._quick_returns.set_origin(profile.origin)
+        else:
+            self._quick_returns = QuickReturnStore(
+                self._quick_return_path(), profile.origin
+            )
         self._live_health = HealthState.UNKNOWN
 
-    def _quick_return_path(self) -> Path:
-        key = (
-            hashlib.sha256(self._origin.encode()).hexdigest()[:16]
-            if self._origin
-            else "unconfigured"
+    def _profile_response(self, **payload: Any) -> dict[str, Any]:
+        return self._ok(
+            profiles=self._profile_store.snapshot(),
+            instance=self._instance_status(),
+            magnus=self._magnus.status(),
+            **payload,
         )
+
+    def _profile_add(self, raw: dict[str, Any]) -> dict[str, Any]:
+        username = raw.get("username")
+        password = raw.get("password")
+        if not isinstance(username, str) or not isinstance(password, str):
+            return self._error("invalid_magnus_credentials")
+        previous = self._profile_store.active()
+        added: RockProfile | None = None
+        try:
+            added = self._profile_store.add(raw.get("name"), raw.get("domain"))
+            self._activate_profile(added)
+            self._magnus.configure(username, password)
+        except (ProfileError, MagnusError) as error:
+            if added:
+                self._rollback_profile_add(added, previous)
+            return self._error(str(error))
+        self._live.clear()
+        return self._profile_response(refreshLive=True)
+
+    def _rollback_profile_add(
+        self,
+        added: RockProfile,
+        previous: RockProfile | None = None,
+    ) -> None:
+        remover = getattr(self._magnus, "remove_profile_credentials", None)
+        if callable(remover):
+            remover(added.profile_id)
+        try:
+            self._profile_store.remove(added.profile_id)
+            if previous:
+                self._profile_store.set_active(previous.profile_id)
+        except ProfileError:
+            pass
+        self._activate_profile(previous)
+
+    def _profile_remove(self, profile_id: object) -> dict[str, Any]:
+        try:
+            profile = self._profile_store.get(profile_id)
+            remover = getattr(self._magnus, "remove_profile_credentials", None)
+            if callable(remover):
+                remover(profile.profile_id)
+            path = self._quick_return_path(profile.profile_id)
+            QuickReturnStore(path, profile.origin).clear()
+            self._profile_store.remove(profile.profile_id)
+            if profile.profile_id == self._active_profile_id:
+                self._activate_profile(self._profile_store.active())
+        except (ProfileError, MagnusError) as error:
+            return self._error(str(error))
+        return self._profile_response(refreshLive=True)
+
+    def _quick_return_path(self, profile_id: str | None = None) -> Path:
+        key = profile_id or self._active_profile_id or "unconfigured"
+        return self._quick_root / f"quick-returns-{key}.json"
+
+    def _legacy_quick_return_path(self, origin: str) -> Path:
+        key = hashlib.sha256(origin.encode()).hexdigest()[:16]
         return self._quick_root / f"quick-returns-{key}.json"
 
     def _instance_status(self) -> dict[str, Any]:

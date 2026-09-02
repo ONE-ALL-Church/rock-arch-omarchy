@@ -61,3 +61,11 @@ class InstanceStore:
         os.replace(temporary, self.path)
         self.path.chmod(0o600)
         return origin
+
+    def clear(self) -> None:
+        """Remove the legacy active-instance pointer without following links."""
+
+        try:
+            self.path.unlink(missing_ok=True)
+        except OSError:
+            return

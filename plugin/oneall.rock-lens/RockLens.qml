@@ -22,6 +22,13 @@ Panel {
   property var results: []
   property var personalLinks: []
   property var quickReturns: []
+  property var profiles: []
+  property bool profilesLoaded: false
+  property string activeProfileId: ""
+  property bool preferencePersonContext: true
+  property bool preferenceRecentLinks: true
+  property bool preferenceCloseAfterOpen: false
+  property var enabledCategories: ["People", "Groups", "Workflows", "Jobs", "Pages", "Content Channel Items"]
   property var quickLook: null
   property var requestQueue: []
   property string searchSource: "synthetic"
@@ -29,6 +36,13 @@ Panel {
   property string instanceDomain: ""
   property string setupUsername: ""
   property string setupPassword: ""
+  property string newProfileName: ""
+  property string newProfileDomain: ""
+  property bool addProfileMode: false
+  property string pendingRemoveProfileId: ""
+  property bool pendingSignOut: false
+  property bool pendingClearRecent: false
+  property string pendingSuccessText: ""
   property bool magnusAvailable: false
   property bool magnusConfigured: false
   property bool personalLinksAvailable: false
@@ -46,10 +60,11 @@ Panel {
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
-    !domainField.activeFocus && !usernameField.activeFocus && !passwordField.activeFocus
+    !domainField.activeFocus && !usernameField.activeFocus && !passwordField.activeFocus &&
+    !profileNameField.activeFocus && !activeUsernameField.activeFocus && !activePasswordField.activeFocus
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
-    magnusConfigured ? "Magnus · " + instanceDomain :
-    magnusAvailable ? "Rock login required" : "Magnus unavailable"
+    magnusConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
+    magnusAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Magnus unavailable"
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -80,6 +95,26 @@ Panel {
     if (prefix === "c" || prefix === "content" || prefix === "contents" ||
         prefix === "item" || prefix === "items") return "c"
     return ""
+  }
+
+  function activeProfileName() {
+    for (var index = 0; index < profiles.length; index++)
+      if (profiles[index].id === activeProfileId) return String(profiles[index].name || "Rock")
+    return "Rock"
+  }
+
+  function categoryEnabled(category) {
+    return enabledCategories.indexOf(category) >= 0
+  }
+
+  function toggleCategory(category) {
+    var next = []
+    for (var index = 0; index < enabledCategories.length; index++)
+      if (enabledCategories[index] !== category) next.push(enabledCategories[index])
+    if (!categoryEnabled(category)) next.push(category)
+    enabledCategories = next
+    request({op: "preferences_update", preferences: {enabledCategories: next}})
+    if (viewMode === "search") scheduleSearch()
   }
 
   function scopeLabelForKey(key) {
@@ -132,6 +167,10 @@ Panel {
   }
 
   function escapePanel() {
+    if (viewMode === "settings") {
+      focusSearch()
+      return
+    }
     if (!clearScope()) close()
   }
 
@@ -140,6 +179,7 @@ Panel {
     try { response = JSON.parse(line) } catch (e) { return }
     if (!response || response.ok !== true) {
       setupBusy = false
+      pendingSuccessText = ""
       feedbackText = response && response.error ? String(response.error).split("_").join(" ") : "Request failed"
       return
     }
@@ -161,6 +201,21 @@ Panel {
       magnusAvailable = response.magnus.available === true
       magnusConfigured = response.magnus.configured === true
     }
+    if (response.profiles) {
+      profilesLoaded = true
+      activeProfileId = String(response.profiles.activeProfileId || "")
+      profiles = Array.isArray(response.profiles.profiles) ? response.profiles.profiles : []
+      var preferences = response.profiles.preferences || {}
+      preferencePersonContext = preferences.showPersonContext !== false
+      preferenceRecentLinks = preferences.recentLinks !== false
+      preferenceCloseAfterOpen = preferences.closeAfterOpen === true
+      if (Array.isArray(preferences.enabledCategories))
+        enabledCategories = preferences.enabledCategories
+      if (profiles.length === 0 && opened) {
+        viewMode = "settings"
+        addProfileMode = true
+      }
+    }
     if (isSearchResponse && !staleSearch) {
       results = response.results
       if (resultCursor >= results.length) resultCursor = results.length - 1
@@ -179,18 +234,35 @@ Panel {
     if (response.refreshLive === true) {
       setupBusy = false
       setupPassword = ""
-      feedbackText = "Magnus credentials saved securely"
+      newProfileName = ""
+      newProfileDomain = ""
+      if (profiles.length > 0) addProfileMode = false
+      pendingRemoveProfileId = ""
+      pendingSignOut = false
+      feedbackText = pendingSuccessText || "Rock connection updated"
+      pendingSuccessText = ""
       Qt.callLater(function() {
         root.refreshSearch()
         root.refreshQuickReturns()
         if (root.viewMode === "personal") root.refreshPersonalLinks()
-        searchField.forceActiveFocus()
+        if (root.viewMode === "search") searchField.forceActiveFocus()
       })
+    }
+    if (response.connection === "connected") {
+      setupBusy = false
+      feedbackText = "Connection successful"
+    } else if (response.connection === "signed_out") {
+      setupBusy = false
+      pendingSignOut = false
+      setupPassword = ""
+      feedbackText = "Signed out; this profile and its local history were kept"
     }
     if (!staleSearch && Array.isArray(response.unavailable) && response.unavailable.length)
       feedbackText = "Unavailable: " + response.unavailable.join(", ")
-    else if (response.opened === true)
-      feedbackText = "Opened in Rock and added to Recent Links"
+    else if (response.opened === true) {
+      feedbackText = preferenceRecentLinks ? "Opened in Rock and added to Recent Links" : "Opened in Rock"
+      if (preferenceCloseAfterOpen) Qt.callLater(function() { root.close() })
+    }
     else if (response.source === "unavailable" && !staleSearch)
       feedbackText = "Live Rock search needs Magnus setup"
     else if (response.source && !staleSearch)
@@ -232,6 +304,21 @@ Panel {
     quickLook = null
     panelFlick.contentY = 0
     Qt.callLater(function() { searchField.forceActiveFocus() })
+  }
+
+  function openSettings(showAdd) {
+    viewMode = "settings"
+    addProfileMode = showAdd === true || (profilesLoaded && profiles.length === 0)
+    resultCursor = -1
+    recentCursor = -1
+    linkCursor = -1
+    quickLook = null
+    pendingRemoveProfileId = ""
+    pendingSignOut = false
+    pendingClearRecent = false
+    feedbackText = ""
+    panelFlick.contentY = 0
+    request({op: "profiles_status"})
   }
   function backspaceToSearch() {
     var selectionStart = searchField.selectionStart
@@ -385,12 +472,52 @@ Panel {
   }
   function saveMagnusCredentials() {
     var username = setupUsername.trim()
-    var domain = instanceDomain.trim()
+    if (!username || !setupPassword || setupBusy || !activeProfileId) return
+    setupBusy = true
+    var password = setupPassword
+    pendingSuccessText = "Login updated securely"
+    request({op: "profile_credentials_update", username: username, password: password})
+    setupPassword = ""
+  }
+  function addProfile() {
+    var username = setupUsername.trim()
+    var domain = newProfileDomain.trim()
     if (!domain || !username || !setupPassword || setupBusy) return
     setupBusy = true
     var password = setupPassword
-    request({op: "magnus_configure", domain: domain, username: username, password: password})
+    pendingSuccessText = "Profile added"
+    request({op: "profile_add", name: newProfileName.trim(), domain: domain, username: username, password: password})
     setupPassword = ""
+  }
+  function switchProfile(profileId) {
+    if (!profileId || profileId === activeProfileId || setupBusy) return
+    setupBusy = true
+    pendingSuccessText = "Profile switched"
+    request({op: "profile_switch", profileId: profileId})
+  }
+  function removeProfile(profileId) {
+    if (pendingRemoveProfileId !== profileId) {
+      pendingRemoveProfileId = profileId
+      feedbackText = "Press Remove again to confirm"
+      return
+    }
+    setupBusy = true
+    pendingSuccessText = "Profile removed from this computer"
+    request({op: "profile_remove", profileId: profileId})
+  }
+  function signOut() {
+    if (!pendingSignOut) {
+      pendingSignOut = true
+      feedbackText = "Press Sign out again to clear the saved login"
+      return
+    }
+    setupBusy = true
+    request({op: "profile_sign_out"})
+  }
+  function updatePreference(name, value) {
+    var values = {}
+    values[name] = value
+    request({op: "preferences_update", preferences: values})
   }
   function switchContext() {
     if (!developerMode) return
@@ -461,6 +588,10 @@ Panel {
     function open(): void { root.open() }
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
+    function settings(): void {
+      root.open()
+      root.openSettings(false)
+    }
   }
 
   Shortcut { sequence: "Alt+P"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("p") }
@@ -470,6 +601,7 @@ Panel {
   Shortcut { sequence: "Alt+Shift+P"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("page") }
   Shortcut { sequence: "Alt+C"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+0"; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
+  Shortcut { sequence: "Ctrl+,"; enabled: root.opened; onActivated: root.openSettings(false) }
 
   WidgetButton {
     id: button
@@ -495,7 +627,7 @@ Panel {
     RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus
+      blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
@@ -545,6 +677,24 @@ Panel {
                   else root.selectPersonalLink(0)
                 }
               }
+            }
+          }
+          Rectangle {
+            Layout.preferredWidth: settingsLabel.implicitWidth + 20
+            Layout.preferredHeight: Style.space(32)
+            radius: 7
+            color: root.viewMode === "settings" ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+            Text {
+              id: settingsLabel
+              anchors.centerIn: parent
+              text: "Settings"
+              color: Color.foreground
+              font.bold: root.viewMode === "settings"
+            }
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.openSettings(false)
             }
           }
         }
@@ -621,58 +771,27 @@ Panel {
         }
 
         Column {
-          visible: root.contextName === "PROD" && !root.magnusConfigured
+          visible: root.viewMode !== "settings" && root.contextName === "PROD" && !root.magnusConfigured
           width: content.width
           height: visible ? implicitHeight : 0
           spacing: Style.spacing.sm
-          Text { width: parent.width; text: "Connect this Rock instance. Credentials stay in Secret Service."; color: Color.foreground; opacity: 0.65; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
-          TextField {
-            id: domainField
+          Text {
             width: parent.width
-            placeholderText: "Rock domain (for example rock.example.org)"
-            text: root.instanceDomain
-            selectByMouse: true
-            inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-            onTextChanged: root.instanceDomain = text
+            text: root.profiles.length ? "This profile is signed out. Update its login in Settings." : "Add a Rock profile to begin live search."
+            color: Color.foreground
+            opacity: 0.65
+            wrapMode: Text.WordWrap
+            textFormat: Text.PlainText
           }
-          TextField {
-            id: usernameField
-            width: parent.width
-            placeholderText: "Rock username"
-            text: root.setupUsername
-            selectByMouse: true
-            onTextChanged: root.setupUsername = text
-          }
-          TextField {
-            id: passwordField
-            width: parent.width
-            placeholderText: "Rock password"
-            text: root.setupPassword
-            echoMode: TextInput.Password
-            selectByMouse: true
-            inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-            onTextChanged: root.setupPassword = text
-            onAccepted: root.saveMagnusCredentials()
-          }
-          Rectangle {
-            width: Style.space(150)
-            height: Style.space(34)
-            radius: 6
-            opacity: root.instanceDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy ? 1 : 0.45
-            color: "#14532d"
-            Text { anchors.centerIn: parent; text: root.setupBusy ? "Saving…" : "Save securely"; color: "white"; font.bold: true }
-            MouseArea {
-              anchors.fill: parent
-              enabled: root.instanceDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-              cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-              onClicked: root.saveMagnusCredentials()
-            }
+          Button {
+            text: root.profiles.length ? "Open Settings" : "Add Rock profile"
+            onClicked: root.openSettings(root.profiles.length === 0)
           }
         }
 
         Flickable {
           id: panelFlick
-          readonly property real maximumHeight: Style.space(root.contextName === "PROD" && !root.magnusConfigured ? 180 : 420)
+          readonly property real maximumHeight: Style.space(root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.magnusConfigured ? 180 : 420))
           width: content.width
           height: Math.min(maximumHeight, Math.max(Style.space(72), body.implicitHeight))
           contentWidth: width
@@ -858,12 +977,260 @@ Panel {
                 }
               }
             }
+
+            Column {
+              visible: root.viewMode === "settings"
+              width: body.width
+              height: visible ? implicitHeight : 0
+              spacing: Style.spacing.md
+
+              Text {
+                width: parent.width
+                text: "Rock profiles"
+                color: Color.foreground
+                font.pixelSize: Style.font.heading
+                font.bold: true
+              }
+              Text {
+                width: parent.width
+                text: "Each profile keeps its own secure login and Recent Links. Passwords stay in your desktop password manager."
+                color: Color.foreground
+                opacity: 0.62
+                wrapMode: Text.WordWrap
+                textFormat: Text.PlainText
+              }
+
+              Repeater {
+                model: root.profiles
+                delegate: Rectangle {
+                  required property var modelData
+                  width: body.width
+                  height: Style.space(64)
+                  radius: 8
+                  color: modelData.isActive ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  border.width: modelData.isActive ? 0 : 1
+                  border.color: Qt.rgba(1, 1, 1, 0.12)
+                  RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: Style.spacing.sm
+                    Column {
+                      Layout.fillWidth: true
+                      Text { width: parent.width; text: modelData.name; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
+                      Text { width: parent.width; text: String(modelData.origin).replace("https://", ""); color: Color.foreground; opacity: 0.58; textFormat: Text.PlainText; elide: Text.ElideRight }
+                    }
+                    Button {
+                      text: modelData.isActive ? "Active" : "Use"
+                      enabled: !modelData.isActive && !root.setupBusy
+                      onClicked: root.switchProfile(modelData.id)
+                    }
+                    Button {
+                      text: root.pendingRemoveProfileId === modelData.id ? "Confirm" : "Remove"
+                      enabled: !root.setupBusy
+                      onClicked: root.removeProfile(modelData.id)
+                    }
+                  }
+                }
+              }
+
+              Button {
+                text: root.addProfileMode ? "Cancel adding profile" : "Add profile"
+                enabled: !root.setupBusy
+                onClicked: {
+                  root.addProfileMode = !root.addProfileMode
+                  root.setupUsername = ""
+                  root.setupPassword = ""
+                  root.feedbackText = ""
+                  if (root.addProfileMode) Qt.callLater(function() { profileNameField.forceActiveFocus() })
+                }
+              }
+
+              Column {
+                visible: root.addProfileMode
+                width: parent.width
+                height: visible ? implicitHeight : 0
+                spacing: Style.spacing.sm
+                Text { text: "Add a Rock profile"; color: Color.foreground; font.bold: true }
+                TextField {
+                  id: profileNameField
+                  width: parent.width
+                  maximumLength: 80
+                  placeholderText: "Profile name (for example Main Campus)"
+                  text: root.newProfileName
+                  selectByMouse: true
+                  onTextChanged: root.newProfileName = text
+                }
+                TextField {
+                  id: domainField
+                  width: parent.width
+                  maximumLength: 250
+                  placeholderText: "Rock domain (for example rock.example.org)"
+                  text: root.newProfileDomain
+                  selectByMouse: true
+                  inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
+                  onTextChanged: root.newProfileDomain = text
+                }
+                TextField {
+                  id: usernameField
+                  width: parent.width
+                  maximumLength: 200
+                  placeholderText: "Rock username"
+                  text: root.setupUsername
+                  selectByMouse: true
+                  onTextChanged: root.setupUsername = text
+                }
+                TextField {
+                  id: passwordField
+                  width: parent.width
+                  placeholderText: "Rock password"
+                  text: root.setupPassword
+                  echoMode: TextInput.Password
+                  selectByMouse: true
+                  inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                  onTextChanged: root.setupPassword = text
+                  onAccepted: root.addProfile()
+                }
+                Button {
+                  text: root.setupBusy ? "Saving…" : "Add and connect"
+                  enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                  onClicked: root.addProfile()
+                }
+              }
+
+              Column {
+                visible: root.activeProfileId !== "" && !root.addProfileMode
+                width: parent.width
+                height: visible ? implicitHeight : 0
+                spacing: Style.spacing.sm
+                Text { text: "Connection"; color: Color.foreground; font.bold: true }
+                Text {
+                  width: parent.width
+                  text: root.magnusConfigured ? "Login saved securely for " + root.activeProfileName() : "Login needed for " + root.activeProfileName()
+                  color: Color.foreground
+                  opacity: 0.68
+                  textFormat: Text.PlainText
+                  elide: Text.ElideRight
+                }
+                TextField {
+                  id: activeUsernameField
+                  width: parent.width
+                  maximumLength: 200
+                  placeholderText: "Rock username"
+                  text: root.setupUsername
+                  selectByMouse: true
+                  onTextChanged: root.setupUsername = text
+                }
+                TextField {
+                  id: activePasswordField
+                  width: parent.width
+                  placeholderText: "Rock password"
+                  text: root.setupPassword
+                  echoMode: TextInput.Password
+                  selectByMouse: true
+                  inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                  onTextChanged: root.setupPassword = text
+                  onAccepted: root.saveMagnusCredentials()
+                }
+                Row {
+                  spacing: Style.spacing.sm
+                  Button {
+                    text: root.setupBusy ? "Saving…" : "Update login"
+                    enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                    onClicked: root.saveMagnusCredentials()
+                  }
+                  Button {
+                    text: "Test connection"
+                    enabled: root.magnusConfigured && !root.setupBusy
+                    onClicked: {
+                      root.setupBusy = true
+                      root.feedbackText = "Testing connection…"
+                      root.request({op: "profile_test"})
+                    }
+                  }
+                  Button {
+                    text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
+                    enabled: root.magnusConfigured && !root.setupBusy
+                    onClicked: root.signOut()
+                  }
+                }
+              }
+
+              Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.12) }
+              Text { text: "Search and behavior"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
+              CheckBox {
+                text: "Show age, spouse, campus, and status for people"
+                checked: root.preferencePersonContext
+                onClicked: {
+                  root.preferencePersonContext = checked
+                  root.updatePreference("showPersonContext", checked)
+                }
+              }
+              CheckBox {
+                text: "Remember Recent Links on this computer"
+                checked: root.preferenceRecentLinks
+                onClicked: {
+                  root.preferenceRecentLinks = checked
+                  root.updatePreference("recentLinks", checked)
+                  if (!checked) root.quickReturns = []
+                  else root.refreshQuickReturns()
+                }
+              }
+              CheckBox {
+                text: "Close Rock Lens after opening an item"
+                checked: root.preferenceCloseAfterOpen
+                onClicked: {
+                  root.preferenceCloseAfterOpen = checked
+                  root.updatePreference("closeAfterOpen", checked)
+                }
+              }
+              Text { text: "Search categories"; color: Color.foreground; font.bold: true }
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+                Repeater {
+                  model: ["People", "Groups", "Workflows", "Jobs", "Pages", "Content Channel Items"]
+                  delegate: CheckBox {
+                    required property var modelData
+                    text: modelData
+                    checked: root.categoryEnabled(modelData)
+                    onClicked: root.toggleCategory(modelData)
+                  }
+                }
+              }
+              Row {
+                spacing: Style.spacing.sm
+                Button {
+                  text: root.pendingClearRecent ? "Confirm clear" : "Clear Recent Links"
+                  enabled: root.activeProfileId !== "" && !root.setupBusy
+                  onClicked: {
+                    if (!root.pendingClearRecent) {
+                      root.pendingClearRecent = true
+                      root.feedbackText = "Press Clear Recent Links again to confirm"
+                    } else {
+                      root.pendingClearRecent = false
+                      root.request({op: "recent_links_clear"})
+                      root.feedbackText = "Recent Links cleared"
+                    }
+                  }
+                }
+                Button { text: "Back to Search"; onClicked: root.focusSearch() }
+              }
+              Text {
+                width: parent.width
+                text: "Rock Lens 0.9 · Ctrl+, opens Settings"
+                color: Color.foreground
+                opacity: 0.48
+                font.pixelSize: Style.font.bodySmall
+                textFormat: Text.PlainText
+              }
+            }
           }
         }
 
         Text {
           width: parent.width
           text: root.feedbackText || (root.searchInFlight ? "Searching…" :
+            root.viewMode === "settings" ? "Esc returns to Search · Changes save automatically" :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
             root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links" :
             "Try g: or Alt+G · ↑↓ navigate · Enter open")
