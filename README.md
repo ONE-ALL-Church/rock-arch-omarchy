@@ -125,6 +125,13 @@ text; no slash-command mode is required.
 The search field keeps native editing behavior. Up and Down move through results
 and across the Search/Links boundary, Tab cycles search input, results, and
 links (Shift+Tab reverses), and Enter or Space opens the selected live target.
+Backspace on a highlighted item returns to the search field and deletes at the
+search cursor, so narrowing can continue without an extra navigation step.
+
+People results include compact duplicate-name context when Rock provides it:
+age, conservatively identified spouse, family campus, and connection status.
+Spouse is shown only for a married person with exactly one other active Adult
+in the family group. Email, phone, address, and full birth date are not fetched.
 DEV never opens a target and does not display the PROD Quick Return history.
 
 ## Safety guarantees

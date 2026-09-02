@@ -216,6 +216,26 @@ Panel {
     panelFlick.contentY = 0
     Qt.callLater(function() { searchField.forceActiveFocus() })
   }
+  function backspaceToSearch() {
+    var selectionStart = searchField.selectionStart
+    var selectionEnd = searchField.selectionEnd
+    var cursor = searchField.cursorPosition
+    var changed = false
+
+    if (selectionStart !== selectionEnd) {
+      searchField.remove(selectionStart, selectionEnd)
+      searchField.cursorPosition = selectionStart
+      changed = true
+    } else if (cursor > 0) {
+      searchField.remove(cursor - 1, cursor)
+      searchField.cursorPosition = cursor - 1
+      changed = true
+    }
+
+    feedbackText = ""
+    focusSearch()
+    if (changed) scheduleSearch()
+  }
   function selectResult(index) {
     if (!results.length) {
       focusSearch()
@@ -417,14 +437,16 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(520))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
 
-    PanelKeyCatcher {
+    RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus
+      backspaceEnabled: root.resultCursor >= 0 || root.linkCursor >= 0
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
       onActivateRequested: root.activateCursor()
+      onBackspaceRequested: root.backspaceToSearch()
 
       Column {
         id: content

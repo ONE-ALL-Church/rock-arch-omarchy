@@ -33,7 +33,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
   which is now fixed in the client.
-- Broker/OAuth/Magnus/REST/navigation/instance tests: 46 passing via
+- Broker/OAuth/Magnus/REST/navigation/instance tests: 47 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -84,7 +84,7 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.6.0` after shell restart, registered the
+- Omarchy loaded plugin version `0.6.1` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
@@ -137,6 +137,23 @@
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
   mnemonic Alt shortcuts apply each scope without conflicting with current
   Hyprland bindings.
+- Backspace on a highlighted search or link item is handled by the Rock
+  Lens-local key catcher while the item owns focus. It returns focus to the
+  search field, deletes the selection or character before the preserved cursor,
+  and schedules the narrowed query without affecting native editing while the
+  field itself has focus. An installed DEV interaction typed `ada`,
+  moved Down to highlight the synthetic person, then Backspaced; the field
+  regained focus as `ad` and the row highlight cleared. The temporary capture
+  was restricted to synthetic panel content and deleted afterward.
+- Person result context uses only age, connection/record status, and a bounded
+  family-group projection for campus and Adult member names. Tests verify that
+  a married record with exactly one other active Adult receives spouse context,
+  that email fields in both Person and family responses never cross the public
+  result contract, and that repeated searches reuse the in-memory family cache.
+  A privacy-bounded installed PROD sample returned three People with connection
+  status on all three, age on one, and family campus on two; no sampled row met
+  the conservative spouse rule. Repeating it completed in 0.283 seconds. Only
+  counts were printed, and no person values were retained.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,

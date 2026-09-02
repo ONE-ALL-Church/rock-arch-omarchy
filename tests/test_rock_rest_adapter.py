@@ -158,7 +158,12 @@ class RockRestAdapterTests(unittest.TestCase):
         calls_by_path = {path: params for path, params, _ in http.calls}
         person_params = calls_by_path["/api/People"]
         self.assertIn("D''Angelo", person_params["$filter"])
-        self.assertEqual(person_params["$select"], "Id,NickName,LastName")
+        self.assertIn("Age", person_params["$select"])
+        self.assertIn("GivingGroupId", person_params["$select"])
+        self.assertEqual(
+            person_params["$expand"],
+            "MaritalStatusValue,ConnectionStatusValue,RecordStatusValue",
+        )
         self.assertEqual(person_params["$top"], "3")
         group_params = calls_by_path["/api/Groups"]
         self.assertEqual(group_params["$expand"], "GroupType")
@@ -202,7 +207,7 @@ class RockRestAdapterTests(unittest.TestCase):
         quick_look = adapter.person_quick_look(person["safeId"])
         self.assertIsNotNone(quick_look)
         assert quick_look is not None
-        self.assertEqual(quick_look["campus"], "Not requested")
+        self.assertEqual(quick_look["campus"], "Campus not available")
         target = adapter.resolve(person["safeId"])
         self.assertIsNotNone(target)
         assert target is not None
@@ -210,6 +215,103 @@ class RockRestAdapterTests(unittest.TestCase):
             target.url,
             "https://rock.example.org/Person/17",
         )
+
+    def test_people_include_bounded_duplicate_name_context(self):
+        http = FakeHttp(
+            {
+                "/api/People": [
+                    {
+                        "Id": 17,
+                        "NickName": "Jamie",
+                        "LastName": "Stone",
+                        "Age": 33,
+                        "GivingGroupId": 91,
+                        "MaritalStatusValue": {"Value": "Married"},
+                        "ConnectionStatusValue": {"Value": "Member"},
+                        "RecordStatusValue": {"Value": "Active"},
+                        "Email": "must-not-cross",
+                    }
+                ],
+                "/api/Groups": [
+                    {
+                        "Id": 91,
+                        "Campus": {"Name": "North Campus"},
+                        "Members": [
+                            {
+                                "PersonId": 17,
+                                "IsArchived": False,
+                                "GroupRole": {"Name": "Adult"},
+                                "Person": {
+                                    "NickName": "Jamie",
+                                    "LastName": "Stone",
+                                },
+                            },
+                            {
+                                "PersonId": 18,
+                                "IsArchived": False,
+                                "GroupRole": {"Name": "Adult"},
+                                "Person": {
+                                    "NickName": "Alex",
+                                    "LastName": "Stone",
+                                    "Email": "also-must-not-cross",
+                                },
+                            },
+                            {
+                                "PersonId": 19,
+                                "IsArchived": False,
+                                "GroupRole": {"Name": "Child"},
+                                "Person": {
+                                    "NickName": "Casey",
+                                    "LastName": "Stone",
+                                },
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+        batch = adapter.search("Jamie", "People")
+
+        self.assertEqual(
+            [call[0] for call in http.calls], ["/api/People", "/api/Groups"]
+        )
+        family_params = http.calls[1][1]
+        self.assertEqual(family_params["$filter"], "Id eq 91")
+        self.assertIn("Campus/Name", family_params["$select"])
+        self.assertIn("Members/GroupRole/Name", family_params["$select"])
+        self.assertEqual(len(batch.results), 1)
+        person = batch.results[0]
+        self.assertEqual(
+            person["subtitle"], "Age 33 · Spouse Alex Stone · North Campus"
+        )
+        self.assertEqual(person["status"], "Member")
+        self.assertNotIn("must-not-cross", json.dumps(batch.results))
+
+        quick_look = adapter.person_quick_look(person["safeId"])
+        self.assertIsNotNone(quick_look)
+        assert quick_look is not None
+        self.assertEqual(quick_look["subtitle"], "Age 33 · Spouse Alex Stone · Member")
+        self.assertEqual(quick_look["campus"], "Campus · North Campus")
+        self.assertNotIn("must-not-cross", json.dumps(quick_look))
+
+        adapter.search("Jamie", "People")
+        self.assertEqual(
+            sum(path == "/api/Groups" for path, _, _ in http.calls),
+            1,
+        )
+
+        http.responses["/api/Groups"][0]["Members"].append(
+            {
+                "PersonId": 20,
+                "IsArchived": False,
+                "GroupRole": {"Name": "Adult"},
+                "Person": {"NickName": "Morgan", "LastName": "Stone"},
+            }
+        )
+        adapter.clear()
+        ambiguous = adapter.search("Jamie", "People").results[0]
+        self.assertNotIn("Spouse", ambiguous["subtitle"])
 
     def test_search_returns_partial_results_without_falling_back(self):
         failed = {"/api/Groups", "/api/ServiceJobs"}

@@ -153,18 +153,29 @@ class _RegistryEntry:
     person: dict[str, Any] | None
 
 
+@dataclass(frozen=True)
+class _FamilyContext:
+    campus: str
+    adults: tuple[tuple[str, str], ...]
+
+
 SEARCH_SPECS = (
     _SearchSpec(
         "People",
         "Person",
         "/api/People",
         ("NickName", "LastName"),
-        "Id,NickName,LastName",
+        (
+            "Id,NickName,LastName,Age,GivingGroupId,"
+            "MaritalStatusValue/Value,ConnectionStatusValue/Value,"
+            "RecordStatusValue/Value"
+        ),
         "LastName,NickName",
         ("NickName", "LastName"),
-        "Person · live Rock record",
+        "Person",
         10,
         "/Person/{id}",
+        expand="MaritalStatusValue,ConnectionStatusValue,RecordStatusValue",
     ),
     _SearchSpec(
         "Groups",
@@ -249,6 +260,7 @@ class RockRestReadOnlyAdapter:
         self._http = http or RockRestHttpClient(origin=self.origin)
         self._key = secrets.token_bytes(32)
         self._registry: OrderedDict[str, _RegistryEntry] = OrderedDict()
+        self._family_contexts: OrderedDict[str, _FamilyContext] = OrderedDict()
 
     def set_origin(self, origin: str) -> None:
         try:
@@ -262,6 +274,7 @@ class RockRestReadOnlyAdapter:
 
     def clear(self) -> None:
         self._registry.clear()
+        self._family_contexts.clear()
 
     def search(self, query: str, category: str | None = None) -> SearchBatch:
         normalized = sanitize_text(query, 120)
@@ -299,7 +312,14 @@ class RockRestReadOnlyAdapter:
                 for spec, request in zip(specs, requests, strict=True):
                     try:
                         value = request.result()
-                        results.extend(self._transform_rows(spec, value))
+                        family_contexts = (
+                            self._load_family_contexts(value, cookie)
+                            if spec.category == "People"
+                            else {}
+                        )
+                        results.extend(
+                            self._transform_rows(spec, value, family_contexts)
+                        )
                     except RockRestError:
                         unavailable.append(spec.category)
         except MagnusError as error:
@@ -405,9 +425,15 @@ class RockRestReadOnlyAdapter:
             params["$expand"] = spec.expand
         return params
 
-    def _transform_rows(self, spec: _SearchSpec, value: Any) -> list[dict[str, Any]]:
+    def _transform_rows(
+        self,
+        spec: _SearchSpec,
+        value: Any,
+        family_contexts: dict[str, _FamilyContext] | None = None,
+    ) -> list[dict[str, Any]]:
         if not isinstance(value, list) or len(value) > 1_000:
             raise RockRestError("invalid_rock_response")
+        family_contexts = family_contexts or {}
         results: list[dict[str, Any]] = []
         for row in value[:ROWS_PER_CATEGORY]:
             if not isinstance(row, dict):
@@ -426,6 +452,29 @@ class RockRestReadOnlyAdapter:
                 continue
             status = self._status(spec, row)
             subtitle = spec.subtitle
+            person_quick_subtitle = "Live Rock record · read-only"
+            person_campus = "Campus not available"
+            if spec.category == "People":
+                family_id = self._positive_id(self._field(row, "GivingGroupId"))
+                family = family_contexts.get(family_id)
+                identity_parts: list[str] = []
+                age = self._age(self._field(row, "Age"))
+                if age is not None:
+                    identity_parts.append(f"Age {age}")
+                spouse = self._spouse_name(raw_id, row, family)
+                if spouse:
+                    identity_parts.append(f"Spouse {spouse}")
+                if family and family.campus:
+                    person_campus = f"Campus · {family.campus}"
+                search_parts = list(identity_parts)
+                if family and family.campus:
+                    search_parts.append(family.campus)
+                subtitle = " · ".join(search_parts) or spec.subtitle
+                status = self._person_status(row)
+                quick_parts = identity_parts + ([status] if status else [])
+                person_quick_subtitle = (
+                    " · ".join(quick_parts) or "Live Rock record · read-only"
+                )
             if spec.category == "Groups":
                 group_type = self._field(row, "GroupType")
                 if isinstance(group_type, dict):
@@ -451,8 +500,8 @@ class RockRestReadOnlyAdapter:
                 person = {
                     "safeId": "",
                     "displayName": title,
-                    "subtitle": "Live Rock record · read-only",
-                    "campus": "Not requested",
+                    "subtitle": person_quick_subtitle,
+                    "campus": person_campus,
                 }
             safe_id = self._register(spec.category, raw_id, target, person)
             if person is not None:
@@ -471,6 +520,156 @@ class RockRestReadOnlyAdapter:
                 )
             )
         return results
+
+    def _load_family_contexts(
+        self, people: Any, cookie: str
+    ) -> dict[str, _FamilyContext]:
+        if not isinstance(people, list):
+            return {}
+        family_ids: list[str] = []
+        for row in people[:ROWS_PER_CATEGORY]:
+            if not isinstance(row, dict):
+                continue
+            family_id = self._positive_id(self._field(row, "GivingGroupId"))
+            if family_id and family_id not in family_ids:
+                family_ids.append(family_id)
+
+        contexts: dict[str, _FamilyContext] = {}
+        missing: list[str] = []
+        for family_id in family_ids:
+            cached = self._family_contexts.get(family_id)
+            if cached is None:
+                missing.append(family_id)
+                continue
+            self._family_contexts.move_to_end(family_id)
+            contexts[family_id] = cached
+        if not missing:
+            return contexts
+
+        family_filter = " or ".join(f"Id eq {family_id}" for family_id in missing)
+        if len(missing) > 1:
+            family_filter = f"({family_filter})"
+        try:
+            value = self._http.get_json(
+                "/api/Groups",
+                {
+                    "$filter": family_filter,
+                    "$select": (
+                        "Id,Campus/Name,Members/PersonId,Members/IsArchived,"
+                        "Members/Person/NickName,Members/Person/LastName,"
+                        "Members/GroupRole/Name"
+                    ),
+                    "$expand": "Campus,Members,Members/Person,Members/GroupRole",
+                    "$orderby": "Id",
+                    "$top": str(len(missing)),
+                },
+                cookie,
+            )
+        except RockRestError:
+            return contexts
+        if not isinstance(value, list) or len(value) > ROWS_PER_CATEGORY:
+            return contexts
+
+        loaded: dict[str, _FamilyContext] = {}
+        for group in value:
+            if not isinstance(group, dict):
+                continue
+            family_id = self._positive_id(self._field(group, "Id"))
+            if family_id not in missing:
+                continue
+            loaded[family_id] = self._family_context(group)
+        for family_id in missing:
+            context = loaded.get(family_id, _FamilyContext("", ()))
+            self._family_contexts[family_id] = context
+            self._family_contexts.move_to_end(family_id)
+            contexts[family_id] = context
+        while len(self._family_contexts) > MAX_TARGETS:
+            self._family_contexts.popitem(last=False)
+        return contexts
+
+    @classmethod
+    def _family_context(cls, group: dict[str, Any]) -> _FamilyContext:
+        campus_record = cls._field(group, "Campus")
+        campus = (
+            sanitize_text(cls._field(campus_record, "Name"), 80)
+            if isinstance(campus_record, dict)
+            else ""
+        )
+        adults: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        members = cls._field(group, "Members")
+        if not isinstance(members, list):
+            return _FamilyContext(campus, ())
+        for member in members[:50]:
+            if not isinstance(member, dict) or cls._field(member, "IsArchived") is True:
+                continue
+            role = cls._field(member, "GroupRole")
+            role_name = (
+                sanitize_text(cls._field(role, "Name"), 40)
+                if isinstance(role, dict)
+                else ""
+            )
+            if role_name.casefold() != "adult":
+                continue
+            person = cls._field(member, "Person")
+            if not isinstance(person, dict):
+                continue
+            person_id = cls._positive_id(cls._field(member, "PersonId"))
+            name = " ".join(
+                part
+                for part in (
+                    sanitize_text(cls._field(person, "NickName"), 60),
+                    sanitize_text(cls._field(person, "LastName"), 60),
+                )
+                if part
+            )
+            if person_id and name and person_id not in seen:
+                seen.add(person_id)
+                adults.append((person_id, name))
+        return _FamilyContext(campus, tuple(adults))
+
+    @classmethod
+    def _spouse_name(
+        cls,
+        person_id: str,
+        row: dict[str, Any],
+        family: _FamilyContext | None,
+    ) -> str:
+        if not family:
+            return ""
+        marital = cls._defined_value(row, "MaritalStatusValue")
+        if marital.casefold() != "married":
+            return ""
+        candidates = [
+            name for member_id, name in family.adults if member_id != person_id
+        ]
+        return candidates[0] if len(candidates) == 1 else ""
+
+    @classmethod
+    def _person_status(cls, row: dict[str, Any]) -> str:
+        record_status = cls._defined_value(row, "RecordStatusValue")
+        if record_status and record_status.casefold() != "active":
+            return record_status
+        return (
+            cls._defined_value(row, "ConnectionStatusValue") or record_status or "Live"
+        )
+
+    @classmethod
+    def _defined_value(cls, row: dict[str, Any], name: str) -> str:
+        value = cls._field(row, name)
+        return (
+            sanitize_text(cls._field(value, "Value"), 80)
+            if isinstance(value, dict)
+            else ""
+        )
+
+    @staticmethod
+    def _age(value: Any) -> int | None:
+        try:
+            age = int(value)
+        except (TypeError, ValueError):
+            return None
+        return age if 0 <= age <= 125 else None
 
     def _register(
         self,

@@ -12,8 +12,8 @@ _RECORDS = (
         "category": "People",
         "safeId": "mock-person-ada",
         "title": "Ada Rivera",
-        "subtitle": "Volunteer Coordinator",
-        "status": "Active",
+        "subtitle": "Age 34 · Spouse Mateo Rivera · North Campus",
+        "status": "Member",
         "canOpen": False,
     },
     {
@@ -62,8 +62,8 @@ _PERSONS = {
     "mock-person-ada": {
         "safeId": "mock-person-ada",
         "displayName": "Ada Rivera",
-        "subtitle": "Volunteer Coordinator · synthetic record",
-        "campus": "North Campus",
+        "subtitle": "Age 34 · Spouse Mateo Rivera · Member",
+        "campus": "Campus · North Campus",
     }
 }
 

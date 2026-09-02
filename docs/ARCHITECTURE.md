@@ -79,6 +79,13 @@ controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
 fixed reads share one ephemeral Magnus-authenticated cookie and start in
 parallel; results are still transformed in a deterministic category order.
 The Groups projection also expands only `GroupType.Name` for its subtitle.
+People project age, Giving Group, marital/connection/record status, then perform
+at most one bounded Groups read for the returned family IDs. That second read
+projects only campus plus member names, roles, and archive flags; the in-memory
+result is cached by family ID. A spouse label requires a married record and
+exactly one other non-archived Adult family member, avoiding guesses for
+multi-adult households. Contact details, addresses, and full birth dates are
+never requested.
 Recognized leading entity prefixes are parsed into one canonical category and
 the remaining text; a scoped search runs only that category's existing fixed
 specification. Bare prefixes omit `$filter` but retain the fixed projection,
