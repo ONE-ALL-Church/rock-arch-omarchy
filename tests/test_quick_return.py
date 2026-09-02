@@ -85,6 +85,20 @@ class QuickReturnTests(unittest.TestCase):
         self.path.chmod(0o644)
         self.assertEqual(self.store.public_items(), [])
 
+    def test_clear_removes_only_the_local_history_file(self):
+        self.store.add(
+            NavigationTarget(
+                "People",
+                "Page",
+                50,
+                DEFAULT_ROCK_ORIGIN + "/page/12",
+            )
+        )
+        self.assertTrue(self.path.exists())
+        self.store.clear()
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.store.public_items(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

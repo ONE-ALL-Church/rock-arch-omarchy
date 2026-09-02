@@ -509,6 +509,14 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(
             broker.handle({"op": "open_navigation", "safeId": quick_id})["opened"]
         )
+        cleared = broker.handle({"op": "recent_links_clear"})
+        self.assertEqual(cleared, {"ok": True, "quickReturns": []})
+        self.assertEqual(
+            broker.handle(
+                {"op": "navigation_status", "section": "quick_returns"}
+            ),
+            {"ok": True, "quickReturns": []},
+        )
         broker.handle({"op": "set_context", "context": "DEV"})
         dev_navigation = broker.handle({"op": "navigation_status"})
         self.assertEqual(dev_navigation["personalLinks"], [])

@@ -42,6 +42,7 @@ Panel {
   property string pendingRemoveProfileId: ""
   property bool pendingSignOut: false
   property bool pendingClearRecent: false
+  property bool editLoginMode: false
   property string pendingSuccessText: ""
   property bool magnusAvailable: false
   property bool magnusConfigured: false
@@ -89,7 +90,9 @@ Panel {
     var prefix = text.substring(0, colon).trim().toLowerCase()
     if (prefix === "p" || prefix === "person" || prefix === "people") return "p"
     if (prefix === "g" || prefix === "group" || prefix === "groups") return "g"
-    if (prefix === "w" || prefix === "workflow" || prefix === "workflows") return "w"
+    if (prefix === "w" || prefix === "wt" || prefix === "workflow" ||
+        prefix === "workflows" || prefix === "workflowtype" ||
+        prefix === "workflowtypes") return "w"
     if (prefix === "j" || prefix === "job" || prefix === "jobs") return "j"
     if (prefix === "pg" || prefix === "page" || prefix === "pages") return "page"
     if (prefix === "c" || prefix === "content" || prefix === "contents" ||
@@ -107,6 +110,10 @@ Panel {
     return enabledCategories.indexOf(category) >= 0
   }
 
+  function displayCategory(category) {
+    return category === "Workflows" ? "Workflow Types" : category
+  }
+
   function toggleCategory(category) {
     var next = []
     for (var index = 0; index < enabledCategories.length; index++)
@@ -120,7 +127,7 @@ Panel {
   function scopeLabelForKey(key) {
     if (key === "p") return "People"
     if (key === "g") return "Groups"
-    if (key === "w") return "Workflows"
+    if (key === "w") return "Workflow Types"
     if (key === "j") return "Jobs"
     if (key === "page") return "Pages"
     if (key === "c") return "Content"
@@ -237,6 +244,7 @@ Panel {
       newProfileName = ""
       newProfileDomain = ""
       if (profiles.length > 0) addProfileMode = false
+      editLoginMode = false
       pendingRemoveProfileId = ""
       pendingSignOut = false
       feedbackText = pendingSuccessText || "Rock connection updated"
@@ -254,6 +262,7 @@ Panel {
     } else if (response.connection === "signed_out") {
       setupBusy = false
       pendingSignOut = false
+      editLoginMode = true
       setupPassword = ""
       feedbackText = "Signed out; this profile and its local history were kept"
     }
@@ -302,6 +311,7 @@ Panel {
     recentCursor = -1
     linkCursor = -1
     quickLook = null
+    pendingClearRecent = false
     panelFlick.contentY = 0
     Qt.callLater(function() { searchField.forceActiveFocus() })
   }
@@ -316,6 +326,7 @@ Panel {
     pendingRemoveProfileId = ""
     pendingSignOut = false
     pendingClearRecent = false
+    editLoginMode = false
     feedbackText = ""
     panelFlick.contentY = 0
     request({op: "profiles_status"})
@@ -492,6 +503,7 @@ Panel {
   function switchProfile(profileId) {
     if (!profileId || profileId === activeProfileId || setupBusy) return
     setupBusy = true
+    editLoginMode = false
     pendingSuccessText = "Profile switched"
     request({op: "profile_switch", profileId: profileId})
   }
@@ -518,6 +530,17 @@ Panel {
     var values = {}
     values[name] = value
     request({op: "preferences_update", preferences: values})
+  }
+  function clearRecentLinks() {
+    if (!quickReturns.length || setupBusy) return
+    if (!pendingClearRecent) {
+      pendingClearRecent = true
+      feedbackText = "Press Clear again to remove this profile's Recent Links"
+      return
+    }
+    pendingClearRecent = false
+    request({op: "recent_links_clear"})
+    feedbackText = "Recent Links cleared"
   }
   function switchContext() {
     if (!developerMode) return
@@ -714,6 +737,7 @@ Panel {
             onTextEdited: {
               root.resultCursor = -1
               root.recentCursor = -1
+              root.pendingClearRecent = false
               root.results = []
               root.quickLook = null
               root.feedbackText = ""
@@ -829,7 +853,7 @@ Panel {
                     anchors.leftMargin: 8
                     anchors.rightMargin: 8
                     Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                    Text { width: parent.width; text: modelData.category + " · " + modelData.subtitle + " · " + modelData.status; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
+                    Text { width: parent.width; text: root.displayCategory(modelData.category) + " · " + modelData.subtitle + " · " + modelData.status; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
                   }
                   MouseArea {
                     anchors.fill: parent
@@ -895,7 +919,37 @@ Panel {
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
 
-              Text { text: "Recent Links"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
+              RowLayout {
+                width: parent.width
+                Text {
+                  text: "Recent Links"
+                  color: Color.foreground
+                  font.pixelSize: Style.font.heading
+                  font.bold: true
+                }
+                Item { Layout.fillWidth: true }
+                Rectangle {
+                  Layout.preferredWidth: clearRecentLabel.implicitWidth + 20
+                  Layout.preferredHeight: Style.space(30)
+                  radius: 6
+                  visible: root.contextName === "PROD"
+                  opacity: root.quickReturns.length > 0 && !root.setupBusy ? 1 : 0.4
+                  color: root.pendingClearRecent ? "#7f1d1d" : Style.selectedFillFor(Color.foreground, Color.accent)
+                  Text {
+                    id: clearRecentLabel
+                    anchors.centerIn: parent
+                    text: root.pendingClearRecent ? "Confirm clear" : "Clear"
+                    color: Color.foreground
+                    font.bold: true
+                  }
+                  MouseArea {
+                    anchors.fill: parent
+                    enabled: root.quickReturns.length > 0 && !root.setupBusy
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: root.clearRecentLinks()
+                  }
+                }
+              }
               Text {
                 visible: root.quickReturns.length === 0
                 width: body.width
@@ -1102,44 +1156,33 @@ Panel {
                 width: parent.width
                 height: visible ? implicitHeight : 0
                 spacing: Style.spacing.sm
-                Text { text: "Connection"; color: Color.foreground; font.bold: true }
-                Text {
+                RowLayout {
                   width: parent.width
-                  text: root.magnusConfigured ? "Login saved securely for " + root.activeProfileName() : "Login needed for " + root.activeProfileName()
-                  color: Color.foreground
-                  opacity: 0.68
-                  textFormat: Text.PlainText
-                  elide: Text.ElideRight
-                }
-                TextField {
-                  id: activeUsernameField
-                  width: parent.width
-                  maximumLength: 200
-                  placeholderText: "Rock username"
-                  text: root.setupUsername
-                  selectByMouse: true
-                  onTextChanged: root.setupUsername = text
-                }
-                TextField {
-                  id: activePasswordField
-                  width: parent.width
-                  placeholderText: "Rock password"
-                  text: root.setupPassword
-                  echoMode: TextInput.Password
-                  selectByMouse: true
-                  inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                  onTextChanged: root.setupPassword = text
-                  onAccepted: root.saveMagnusCredentials()
+                  Text { text: "Connection"; color: Color.foreground; font.bold: true }
+                  Item { Layout.fillWidth: true }
+                  Text {
+                    text: root.magnusConfigured ? "Connected" : "Login required"
+                    color: root.magnusConfigured ? "#86efac" : Color.foreground
+                    opacity: root.magnusConfigured ? 0.9 : 0.62
+                    font.pixelSize: Style.font.bodySmall
+                  }
                 }
                 Row {
                   spacing: Style.spacing.sm
                   Button {
-                    text: root.setupBusy ? "Saving…" : "Update login"
-                    enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                    onClicked: root.saveMagnusCredentials()
+                    visible: root.magnusConfigured
+                    text: root.editLoginMode ? "Cancel" : (root.magnusConfigured ? "Change login" : "Enter login")
+                    enabled: !root.setupBusy
+                    onClicked: {
+                      root.editLoginMode = !root.editLoginMode
+                      root.setupUsername = ""
+                      root.setupPassword = ""
+                      if (root.editLoginMode) Qt.callLater(function() { activeUsernameField.forceActiveFocus() })
+                    }
                   }
                   Button {
-                    text: "Test connection"
+                    visible: root.magnusConfigured
+                    text: "Test"
                     enabled: root.magnusConfigured && !root.setupBusy
                     onClicked: {
                       root.setupBusy = true
@@ -1148,9 +1191,41 @@ Panel {
                     }
                   }
                   Button {
+                    visible: root.magnusConfigured
                     text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
                     enabled: root.magnusConfigured && !root.setupBusy
                     onClicked: root.signOut()
+                  }
+                }
+                Column {
+                  visible: root.editLoginMode || !root.magnusConfigured
+                  width: parent.width
+                  height: visible ? implicitHeight : 0
+                  spacing: Style.spacing.sm
+                  TextField {
+                    id: activeUsernameField
+                    width: parent.width
+                    maximumLength: 200
+                    placeholderText: "Rock username"
+                    text: root.setupUsername
+                    selectByMouse: true
+                    onTextChanged: root.setupUsername = text
+                  }
+                  TextField {
+                    id: activePasswordField
+                    width: parent.width
+                    placeholderText: "Rock password"
+                    text: root.setupPassword
+                    echoMode: TextInput.Password
+                    selectByMouse: true
+                    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                    onTextChanged: root.setupPassword = text
+                    onAccepted: root.saveMagnusCredentials()
+                  }
+                  Button {
+                    text: root.setupBusy ? "Saving…" : "Save login"
+                    enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                    onClicked: root.saveMagnusCredentials()
                   }
                 }
               }
@@ -1158,7 +1233,7 @@ Panel {
               Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.12) }
               Text { text: "Search and behavior"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
               CheckBox {
-                text: "Show age, spouse, campus, and status for people"
+                text: "Person context · age, spouse, campus, and status"
                 checked: root.preferencePersonContext
                 onClicked: {
                   root.preferencePersonContext = checked
@@ -1166,7 +1241,7 @@ Panel {
                 }
               }
               CheckBox {
-                text: "Remember Recent Links on this computer"
+                text: "Remember Recent Links"
                 checked: root.preferenceRecentLinks
                 onClicked: {
                   root.preferenceRecentLinks = checked
@@ -1188,36 +1263,25 @@ Panel {
                 width: parent.width
                 spacing: Style.spacing.sm
                 Repeater {
-                  model: ["People", "Groups", "Workflows", "Jobs", "Pages", "Content Channel Items"]
+                  model: [
+                    {key: "People", label: "People"},
+                    {key: "Groups", label: "Groups"},
+                    {key: "Workflows", label: "Workflow Types"},
+                    {key: "Jobs", label: "Jobs"},
+                    {key: "Pages", label: "Pages"},
+                    {key: "Content Channel Items", label: "Content Items"}
+                  ]
                   delegate: CheckBox {
                     required property var modelData
-                    text: modelData
-                    checked: root.categoryEnabled(modelData)
-                    onClicked: root.toggleCategory(modelData)
+                    text: modelData.label
+                    checked: root.categoryEnabled(modelData.key)
+                    onClicked: root.toggleCategory(modelData.key)
                   }
                 }
-              }
-              Row {
-                spacing: Style.spacing.sm
-                Button {
-                  text: root.pendingClearRecent ? "Confirm clear" : "Clear Recent Links"
-                  enabled: root.activeProfileId !== "" && !root.setupBusy
-                  onClicked: {
-                    if (!root.pendingClearRecent) {
-                      root.pendingClearRecent = true
-                      root.feedbackText = "Press Clear Recent Links again to confirm"
-                    } else {
-                      root.pendingClearRecent = false
-                      root.request({op: "recent_links_clear"})
-                      root.feedbackText = "Recent Links cleared"
-                    }
-                  }
-                }
-                Button { text: "Back to Search"; onClicked: root.focusSearch() }
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.9 · Ctrl+, opens Settings"
+                text: "Rock Lens 0.9.1 · Ctrl+, opens Settings"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall
@@ -1233,7 +1297,7 @@ Panel {
             root.viewMode === "settings" ? "Esc returns to Search · Changes save automatically" :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
             root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links" :
-            "Try g: or Alt+G · ↑↓ navigate · Enter open")
+            "Try g: groups or w: workflow types · ↑↓ navigate · Enter open")
           color: Color.foreground
           opacity: 0.55
           wrapMode: Text.WordWrap

@@ -8,7 +8,7 @@
 3. `OAuthManager`: Rock OpenID Connect authorization-code login with S256 PKCE,
    a loopback callback, refresh-token renewal, and Secret Service persistence.
 4. `MockAdapter`: deterministic, synthetic records for People, Groups,
-   Workflows, Jobs, Pages, and Content Channel Items.
+   Workflow Types, Jobs, Pages, and Content Channel Items.
 5. `MagnusReadOnlyAdapter`: privileged, bounded file inspection against the
    user-selected, validated Rock origin, with per-origin credentials held in
    Secret Service and raw Magnus state confined to an ephemeral owner-only

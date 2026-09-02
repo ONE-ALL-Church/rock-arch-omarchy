@@ -166,6 +166,18 @@
   returned three live rows with no unavailable category in 0.545 seconds. Only
   counts and category names were printed. The temporary Settings capture was
   deleted after inspection.
+- Plugin version `0.9.1` tightens the Settings hierarchy by collapsing saved
+  credentials behind Change login, shortening connection and preference
+  controls, and moving the confirmed Clear action into the Recent Links header.
+  Workflow Types is now the user-facing category name; `w:`, `wt:`,
+  `workflow:`, `workflowtype:`, and `workflowtypes:` all scope the fixed
+  `/api/WorkflowTypes` read. The installed panel loaded without QML errors and
+  fit the profiles, collapsed connection controls, all preferences, all six
+  category controls, and footer in one view. A live `w:` check returned three
+  Workflow Type rows with no unavailable category in 0.936 seconds; only the
+  count and internal category label were printed. Sixty tests cover the broker
+  Clear operation and local history-file removal. Temporary visual captures
+  were deleted after inspection.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
