@@ -214,6 +214,12 @@
   empty-looking leaf and completed a read-only preview without printing item
   names, paths, IDs, or content. Sixty-six tests pass, including a regression
   test shaped like the live descriptor.
+- Plugin version `0.10.3` includes Settings in the keyboard Tab ring. Forward
+  traversal is Search, a search/recent result when present, Personal Links,
+  optional Magnus, Settings, then Search. Shift+Tab follows the exact reverse
+  route. Entering Settings transfers focus to the shared key catcher so the
+  next Tab or Shift+Tab remains deterministic. Sixty-seven tests pass,
+  including a source-contract regression for both traversal directions.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and

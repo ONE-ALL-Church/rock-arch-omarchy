@@ -423,6 +423,7 @@ Panel {
     feedbackText = ""
     panelFlick.contentY = 0
     request({op: "profiles_status"})
+    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
   function backspaceToSearch() {
     var selectionStart = searchField.selectionStart
@@ -548,17 +549,24 @@ Panel {
   }
   function moveTab(direction) {
     if (direction >= 0) {
-      if (viewMode === "search" && resultCursor < 0 && recentCursor < 0 && activeSearchCount)
+      if (viewMode === "settings")
+        focusSearch()
+      else if (viewMode === "search" && resultCursor < 0 && recentCursor < 0 && activeSearchCount)
         selectSearchItem(0)
       else if (viewMode === "search")
         selectPersonalLink(0)
       else if (viewMode === "personal" && magnusAvailable)
         openMagnus()
+      else if (viewMode === "personal" || viewMode === "magnus")
+        openSettings(false)
       else
         focusSearch()
       return
     }
-    if (viewMode === "magnus") {
+    if (viewMode === "settings") {
+      if (magnusAvailable) openMagnus()
+      else selectPersonalLink(Math.max(0, navigationCount - 1))
+    } else if (viewMode === "magnus") {
       selectPersonalLink(Math.max(0, navigationCount - 1))
     } else if (viewMode === "personal") {
       if (activeSearchCount) selectSearchItem(activeSearchCount - 1)
@@ -566,7 +574,7 @@ Panel {
     } else if (resultCursor >= 0 || recentCursor >= 0) {
       focusSearch()
     } else {
-      selectPersonalLink(navigationCount - 1)
+      openSettings(false)
     }
   }
   function moveCursor(dx, dy) {
@@ -1635,7 +1643,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.10.2 · Ctrl+, opens Settings"
+                text: "Rock Lens 0.10.3 · Ctrl+, opens Settings"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall
@@ -1651,11 +1659,11 @@ Panel {
             ((root.contextName === "DEV" || root.rockConfigured) && root.searchInFlight) ? "Searching…" :
             !root.statusLoaded ? "Checking saved Rock login…" :
             root.contextName === "PROD" && !root.rockConfigured ? "Open Settings to save a Rock login." :
-            root.viewMode === "settings" ? "Esc returns to Search · Changes save automatically" :
-            root.viewMode === "magnus" ? (root.magnusPreview ? "Esc or Back returns to files" : "↑↓ browse · Enter preview · Esc back") :
+            root.viewMode === "settings" ? "Tab Search · Shift+Tab previous · Esc Search · Changes save automatically" :
+            root.viewMode === "magnus" ? (root.magnusPreview ? "Esc or Back returns to files · Tab Settings" : "↑↓ browse · Enter preview · Esc back · Tab Settings") :
             root.scopeKey ? "Esc clear · ↑↓ navigate · Tab switch · Enter open" :
-            root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links" :
-            "Try g: groups or w: workflow types · ↑↓ navigate · Enter open")
+            root.showRecentLinks ? "Type to search · ↑↓ select recent · Tab Personal Links · Shift+Tab Settings" :
+            "Try g: groups or w: workflow types · ↑↓ navigate · Tab switch · Enter open")
           color: Color.foreground
           opacity: 0.55
           wrapMode: Text.WordWrap
