@@ -106,12 +106,23 @@ class RockRestAdapterTests(unittest.TestCase):
                     }
                 ],
                 "/api/Groups": [{"Id": 4, "Name": "Delta", "IsActive": True}],
-                "/api/WorkflowTypes": [],
-                "/api/ServiceJobs": [],
+                "/api/WorkflowTypes": [
+                    {"Id": 6, "Name": "Follow-up", "IsActive": True}
+                ],
+                "/api/ServiceJobs": [
+                    {
+                        "Id": 7,
+                        "Name": "Data Sync",
+                        "IsActive": True,
+                        "LastStatus": "Success",
+                    }
+                ],
                 "/api/Pages": [
                     {"Id": 9, "PageTitle": "Directory", "InternalName": "Dir"}
                 ],
-                "/api/ContentChannelItems": [],
+                "/api/ContentChannelItems": [
+                    {"Id": 12, "Title": "Weekend Update", "Status": 1}
+                ],
             }
         )
         adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
@@ -134,6 +145,30 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertNotIn("must-not-cross", json.dumps(batch.results))
         page = next(row for row in batch.results if row["category"] == "Pages")
         self.assertEqual(page["title"], "Directory")
+        self.assertTrue(all(row["canOpen"] for row in batch.results))
+
+        expected_targets = {
+            "People": ("Person", "/Person/17"),
+            "Groups": ("Group", "/Group/4"),
+            "Workflows": (
+                "Workflow Type",
+                "/admin/general/workflows?WorkflowTypeId=6",
+            ),
+            "Jobs": ("Scheduled Job", "/admin/system/jobs/7"),
+            "Pages": ("Page", "/page/9"),
+            "Content Channel Items": (
+                "Content Channel Item",
+                "/ContentChannelItem/12",
+            ),
+        }
+        for result in batch.results:
+            with self.subTest(category=result["category"]):
+                target = adapter.resolve(result["safeId"])
+                self.assertIsNotNone(target)
+                assert target is not None
+                expected_kind, expected_path = expected_targets[result["category"]]
+                self.assertEqual(target.kind, expected_kind)
+                self.assertEqual(target.url, DEFAULT_ROCK_ORIGIN + expected_path)
 
         quick_look = adapter.person_quick_look(person["safeId"])
         self.assertIsNotNone(quick_look)

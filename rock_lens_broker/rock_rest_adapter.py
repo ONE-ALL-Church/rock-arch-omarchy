@@ -120,6 +120,7 @@ class RockRestHttpClient:
 @dataclass(frozen=True)
 class _SearchSpec:
     category: str
+    navigation_kind: str
     path: str
     search_fields: tuple[str, ...]
     select: str
@@ -147,6 +148,7 @@ class _RegistryEntry:
 SEARCH_SPECS = (
     _SearchSpec(
         "People",
+        "Person",
         "/api/People",
         ("NickName", "LastName"),
         "Id,NickName,LastName",
@@ -158,6 +160,7 @@ SEARCH_SPECS = (
     ),
     _SearchSpec(
         "Groups",
+        "Group",
         "/api/Groups",
         ("Name",),
         "Id,Name,IsActive",
@@ -165,10 +168,12 @@ SEARCH_SPECS = (
         ("Name",),
         "Group",
         20,
+        "/Group/{id}",
         active_field="IsActive",
     ),
     _SearchSpec(
         "Workflows",
+        "Workflow Type",
         "/api/WorkflowTypes",
         ("Name",),
         "Id,Name,IsActive",
@@ -176,10 +181,12 @@ SEARCH_SPECS = (
         ("Name",),
         "Workflow type",
         30,
+        "/admin/general/workflows?WorkflowTypeId={id}",
         active_field="IsActive",
     ),
     _SearchSpec(
         "Jobs",
+        "Scheduled Job",
         "/api/ServiceJobs",
         ("Name",),
         "Id,Name,IsActive,LastStatus",
@@ -187,11 +194,13 @@ SEARCH_SPECS = (
         ("Name",),
         "Service job",
         40,
+        "/admin/system/jobs/{id}",
         active_field="IsActive",
         status_field="LastStatus",
     ),
     _SearchSpec(
         "Pages",
+        "Page",
         "/api/Pages",
         ("PageTitle", "InternalName"),
         "Id,PageTitle,InternalName",
@@ -203,6 +212,7 @@ SEARCH_SPECS = (
     ),
     _SearchSpec(
         "Content Channel Items",
+        "Content Channel Item",
         "/api/ContentChannelItems",
         ("Title",),
         "Id,Title,Status",
@@ -210,6 +220,7 @@ SEARCH_SPECS = (
         ("Title",),
         "Content channel item",
         60,
+        "/ContentChannelItem/{id}",
         status_field="Status",
     ),
 )
@@ -380,7 +391,7 @@ class RockRestReadOnlyAdapter:
                 try:
                     target = clean_target(
                         title,
-                        spec.category.removesuffix("s"),
+                        spec.navigation_kind,
                         spec.type_order,
                         spec.route.format(id=raw_id),
                         self.origin,

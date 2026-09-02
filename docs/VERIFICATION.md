@@ -84,14 +84,14 @@
 - Magnus 0.1.0's password prompt and nested cookie cache were verified against
   the installed CLI. Rock Lens handles both without persisting its ephemeral
   plaintext Magnus profile or exposing the password/cookie.
-- Omarchy loaded plugin version `0.4.0` after shell restart, registered the
+- Omarchy loaded plugin version `0.4.1` after shell restart, registered the
   Rock Lens IPC target, started the updated broker, and opened the panel. The
   owner-only runtime boundary remained `0700`/`0600`.
 - The final installed broker was exercised through its real Unix socket in
   PROD. It returned 15 Personal Links and 18 live search rows (three from each
-  of the six categories), with zero unavailable categories. Only counts and
-  category names were printed during verification; no record or link values
-  were retained.
+  of the six categories), with zero unavailable categories. After the all-route
+  update, all 18 rows reported `canOpen: true`. Only counts and category names
+  were printed during verification; no record or link values were retained.
 - Search keyboard editing was verified against the installed panel after a
   shell restart. The injected sequence `zzzz`, Space, `z`, Backspace,
   Backspace produced `zzzz`, confirming that both Space insertion and
@@ -104,6 +104,10 @@
   visible and the panel followed it automatically. Enter and Space dispatch the
   selected verified live target through the existing opaque-ID navigation
   operation; DEV remains non-opening.
+- All six live search categories now create opaque, exact-origin navigation
+  targets. Adapter coverage asserts the canonical Person, Group, Workflow Type,
+  Scheduled Job, Page, and Content Channel Item routes and requires `canOpen`
+  for every transformed live result.
 - The panel now uses a compact connection line, concise setup copy and footer,
   a content-responsive list height, and a single selected row. DEV navigation
   omits the per-origin PROD Quick Return history.

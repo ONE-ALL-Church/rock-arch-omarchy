@@ -94,8 +94,10 @@ Personal Links reads. The adapter still exposes only bounded `ls`, `cat`, and
 
 In the launcher, PROD search starts only after at least one character is typed.
 The **Links** tab loads Personal Links and local Quick Returns. **Open** is
-offered only for route shapes Rock Lens has verified (currently Person and Page
-results); Personal Links must resolve to the exact Rock origin.
+offered for every search category: People, Groups, Workflow Types, Scheduled
+Jobs, Pages, and Content Channel Items. Each target uses a fixed Rock route and
+must resolve to the exact configured Rock origin; Personal Links have the same
+origin restriction.
 
 The search field keeps native editing behavior. Up and Down move through results
 and across the Search/Links boundary, Tab cycles search input, results, and

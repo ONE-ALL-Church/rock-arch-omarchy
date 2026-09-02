@@ -646,7 +646,7 @@ Panel {
 
         Text {
           width: parent.width
-          text: root.feedbackText || "↑/↓ move · Tab next · Enter/Space select"
+          text: root.feedbackText || "↑/↓ move · Tab next · Enter/Space open"
           color: Color.foreground
           opacity: 0.55
           wrapMode: Text.WordWrap

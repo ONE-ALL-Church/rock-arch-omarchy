@@ -106,10 +106,13 @@ operation.
 ## Navigation, Personal Links, and Quick Returns
 
 Search results and Personal Links cross the socket with process-local HMAC IDs.
-Only the broker can resolve those IDs. Generated search navigation is enabled
-only for confirmed Person (`/Person/{Id}`) and Page (`/page/{Id}`) routes.
-Personal Link targets may be relative but must resolve to HTTPS on the selected
-Rock origin; external and malformed links are omitted.
+Only the broker can resolve those IDs. Every search category maps to a fixed
+Rock route: Person (`/Person/{Id}`), Group (`/Group/{Id}`), Workflow Type
+configuration (`/admin/general/workflows?WorkflowTypeId={Id}`), Scheduled Job
+detail (`/admin/system/jobs/{Id}`), Page (`/page/{Id}`), and Content Channel
+Item (`/ContentChannelItem/{Id}`). Personal Link targets may be relative but
+must resolve to HTTPS on the selected Rock origin; external and malformed
+links are omitted.
 
 Successful user-requested opens are added to Quick Returns. The store keeps the
 title, type, order, target, and timestamp locally, but returns only another
