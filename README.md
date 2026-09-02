@@ -5,6 +5,8 @@ first slice runs entirely against public-safe mock data. QML is only a view:
 search terms travel over an owner-only local Unix socket to a Python broker,
 and only allowlisted display fields return.
 
+![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
+
 ## Run the MVP
 
 ```bash

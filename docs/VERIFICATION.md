@@ -19,6 +19,19 @@
 - QML validation: run `qmllint plugin/oneall.rock-lens/*.qml` when available.
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.
+- Restart persistence: broker PID changed across an Omarchy shell restart,
+  owner-only socket/state permissions remained `0700`/`0600`, explicit context
+  remained `DEV`, plugin re-registration completed, and the final summon
+  returned `ok`.
+- Shortcut registration: Hyprland reports `modmask: 64`, key `R`, description
+  `Rock Lens`. Synthetic input injection was inconclusive, so the registered
+  binding plus its exact IPC target were verified separately.
+- Visual verification: `outputs/rock-lens-mvp.png` is a panel-only capture. It
+  shows explicit DEV context, mock/live health separation, all six synthetic
+  entity categories, read-only job status, and a privacy-safe Person Quick
+  Look. The full desktop was excluded from the retained artifact.
+- Full OS logout/login was not performed; shell restart and user-config
+  persistence cover the non-disruptive acceptance check.
 
 ## Final local integration verification
 
