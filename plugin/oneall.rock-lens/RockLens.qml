@@ -18,7 +18,10 @@ Panel {
   property string query: ""
   property var results: []
   property var quickLook: null
-  property string healthText: "mock healthy · live unknown"
+  property string healthText: "mock healthy · Rock OAuth unknown · live unknown"
+  property string authState: "unconfigured"
+  property string authLabel: "OAuth setup needed"
+  property bool authConfigured: false
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -34,6 +37,11 @@ Panel {
     try { response = JSON.parse(line) } catch (e) { return }
     if (!response || response.ok !== true) return
     if (response.context) contextName = response.context === "PROD" ? "PROD" : "DEV"
+    if (response.auth) {
+      authState = String(response.auth.state || "failed")
+      authLabel = String(response.auth.label || "Rock sign-in unavailable")
+      authConfigured = response.auth.configured === true
+    }
     if (Array.isArray(response.results)) results = response.results
     if (response.person) quickLook = response.person
     if (Array.isArray(response.capabilities)) {
@@ -45,6 +53,11 @@ Panel {
   }
 
   function refreshSearch() { request({op: "search", query: query}) }
+  function authAction() {
+    if (authState === "authenticated") request({op: "auth_disconnect"})
+    else if (authConfigured && authState !== "starting" && authState !== "waiting" && authState !== "refreshing")
+      request({op: "auth_login"})
+  }
   function resetPanel() {
     query = ""
     quickLook = null
@@ -72,6 +85,12 @@ Panel {
     }
   }
   Timer { id: retryTimer; interval: 120; onTriggered: { brokerSocket.connected = true; sendTimer.restart() } }
+  Timer {
+    interval: 800
+    repeat: true
+    running: root.opened && (root.authState === "starting" || root.authState === "waiting" || root.authState === "refreshing")
+    onTriggered: root.request({op: "auth_status"})
+  }
 
   Socket {
     id: brokerSocket
@@ -91,7 +110,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "ROCK " + root.contextName
+    text: "ROCK " + root.contextName + (root.authState === "authenticated" ? "  ●" : "")
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
     horizontalMargin: 8
     onPressed: root.toggle()
@@ -139,6 +158,50 @@ Panel {
 
         Text { width: parent.width; text: root.query || "Search People, Groups, Workflows, Jobs, Pages, Content Channel Items…"; color: Color.foreground; opacity: root.query ? 1 : 0.55; elide: Text.ElideRight }
         Text { width: parent.width; text: root.healthText; color: Color.foreground; opacity: 0.55; font.pixelSize: Style.font.bodySmall }
+        Rectangle {
+          width: content.width
+          height: Style.space(44)
+          radius: 8
+          color: Style.selectedFillFor(Color.foreground, Color.accent)
+          Row {
+            anchors.fill: parent
+            anchors.margins: 9
+            spacing: Style.spacing.md
+            Text {
+              width: parent.width - authButton.width - parent.spacing
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.authLabel
+              color: Color.foreground
+              textFormat: Text.PlainText
+              elide: Text.ElideRight
+            }
+            Rectangle {
+              id: authButton
+              width: authButtonText.implicitWidth + 20
+              height: parent.height
+              radius: 6
+              opacity: authMouse.enabled ? 1 : 0.45
+              color: root.authState === "authenticated" ? "#7f1d1d" : "#14532d"
+              Text {
+                id: authButtonText
+                anchors.centerIn: parent
+                text: root.authState === "authenticated" ? "Disconnect" :
+                  (root.authState === "starting" || root.authState === "waiting" || root.authState === "refreshing") ? "Working…" :
+                  root.authConfigured ? "Sign in" : "Setup needed"
+                color: "white"
+                font.bold: true
+                textFormat: Text.PlainText
+              }
+              MouseArea {
+                id: authMouse
+                anchors.fill: parent
+                enabled: root.authConfigured && root.authState !== "starting" && root.authState !== "waiting" && root.authState !== "refreshing"
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: root.authAction()
+              }
+            }
+          }
+        }
         Repeater {
           model: root.results
           delegate: Rectangle {
@@ -160,7 +223,7 @@ Panel {
             Text { text: root.quickLook ? root.quickLook.campus : ""; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText }
           }
         }
-        Text { width: parent.width; text: "Type to filter · Enter opens privacy-safe Person Quick Look · read-only"; color: Color.foreground; opacity: 0.5; wrapMode: Text.WordWrap }
+        Text { width: parent.width; text: "Rock OAuth stays in the local broker · Type to filter · Enter opens privacy-safe Person Quick Look · read-only"; color: Color.foreground; opacity: 0.5; wrapMode: Text.WordWrap }
       }
     }
   }

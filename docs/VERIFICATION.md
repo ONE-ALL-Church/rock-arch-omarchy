@@ -7,15 +7,22 @@
   installed user-scoped. Important REST authorization guidance is official and
   source-backed; ServiceJob and ServiceJobHistory shapes are official Model Map
   evidence.
+- Rock OAuth: authorization-code, S256 PKCE, exact state validation, refresh,
+  owner-only config, Secret Service stdin handling, and public response
+  redaction are covered by local tests. No live login was attempted because no
+  tenant-specific OpenID client is configured on this machine.
+- Public discovery probe: Rock's public demo returned its canonical HTTPS
+  issuer and the expected `/Auth/Authorize` and `/Auth/Token` endpoints; the
+  broker accepted that document under its exact-issuer/same-origin checks.
 - ONE&ALL Rock RMS MCP V3: not exposed to this running host at implementation
-  time. No OAuth login was attempted.
+  time.
 - Production SQL: not attempted because V3 `/v3/sql/health` was unavailable and
   no guarded `sqlread` identity was proven.
 - Magnus: requested npm metadata check for `rock-magnus-cli` returned registry
   `E404 Not Found`, so package identity could not be verified and installation
   was not attempted. `magnus` remains unavailable; authentication is gated.
 - Live Rock reads: gated; no tenant, actor, or Rock version claimed.
-- Mock tests: run `python3 -m unittest discover -s tests -v`.
+- Broker/OAuth tests: 12 passing via `python3 -m unittest discover -s tests -v`.
 - QML validation: run `qmllint plugin/oneall.rock-lens/*.qml` when available.
 - Live shell: plugin discovered and enabled, bar entry added, `Super+R` binding
   loaded with no Hyprland config errors, and shell summon returned `ok`.
@@ -47,7 +54,12 @@
   the binding's registered summon command returned `ok` and opened the panel.
 - `hyprctl reload` succeeded and `hyprctl configerrors` was empty.
 - The broker status contract returned exactly six mock categories, explicit
-  `DEV`, `mock: healthy`, and no healthy live capability.
+  `DEV`, `mock: healthy`, a sanitized `OAuth setup needed` state, and no
+  healthy live capability. Calling login while unconfigured failed closed and
+  did not open a browser.
+- Omarchy loaded plugin version `0.2.0` after shell restart, registered the
+  Rock Lens IPC target, started the updated broker, and opened the panel. The
+  owner-only runtime boundary remained `0700`/`0600`.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,

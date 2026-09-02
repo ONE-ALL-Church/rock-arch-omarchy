@@ -15,7 +15,9 @@ class BrokerServer:
         self.socket_path = socket_path
         self.broker = Broker(state_file)
 
-    async def _client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def _client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         try:
             while line := await reader.readline():
                 if len(line) > MAX_REQUEST:
@@ -23,10 +25,19 @@ class BrokerServer:
                 else:
                     try:
                         request = json.loads(line)
-                        response = self.broker.handle(request) if isinstance(request, dict) else {"ok": False, "error": "invalid_request"}
+                        response = (
+                            self.broker.handle(request)
+                            if isinstance(request, dict)
+                            else {"ok": False, "error": "invalid_request"}
+                        )
                     except (json.JSONDecodeError, UnicodeDecodeError):
                         response = {"ok": False, "error": "invalid_json"}
-                writer.write(json.dumps(response, separators=(",", ":"), ensure_ascii=True).encode() + b"\n")
+                writer.write(
+                    json.dumps(
+                        response, separators=(",", ":"), ensure_ascii=True
+                    ).encode()
+                    + b"\n"
+                )
                 await writer.drain()
         finally:
             writer.close()
@@ -38,13 +49,15 @@ class BrokerServer:
         self.socket_path.parent.chmod(0o700)
         if self.socket_path.exists():
             try:
-                reader, writer = await asyncio.open_unix_connection(str(self.socket_path))
+                _, writer = await asyncio.open_unix_connection(str(self.socket_path))
                 writer.close()
                 await writer.wait_closed()
                 return
             except OSError:
                 self.socket_path.unlink(missing_ok=True)
-        server = await asyncio.start_unix_server(self._client, path=str(self.socket_path))
+        server = await asyncio.start_unix_server(
+            self._client, path=str(self.socket_path)
+        )
         self.socket_path.chmod(0o600)
         async with server:
             await server.serve_forever()
