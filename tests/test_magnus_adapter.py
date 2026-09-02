@@ -192,6 +192,36 @@ class MagnusAdapterTests(unittest.TestCase):
         self.assertNotIn("FileContent", serialized)
         self.assertNotIn("attacker.example", serialized)
 
+    def test_generic_uri_is_discriminated_by_folder_type(self):
+        tree = [
+            {
+                "DisplayName": "Theme",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/Theme",
+            },
+            {
+                "DisplayName": "File.lava",
+                "IsFolder": False,
+                "Uri": "/api/TriumphTech/Magnus/FileContent/Theme/File.lava",
+            },
+        ]
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(),
+            CANONICAL_MAGNUS_SERVER,
+            FakeMagnusHttp({"/" + DEFAULT_TREE_PATH: tree}),
+        )
+
+        listed = adapter.list_tree()
+
+        self.assertIn("path", listed[0])
+        self.assertNotIn("filePath", listed[0])
+        self.assertNotIn("path", listed[1])
+        self.assertEqual(listed[1]["filePath"], "/FileContent/Theme/File.lava")
+        self.assertEqual(
+            [item["kind"] for item in adapter.browse()["items"]],
+            ["folder", "file"],
+        )
+
     def test_text_preview_is_bounded_and_includes_a_hash(self):
         tree = [
             {

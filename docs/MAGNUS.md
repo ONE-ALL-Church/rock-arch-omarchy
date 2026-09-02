@@ -49,7 +49,9 @@ responses are capped at 2 MiB/500 items and content reads at 4 MiB.
 QML never receives these paths. The broker registers each folder and file under
 a process-local HMAC identifier. Item descriptors may advertise `build`,
 `delete`, `upload`, `newFile`, or `newFolder`; Rock Lens emits only the validated
-action name as informational UI and discards the URI.
+action name as informational UI and discards the URI. Magnus uses the generic
+descriptor `Uri` for both folders and files, so the broker validates it as a
+tree path or content path according to the descriptor's `IsFolder` value.
 
 ## Authentication and migration
 

@@ -373,10 +373,16 @@ class MagnusReadOnlyAdapter:
                 item[key] = sanitize_text(raw, 100)
 
         candidates = (
-            ("path", "path", self._normalized_tree_path),
-            ("uri", "path", self._normalized_tree_path),
-            ("filePath", "filePath", self._normalized_file_path),
-            ("fileContentUri", "filePath", self._normalized_file_path),
+            (
+                ("path", "path", self._normalized_tree_path),
+                ("uri", "path", self._normalized_tree_path),
+            )
+            if is_folder
+            else (
+                ("filePath", "filePath", self._normalized_file_path),
+                ("fileContentUri", "filePath", self._normalized_file_path),
+                ("uri", "filePath", self._normalized_file_path),
+            )
         )
         for source, target, validator in candidates:
             raw = self._field(value, source)

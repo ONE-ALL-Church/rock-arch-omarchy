@@ -207,6 +207,13 @@
   same Rock origin also resets Magnus entitlement state. Close-after-open is
   enabled for new preference stores by default. Sixty-five tests cover the
   updated status, account-switch, and preference behavior.
+- Plugin version `0.10.2` fixes terminal Magnus folders that appeared empty.
+  Live Magnus descriptors use the same `Uri` field for tree and file targets;
+  the adapter now validates that URI as a tree path for folders and a content
+  path for files. A privacy-bounded live check found files in a previously
+  empty-looking leaf and completed a read-only preview without printing item
+  names, paths, IDs, or content. Sixty-six tests pass, including a regression
+  test shaped like the live descriptor.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and

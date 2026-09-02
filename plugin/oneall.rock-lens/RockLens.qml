@@ -1635,7 +1635,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.10.1 · Ctrl+, opens Settings"
+                text: "Rock Lens 0.10.2 · Ctrl+, opens Settings"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall
