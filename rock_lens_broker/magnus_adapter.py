@@ -19,6 +19,7 @@ from .contracts import sanitize_text
 from .navigation import NavigationError, NavigationTarget, validate_rock_url
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
 from .rock_session import RockSessionError
+from .version import HTTP_USER_AGENT
 
 CANONICAL_MAGNUS_SERVER = DEFAULT_ROCK_ORIGIN
 DEFAULT_TREE_PATH = "api/TriumphTech/Magnus/GetTreeItems/root"
@@ -33,7 +34,7 @@ MAX_REGISTERED_ITEMS = 2_000
 HTTP_TIMEOUT_SECONDS = 20
 MAX_ACTION_OUTPUT_BYTES = 64 * 1024
 MOBILE_APP_BUILD_PREFIX = MAGNUS_API_PREFIX + "/Build/mobileapps/"
-ROCK_LENS_USER_AGENT = "Rock-Lens/0.12"
+ROCK_LENS_USER_AGENT = HTTP_USER_AGENT
 
 
 class MagnusError(Exception):

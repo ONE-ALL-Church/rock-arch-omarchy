@@ -56,8 +56,23 @@ can therefore be installed directly without Node.js, npm, Magnus CLI, or Rock
 MCP:
 
 ```bash
-omarchy plugin add https://github.com/OWNER/rock-lens-omarchy.git --enable
+omarchy plugin add https://github.com/bscottdavis/rock-lens-omarchy.git --enable
 ```
+
+## Updates
+
+Git installs can be updated safely in place. Omarchy fetches the repository,
+fast-forwards only, validates the updated plugin, and rolls back a failed
+validation:
+
+```bash
+omarchy plugin update oneall.rock-lens
+```
+
+Third-party plugins are not updated by the general `omarchy update` command.
+Run the plugin update command when a new Rock Lens release is available. Release
+notes and publisher steps live in [CHANGELOG.md](CHANGELOG.md) and
+[docs/RELEASING.md](docs/RELEASING.md).
 
 For a standalone broker command outside Omarchy, install the same dependency-free
 Python package with `uv tool install .`.

@@ -27,7 +27,7 @@
   cookie. A privacy-safe no-match query returned no records and no unavailable
   categories; Personal Links returned 15 same-origin entries, recorded only as
   a count during verification. The tenant edge returned 403 for Python's
-  default user-agent and 200 for the transparent `Rock-Lens/0.12` identifier,
+  default user-agent and 200 for the transparent `Rock-Lens/0.13` identifier,
   which is now fixed in the client.
 - Broker/auth/Magnus/REST/navigation/instance tests: 87 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode

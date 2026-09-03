@@ -3,6 +3,8 @@ from __future__ import annotations
 import ipaddress
 import urllib.parse
 
+# A reserved, non-routable example origin used only to initialize adapters before
+# a profile is selected. Real requests require the user's validated profile origin.
 DEFAULT_ROCK_ORIGIN = "https://rock.example.org"
 MAX_ORIGIN_LENGTH = 300
 

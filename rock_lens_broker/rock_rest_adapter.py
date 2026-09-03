@@ -25,13 +25,14 @@ from .contracts import (
 from .navigation import NavigationError, NavigationTarget, clean_target
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
 from .rock_session import RockSessionError
+from .version import HTTP_USER_AGENT
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_TARGETS = 256
 MAX_PERSONAL_LINKS = 200
 PERSONAL_LINK_CACHE_SECONDS = 5 * 60
 ROWS_PER_CATEGORY = 3
-ROCK_LENS_USER_AGENT = "Rock-Lens/0.12"
+ROCK_LENS_USER_AGENT = HTTP_USER_AGENT
 GUID_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"

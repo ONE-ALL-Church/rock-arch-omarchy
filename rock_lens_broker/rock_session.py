@@ -14,12 +14,13 @@ from .auth import SecretStore, SecretToolStore
 from .contracts import Context
 from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, validate_profile_id
+from .version import HTTP_USER_AGENT
 
 AUTH_COOKIE_IDLE_SECONDS = 15 * 60
 HTTP_TIMEOUT_SECONDS = 15
 MAX_PASSWORD_BYTES = 1_024
 MAX_COOKIE_BYTES = 16 * 1024
-ROCK_LENS_USER_AGENT = "Rock-Lens/0.12"
+ROCK_LENS_USER_AGENT = HTTP_USER_AGENT
 
 
 class RockSessionError(Exception):
