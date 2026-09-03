@@ -47,8 +47,12 @@ Tree paths must begin with
 `api/TriumphTech/Magnus/GetTreeItems/`. Content paths must begin with
 `/FileContent/`; the full `/api/TriumphTech/Magnus/FileContent/` form is safely
 normalized. Alternate origins, redirects, URL credentials, queries, fragments,
-backslashes, control characters, and traversal segments are rejected. Tree
-responses are capped at 2 MiB/500 items and content reads at 4 MiB.
+backslashes, control characters, and traversal segments are rejected. Path
+validation repeatedly percent-decodes before checking boundaries, so `%2e%2e`
+and multiply encoded traversal cannot bypass the allowlist. The HTTP client
+also rejects every route outside the fixed probe, tree, file-content, and
+numeric mobile-app build families before opening a connection. Tree responses
+are capped at 2 MiB/500 items and content reads at 4 MiB.
 
 QML never receives these paths. The broker registers each folder and file under
 a process-local HMAC identifier. The broker retains a build URI only when it is
@@ -68,7 +72,9 @@ broker memory with a sliding 15-minute idle timeout.
 Version 0.10 migrates profile-scoped `magnus_username` and `magnus_password`
 records written by earlier releases to neutral `rock_username` and
 `rock_password` keys, then removes the obsolete records. Sign-out clears both
-new and legacy keys as well as the in-memory cookie.
+new and legacy keys as well as the in-memory cookie. If Secret Service does not
+confirm deletion, Rock Lens clears the memory cookie but reports failure rather
+than presenting the profile as safely signed out.
 
 ## Build and promotion policy
 

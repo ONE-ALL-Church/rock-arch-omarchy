@@ -23,13 +23,25 @@
 
 ## Trust boundary
 
-The QML side never receives credentials, cookies, SQL, raw entity response
-bodies, raw URLs/record IDs, internal exception text, or fields outside the
-typed display contract. The sole content exception is a bounded UTF-8 Magnus
-file preview explicitly selected by the user.
+QML handles a password only while the user types and submits an explicit login
+request. It clears the password field immediately; if the broker remains
+unavailable, it purges the queued credential request on panel close or after the
+18-second connection timeout. Credentials are never returned from the broker.
+QML never receives cookies, SQL, raw entity response bodies, raw URLs/record
+IDs, internal exception text, or fields outside the typed display contract. The
+sole content exception is a bounded UTF-8 Magnus file preview explicitly
+selected by the user.
 Requests and responses are newline-delimited JSON with a 16 KiB request limit.
 Search text is sent through the socket, not argv. The broker emits no request or
 response logging.
+
+At startup, the broker requires the socket directory to be an actual directory
+owned by the current user and forces mode `0700`. It will never unlink a regular
+file, symlink, foreign socket, or group/world-accessible socket at the expected
+path. A stale socket is removed only after its device, inode, owner, type, and
+permissions are rechecked; a live private socket is treated as an already
+running broker. QML launches the broker through `/usr/bin/python3`, avoiding a
+PATH-selected executable at this credential boundary.
 
 Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and an
 opaque `safeId`. Live search deliberately reports campus as `Not requested`.
@@ -50,6 +62,10 @@ Profiles created by earlier Rock Lens releases automatically migrate their
 `rock_username` and `rock_password` records, then remove the obsolete keys.
 Authentication failure, sign-out, profile change, or a failed authenticated
 request clears the cached cookie.
+Sign-out and profile removal are successful only when Secret Service reports
+that every targeted record was cleared. A deletion failure clears the in-memory
+cookie but returns `secure_storage_failed` instead of claiming that stored
+credentials are gone.
 
 Version 0.14 removed the unused experimental OpenID manager and its public
 broker operations. Legacy `oidc.json`, client-secret, and token records are not
@@ -118,10 +134,13 @@ marks it unavailable for that profile without affecting search or links.
 The native adapter accepts only the configured Rock origin, permits only tree
 paths under `api/TriumphTech/Magnus/GetTreeItems/` and content paths under
 `/FileContent/`, and rejects alternate origins, redirects, query strings,
-fragments, control characters, backslashes, and traversal segments. Tree rows
-and files cross QML only as process-local opaque IDs. Text previews are explicit
-user actions, UTF-8 only, reject NUL bytes, and are capped at 64 KiB; file reads
-are capped at 4 MiB and tree responses at 2 MiB.
+fragments, control characters, backslashes, and traversal segments after
+repeated percent-decoding. This rejects encoded and multiply encoded traversal
+before any network request. The HTTP layer independently permits only the
+probe, tree, file-content, and numeric mobile-app build route families. Tree
+rows and files cross QML only as process-local opaque IDs. Text previews are
+explicit user actions, UTF-8 only, reject NUL bytes, and are capped at 64 KiB;
+file reads are capped at 4 MiB and tree responses at 2 MiB.
 
 Descriptors become capabilities only after validation. Files expose bounded
 download, content/hash copy, and an optional same-origin view target. Folders

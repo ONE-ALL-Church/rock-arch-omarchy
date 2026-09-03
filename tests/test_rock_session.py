@@ -1,6 +1,7 @@
 import json
 import unittest
 from email.message import Message
+from unittest.mock import patch
 
 from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
 from rock_lens_broker.rock_session import (
@@ -8,11 +9,13 @@ from rock_lens_broker.rock_session import (
     RockSessionHttpClient,
     RockSessionProvider,
 )
+from rock_lens_broker.secret_store import SecretToolStore
 
 
 class FakeSecretStore:
     def __init__(self):
         self.values = {}
+        self.fail_clear = False
 
     def available(self):
         return True
@@ -24,7 +27,10 @@ class FakeSecretStore:
         self.values[(context, kind)] = value
 
     def clear(self, context, kind):
+        if self.fail_clear:
+            return False
         self.values.pop((context, kind), None)
+        return True
 
 
 class FakeLoginClient:
@@ -100,6 +106,15 @@ class RockSessionTests(unittest.TestCase):
         self.assertIn("old-password", self.secrets.values.values())
         self.assertNotIn("new-user", self.secrets.values.values())
 
+    def test_legacy_cleanup_failure_restores_working_saved_login(self):
+        self.session.configure("old-user", "old-password")
+        self.secrets.fail_clear = True
+
+        with self.assertRaisesRegex(RockSessionError, "secure_storage_failed"):
+            self.session.configure("new-user", "new-password")
+
+        self.assertEqual(self.session._credentials(), ("old-user", "old-password"))
+
     def test_cookie_is_reused_in_memory_and_invalidation_logs_in_again(self):
         self.session.configure("rock-user", "private-password")
         with self.session.authenticated_cookie() as first:
@@ -139,6 +154,22 @@ class RockSessionTests(unittest.TestCase):
             any("magnus_" in key[1] for key in self.secrets.values)
         )
 
+    def test_legacy_cleanup_failure_is_not_reported_as_migrated(self):
+        self.secrets.store(
+            self.session.context,
+            self.session._secret_kind("rock_username"),
+            "rock-user",
+        )
+        self.secrets.store(
+            self.session.context,
+            self.session._secret_kind("rock_password"),
+            "private-password",
+        )
+        self.secrets.fail_clear = True
+
+        with self.assertRaisesRegex(RockSessionError, "secure_storage_failed"):
+            self.session.migrate_legacy_credentials()
+
     def test_http_login_posts_json_and_selects_only_the_rock_cookie(self):
         response = FakeResponse(
             ["Other=ignored; Path=/", ".ROCK=server-session; Path=/; Secure; HttpOnly"]
@@ -161,6 +192,28 @@ class RockSessionTests(unittest.TestCase):
         client = RockSessionHttpClient(FakeOpener(FakeResponse(["Other=value"])))
         with self.assertRaisesRegex(RockSessionError, "invalid_rock_cookie"):
             client.login(DEFAULT_ROCK_ORIGIN, "user", "password")
+
+        attribute_like = RockSessionHttpClient(
+            FakeOpener(FakeResponse(["Other=value; .ROCK=not-a-cookie-pair"]))
+        )
+        with self.assertRaisesRegex(RockSessionError, "invalid_rock_cookie"):
+            attribute_like.login(DEFAULT_ROCK_ORIGIN, "user", "password")
+
+    def test_sign_out_fails_closed_when_keyring_deletion_fails(self):
+        self.session.configure("rock-user", "private-password")
+        self.secrets.fail_clear = True
+
+        with self.assertRaisesRegex(RockSessionError, "secure_storage_failed"):
+            self.session.sign_out()
+
+        self.assertEqual(self.session.status()["state"], "ready")
+        self.assertTrue(self.session.status()["configured"])
+
+    def test_secret_tool_reports_clear_failure(self):
+        store = SecretToolStore("/usr/bin/secret-tool")
+        with patch("subprocess.run") as run:
+            run.return_value.returncode = 1
+            self.assertFalse(store.clear(self.session.context, "rock_password"))
 
 
 if __name__ == "__main__":

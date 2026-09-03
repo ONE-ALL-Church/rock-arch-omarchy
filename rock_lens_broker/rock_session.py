@@ -13,7 +13,7 @@ from typing import Any, Protocol
 from .contracts import Context
 from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, validate_profile_id
-from .secret_store import SecretStore, SecretToolStore
+from .secret_store import SecretStore, SecretStoreError, SecretToolStore
 from .version import HTTP_USER_AGENT
 
 AUTH_COOKIE_IDLE_SECONDS = 15 * 60
@@ -96,10 +96,11 @@ class RockSessionHttpClient:
             if value:
                 values = [str(value)]
         for header in values:
-            for component in header.split(";"):
-                candidate = component.strip()
-                if candidate.startswith(".ROCK="):
-                    return candidate
+            # Set-Cookie carries one cookie-pair followed by attributes. Never
+            # reinterpret an attribute-like component as the session cookie.
+            candidate = header.split(";", 1)[0].strip()
+            if candidate.startswith(".ROCK="):
+                return candidate
         raise RockSessionError("invalid_rock_cookie")
 
 
@@ -198,7 +199,11 @@ class RockSessionProvider:
             self._restore_secret("rock_password", old_password)
             self._clear_cached_cookie()
             raise RockSessionError("secure_storage_failed") from error
-        self._clear_legacy_keys()
+        if not self._clear_legacy_keys():
+            self._restore_secret("rock_username", old_username)
+            self._restore_secret("rock_password", old_password)
+            self._clear_cached_cookie()
+            raise RockSessionError("secure_storage_failed")
         self._store_cached_cookie(cookie)
 
     def migrate_legacy_credentials(self) -> bool:
@@ -207,6 +212,8 @@ class RockSessionProvider:
         if not self.profile_id or not self.origin or not self.secret_store.available():
             return False
         if self._credentials():
+            if not self._clear_legacy_keys():
+                raise RockSessionError("secure_storage_failed")
             return False
         username = self.secret_store.lookup(
             self.context, self._legacy_secret_kind("magnus_username")
@@ -238,30 +245,37 @@ class RockSessionProvider:
         if self._credentials() != (safe_username, safe_password):
             self._clear_current_keys()
             raise RockSessionError("secure_storage_failed")
-        self._clear_legacy_keys()
+        if not self._clear_legacy_keys():
+            raise RockSessionError("secure_storage_failed")
         return True
 
     def sign_out(self) -> None:
-        self._clear_current_keys()
-        self._clear_legacy_keys()
+        cleared_current = self._clear_current_keys()
+        cleared_legacy = self._clear_legacy_keys()
         self._clear_cached_cookie()
+        if not cleared_current or not cleared_legacy:
+            raise RockSessionError("secure_storage_failed")
 
     def remove_profile_credentials(self, profile_id: str) -> None:
         try:
             safe_profile_id = validate_profile_id(profile_id)
         except ProfileError as error:
             raise RockSessionError("invalid_profile") from error
-        for kind in (
-            "rock_username",
-            "rock_password",
-            "magnus_username",
-            "magnus_password",
-        ):
+        results = [
             self.secret_store.clear(
                 self.context, f"{kind}:profile:{safe_profile_id}"
             )
+            for kind in (
+                "rock_username",
+                "rock_password",
+                "magnus_username",
+                "magnus_password",
+            )
+        ]
         if safe_profile_id == self.profile_id:
             self._clear_cached_cookie()
+        if not all(results):
+            raise RockSessionError("secure_storage_failed")
 
     def test_connection(self) -> None:
         self._clear_cached_cookie()
@@ -327,25 +341,44 @@ class RockSessionProvider:
         origin_key = hashlib.sha256(self.origin.encode()).hexdigest()[:16]
         return f"{kind}:{origin_key}"
 
-    def _clear_current_keys(self) -> None:
+    def _clear_current_keys(self) -> bool:
         if not self.profile_id:
-            return
+            return True
+        results: list[bool] = []
         for kind in ("rock_username", "rock_password"):
-            self.secret_store.clear(self.context, self._secret_kind(kind))
+            results.append(
+                self.secret_store.clear(self.context, self._secret_kind(kind))
+            )
+        return all(results)
 
-    def _clear_legacy_keys(self) -> None:
+    def _clear_legacy_keys(self) -> bool:
         if not self.profile_id:
-            return
+            return True
+        results: list[bool] = []
         for kind in ("magnus_username", "magnus_password"):
-            self.secret_store.clear(self.context, self._legacy_secret_kind(kind))
+            results.append(
+                self.secret_store.clear(
+                    self.context, self._legacy_secret_kind(kind)
+                )
+            )
             if self.origin:
-                self.secret_store.clear(self.context, self._origin_secret_kind(kind))
+                results.append(
+                    self.secret_store.clear(
+                        self.context, self._origin_secret_kind(kind)
+                    )
+                )
+        return all(results)
 
-    def _restore_secret(self, kind: str, value: str | None) -> None:
-        if value is None:
-            self.secret_store.clear(self.context, self._secret_kind(kind))
-        else:
+    def _restore_secret(self, kind: str, value: str | None) -> bool:
+        try:
+            if value is None:
+                return self.secret_store.clear(
+                    self.context, self._secret_kind(kind)
+                )
             self.secret_store.store(self.context, self._secret_kind(kind), value)
+            return True
+        except (SecretStoreError, OSError):
+            return False
 
     def _has_cached_cookie(self) -> bool:
         now = time.monotonic()

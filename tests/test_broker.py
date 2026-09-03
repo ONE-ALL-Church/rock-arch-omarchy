@@ -79,6 +79,18 @@ class FakeSession:
             raise RockSessionError("rock_login_required")
 
 
+class FailedRollbackSession(FakeSession):
+    def configure(self, username, password):
+        from rock_lens_broker.rock_session import RockSessionError
+
+        raise RockSessionError("rock_login_failed")
+
+    def remove_profile_credentials(self, profile_id):
+        from rock_lens_broker.rock_session import RockSessionError
+
+        raise RockSessionError("secure_storage_failed")
+
+
 class FakeMagnus:
     def __init__(self, available=False):
         self.available = available
@@ -651,6 +663,29 @@ class BrokerContractTests(unittest.TestCase):
         self.assertNotIn("rock-user", serialized)
         self.assertNotIn("private-password", serialized)
 
+    def test_failed_profile_rollback_returns_stable_error_and_keeps_profile(self):
+        broker = Broker(
+            self.state,
+            session=FailedRollbackSession(False),
+            magnus=FakeMagnus(False),
+            live=FakeLive(),
+            instance_file=self.instance,
+        )
+
+        response = broker.handle(
+            {
+                "op": "profile_add",
+                "name": "Retry cleanup",
+                "domain": "rock.example.org",
+                "username": "rock-user",
+                "password": "private-password",
+            }
+        )
+
+        self.assertEqual(response, {"ok": False, "error": "secure_storage_failed"})
+        profiles = broker.handle({"op": "profiles_status"})["profiles"]
+        self.assertEqual(len(profiles["profiles"]), 1)
+
     def test_profile_lifecycle_and_preferences_are_broker_managed(self):
         session = FakeSession(False)
         magnus = FakeMagnus(False)
@@ -805,6 +840,21 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(
             broker.handle({"op": "open_navigation", "safeId": quick_id})["error"],
             "navigation_requires_prod",
+        )
+
+    def test_recent_links_clear_does_not_claim_success_after_unlink_failure(self):
+        broker = Broker(
+            self.state,
+            session=FakeSession(True),
+            magnus=FakeMagnus(False),
+            live=FakeLive(),
+            instance_file=self.instance,
+        )
+        with patch.object(broker._quick_returns, "clear", return_value=False):
+            response = broker.handle({"op": "recent_links_clear"})
+
+        self.assertEqual(
+            response, {"ok": False, "error": "recent_links_clear_failed"}
         )
 
 

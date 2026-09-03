@@ -304,8 +304,8 @@ class Broker:
             except OriginError:
                 return self._error("invalid_rock_origin")
             except (RockSessionError, ProfileError) as error:
-                if added_profile:
-                    self._rollback_profile_add(added_profile)
+                if added_profile and not self._rollback_profile_add(added_profile):
+                    return self._error("secure_storage_failed")
                 return self._error(str(error))
             self._live.clear()
             return self._ok(
@@ -374,7 +374,8 @@ class Broker:
                 return self._error(str(error))
             return self._profile_response()
         if op == "recent_links_clear":
-            self._quick_returns.clear()
+            if not self._quick_returns.clear():
+                return self._error("recent_links_clear_failed")
             return self._ok(quickReturns=[])
         if op == "magnus_browse":
             if self._context is not Context.PROD:
@@ -731,8 +732,8 @@ class Broker:
             self._session.configure(username, password)
             self._reset_magnus_access()
         except (ProfileError, RockSessionError) as error:
-            if added:
-                self._rollback_profile_add(added, previous)
+            if added and not self._rollback_profile_add(added, previous):
+                return self._error("secure_storage_failed")
             return self._error(str(error))
         self._live.clear()
         return self._profile_response(refreshLive=True)
@@ -741,17 +742,23 @@ class Broker:
         self,
         added: RockProfile,
         previous: RockProfile | None = None,
-    ) -> None:
+    ) -> bool:
         remover = getattr(self._session, "remove_profile_credentials", None)
         if callable(remover):
-            remover(added.profile_id)
+            try:
+                remover(added.profile_id)
+            except RockSessionError:
+                # Keep the profile visible so the user can retry removal. Its
+                # credentials may still exist in Secret Service.
+                return False
         try:
             self._profile_store.remove(added.profile_id)
             if previous:
                 self._profile_store.set_active(previous.profile_id)
         except ProfileError:
-            pass
+            return False
         self._activate_profile(previous)
+        return True
 
     def _profile_remove(self, profile_id: object) -> dict[str, Any]:
         try:
@@ -760,7 +767,8 @@ class Broker:
             if callable(remover):
                 remover(profile.profile_id)
             path = self._quick_return_path(profile.profile_id)
-            QuickReturnStore(path, profile.origin).clear()
+            if not QuickReturnStore(path, profile.origin).clear():
+                return self._error("recent_links_clear_failed")
             self._profile_store.remove(profile.profile_id)
             if profile.profile_id == self._active_profile_id:
                 self._activate_profile(self._profile_store.active())

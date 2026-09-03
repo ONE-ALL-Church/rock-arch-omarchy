@@ -36,6 +36,11 @@ Select **Connect**. The broker verifies the login before saving it to the
 desktop password manager. No Rock administrator setup or client secret is
 required.
 
+Credentials cross the owner-only local socket only in an explicit login
+request and are never returned. The launcher clears its password field
+immediately; if the broker remains unavailable, any unsent credential request
+is purged when the panel closes or the connection attempt times out.
+
 ## Updates
 
 Git installs can be updated safely in place. Omarchy fetches the repository,
@@ -186,6 +191,8 @@ full capability boundary.
 - Native Rock login sends credentials only in a same-origin HTTPS request body,
   rejects redirects, validates the `.ROCK` cookie, and saves credentials only
   after a successful login.
+- Sign-out and credential removal report failure unless Secret Service confirms
+  deletion.
 - Passwords and cookies never enter argv, repository files, logs,
   notifications, or screenshots.
 - PROD never falls back to synthetic results. Without a configured Rock login
@@ -200,6 +207,7 @@ full capability boundary.
   targets and successfully triggered mobile app builds, are capped at 20, are
   visible only in PROD, and are stored under
   `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
+  Clearing them reports an error if the local history file cannot be removed.
 - Magnus mobile-app rows show the time of the last successful deployment that
   Rock Lens initiated for the active profile. Magnus does not provide a global
   deployment timestamp, so builds started elsewhere are not represented.
@@ -207,8 +215,12 @@ full capability boundary.
   Now UI. The sole server-side action is an explicitly confirmed mobile app
   build advertised by the selected Magnus descriptor.
 - Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
-  and traversal paths, uses the same authenticated Rock session, and does not
-  expose write, upload, create, or delete operations.
+  and raw, percent-encoded, or multiply encoded traversal paths, uses the same
+  authenticated Rock session, and does not expose write, upload, create, or
+  delete operations.
+- The broker refuses unsafe or non-socket objects at its runtime socket path;
+  it reclaims only a private, owner-matching stale Unix socket. The plugin uses
+  the absolute system Python path instead of resolving an executable from PATH.
 - Broker errors are reduced to stable public codes. Response bodies,
   cookies, SQL, unselected PII, URLs, and exceptions are not logged or
   forwarded to QML.

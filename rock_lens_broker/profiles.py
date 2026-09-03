@@ -210,7 +210,12 @@ class ProfileStore:
             return self._validated_state(value)
         except ProfileError:
             raise
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (
+            OSError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            RecursionError,
+        ) as error:
             raise ProfileError("profile_store_unavailable") from error
 
     def _write(self, state: dict[str, Any]) -> None:

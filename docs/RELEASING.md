@@ -14,8 +14,8 @@ required.
 
    ```bash
    python3 -m unittest discover -s tests -v
-   uvx ruff check rock_lens_broker tests
-   uvx ty check rock_lens_broker
+   uvx --from ruff==0.16.5 ruff check rock_lens_broker tests
+   uvx --from ty==0.0.78 ty check rock_lens_broker
    python3 -m compileall -q rock_lens_broker
    omarchy plugin validate .
    ```

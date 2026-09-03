@@ -111,6 +111,10 @@ class MagnusAdapterTests(unittest.TestCase):
             ),
             "/FileContent/block-handler/5/content.lava",
         )
+        self.assertEqual(
+            validate_file_path("/FileContent/theme/hello%20world.lava"),
+            "/FileContent/theme/hello%20world.lava",
+        )
         for invalid in (
             "http://rock.example.org",
             "https://user:pass@rock.example.org",
@@ -121,12 +125,19 @@ class MagnusAdapterTests(unittest.TestCase):
         for invalid in (
             "https://attacker.example/tree",
             "api/TriumphTech/Magnus/GetTreeItems/../secrets",
+            "api/TriumphTech/Magnus/GetTreeItems/%2e%2e/secrets",
+            "api/TriumphTech/Magnus/GetTreeItems/%252e%252e/secrets",
             "api/TriumphTech/Magnus/Delete/root",
         ):
             with self.subTest(invalid=invalid), self.assertRaises(MagnusError):
                 validate_tree_path(invalid)
-        with self.assertRaises(MagnusError):
-            validate_file_path("/FileContent/../secrets")
+        for invalid in (
+            "/FileContent/../secrets",
+            "/FileContent/%2e%2e/secrets",
+            "/FileContent/%252e%252e/secrets",
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(MagnusError):
+                validate_file_path(invalid)
 
     def test_probe_is_optional_and_distinguishes_missing_access(self):
         provider = FakeCookieProvider()
@@ -412,6 +423,36 @@ class MagnusAdapterTests(unittest.TestCase):
         post_request, _ = post_opener.calls[0]
         self.assertEqual(post_request.get_method(), "POST")
         self.assertEqual(post_request.data, b"")
+
+    def test_http_client_rejects_unregistered_routes_before_network_access(self):
+        opener = FakeOpener()
+        client = MagnusHttpClient(opener)
+        for path in (
+            "/api/TriumphTech/Magnus/Delete/root",
+            "/api/TriumphTech/Magnus/GetTreeItems/%252e%252e/secrets",
+            "/api/People",
+        ):
+            with self.subTest(path=path), self.assertRaises(MagnusError):
+                client.get_json(
+                    CANONICAL_MAGNUS_SERVER, path, ".ROCK=test-session"
+                )
+        with self.assertRaises(MagnusError):
+            client.post_json(
+                CANONICAL_MAGNUS_SERVER,
+                "/api/TriumphTech/Magnus/Build/Themes",
+                ".ROCK=test-session",
+            )
+        self.assertEqual(opener.calls, [])
+
+    def test_http_client_reports_deep_json_as_a_stable_failure(self):
+        payload = b"[" * 100_000 + b"]" * 100_000
+        client = MagnusHttpClient(FakeOpener(payload))
+        with self.assertRaisesRegex(MagnusError, "invalid_magnus_response"):
+            client.get_json(
+                CANONICAL_MAGNUS_SERVER,
+                MAGNUS_API_PREFIX + "/GetServer",
+                ".ROCK=test-session",
+            )
 
     def test_file_mutation_methods_are_not_exposed(self):
         adapter = MagnusReadOnlyAdapter(FakeCookieProvider(), CANONICAL_MAGNUS_SERVER)

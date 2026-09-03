@@ -82,6 +82,11 @@ class ProfileStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ProfileError, "profile_store_unavailable"):
             store.snapshot()
 
+        self.path.write_bytes(b"[" * 10_000 + b"]" * 10_000)
+        self.path.chmod(0o600)
+        with self.assertRaisesRegex(ProfileError, "profile_store_unavailable"):
+            store.snapshot()
+
 
 if __name__ == "__main__":
     unittest.main()

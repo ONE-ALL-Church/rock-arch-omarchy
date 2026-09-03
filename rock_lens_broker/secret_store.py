@@ -20,7 +20,7 @@ class SecretStore(Protocol):
 
     def store(self, context: Context, kind: str, value: str) -> None: ...
 
-    def clear(self, context: Context, kind: str) -> None: ...
+    def clear(self, context: Context, kind: str) -> bool: ...
 
 
 class SecretToolStore:
@@ -76,11 +76,11 @@ class SecretToolStore:
         if result.returncode != 0:
             raise SecretStoreError("secure_storage_failed")
 
-    def clear(self, context: Context, kind: str) -> None:
+    def clear(self, context: Context, kind: str) -> bool:
         if not self.available():
-            return
+            return False
         try:
-            subprocess.run(
+            result = subprocess.run(
                 [self.executable, "clear", *self._attributes(context, kind)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -88,4 +88,5 @@ class SecretToolStore:
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired):
-            pass
+            return False
+        return result.returncode == 0

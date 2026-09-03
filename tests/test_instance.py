@@ -45,6 +45,13 @@ class InstanceTests(unittest.TestCase):
             path.chmod(0o600)
             self.assertIsNone(InstanceStore(path).get())
 
+    def test_deep_instance_json_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "instance.json"
+            path.write_bytes(b"[" * 1_500 + b"]" * 1_500)
+            path.chmod(0o600)
+            self.assertIsNone(InstanceStore(path).get())
+
 
 if __name__ == "__main__":
     unittest.main()

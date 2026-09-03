@@ -41,7 +41,7 @@ class InstanceStore:
             value = json.loads(raw)
             origin = value.get("origin") if isinstance(value, dict) else None
             return validate_rock_origin(origin)
-        except (OSError, OriginError, json.JSONDecodeError):
+        except (OSError, OriginError, json.JSONDecodeError, RecursionError):
             return None
 
     def set(self, value: object) -> str:

@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from rock_lens_broker.navigation import NavigationTarget
 from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
@@ -141,6 +142,13 @@ class QuickReturnTests(unittest.TestCase):
         self.path.chmod(0o600)
         self.assertEqual(self.store.public_items(), [])
 
+    def test_deep_history_json_fails_closed(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_bytes(b"[" * 10_000 + b"]" * 10_000)
+        self.path.chmod(0o600)
+
+        self.assertEqual(self.store.public_items(), [])
+
     def test_permissive_store_is_rejected(self):
         self.store.add(
             NavigationTarget(
@@ -163,9 +171,24 @@ class QuickReturnTests(unittest.TestCase):
             )
         )
         self.assertTrue(self.path.exists())
-        self.store.clear()
+        self.assertTrue(self.store.clear())
         self.assertFalse(self.path.exists())
         self.assertEqual(self.store.public_items(), [])
+
+    def test_clear_reports_an_unlink_failure(self):
+        self.store.add(
+            NavigationTarget(
+                "People",
+                "Page",
+                50,
+                DEFAULT_ROCK_ORIGIN + "/page/12",
+            )
+        )
+
+        with patch.object(Path, "unlink", side_effect=PermissionError):
+            self.assertFalse(self.store.clear())
+
+        self.assertTrue(self.path.exists())
 
 
 if __name__ == "__main__":

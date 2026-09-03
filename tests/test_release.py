@@ -46,6 +46,21 @@ class ReleaseContractTests(unittest.TestCase):
         main = (ROOT / "rock_lens_broker/__main__.py").read_text(encoding="utf-8")
         self.assertNotIn('sys.argv[1] == "configure"', main)
 
+    def test_ci_dependencies_and_broker_interpreter_are_pinned(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        qml = (ROOT / "plugin/oneall.rock-lens/RockLens.qml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertNotIn("uses: actions/checkout@v", workflow)
+        self.assertNotIn("uses: actions/setup-python@v", workflow)
+        self.assertNotIn("uses: astral-sh/setup-uv@v", workflow)
+        self.assertIn("uvx --from ruff==", workflow)
+        self.assertIn("uvx --from ty==", workflow)
+        self.assertIn(
+            'command: ["/usr/bin/python3", "-m", "rock_lens_broker"]', qml
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

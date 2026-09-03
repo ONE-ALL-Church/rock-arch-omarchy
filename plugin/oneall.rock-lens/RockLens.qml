@@ -109,6 +109,20 @@ Panel {
     else brokerReconnectTimer.restart()
   }
 
+  function isCredentialRequest(payload) {
+    return payload && (payload.op === "rock_configure" ||
+      payload.op === "profile_add" ||
+      payload.op === "profile_credentials_update")
+  }
+
+  function dropQueuedCredentialRequests() {
+    var retained = []
+    for (var index = 0; index < requestQueue.length; index++)
+      if (!isCredentialRequest(requestQueue[index])) retained.push(requestQueue[index])
+    requestQueue = retained
+    setupPassword = ""
+  }
+
   function flushRequests() {
     if (!brokerSocket.connected || !requestQueue.length) return
     while (brokerSocket.connected && requestQueue.length) {
@@ -193,6 +207,8 @@ Panel {
       return "Magnus couldn't start the deployment. Try again."
     if (code === "clipboard_unavailable")
       return "The clipboard isn't available right now."
+    if (code === "recent_links_clear_failed")
+      return "Recent Links couldn't be cleared from this computer. Try again."
     if (code === "not_found" || code === "magnus_item_not_found")
       return "That item is no longer available. Refresh and try again."
     if (!code) return "That action didn't finish. Try again."
@@ -1089,11 +1105,14 @@ Panel {
     refreshPersonalLinks()
   }
 
-  onOpenedChanged: if (opened) resetPanel()
+  onOpenedChanged: {
+    if (opened) resetPanel()
+    else dropQueuedCredentialRequests()
+  }
 
   Process {
     id: brokerProcess
-    command: ["python3", "-m", "rock_lens_broker"]
+    command: ["/usr/bin/python3", "-m", "rock_lens_broker"]
     workingDirectory: root.packageRoot
     running: true
     onStarted: if (root.requestQueue.length) brokerReconnectTimer.restart()
@@ -1135,6 +1154,7 @@ Panel {
     id: setupTimeoutTimer
     interval: 18000
     onTriggered: if (root.setupBusy) {
+      root.dropQueuedCredentialRequests()
       root.finishSetup()
       root.pendingSuccessText = ""
       root.feedbackText = "Rock did not respond. Check the connection and try again."

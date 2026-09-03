@@ -93,6 +93,18 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("function completeOnboarding()", source)
         self.assertIn('"profile_add" : "rock_configure"', source)
 
+    def test_unsent_credentials_are_purged_from_the_retry_queue(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("function dropQueuedCredentialRequests()", source)
+        self.assertIn("if (!isCredentialRequest(requestQueue[index]))", source)
+        self.assertIn(
+            "else dropQueuedCredentialRequests()",
+            source,
+        )
+        timeout = source[source.index("id: setupTimeoutTimer") :]
+        self.assertIn("root.dropQueuedCredentialRequests()", timeout[:500])
+
     def test_tab_ring_includes_settings_in_both_directions(self):
         source = QML_PATH.read_text(encoding="utf-8")
 

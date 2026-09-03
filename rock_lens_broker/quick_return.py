@@ -106,13 +106,14 @@ class QuickReturnStore:
                     return None
         return None
 
-    def clear(self) -> None:
+    def clear(self) -> bool:
         """Clear the active profile's local history."""
 
         try:
             self.path.unlink(missing_ok=True)
         except OSError:
-            return
+            return False
+        return True
 
     def migrate_from(self, path: Path) -> None:
         """Copy validated legacy history while retaining the source as rollback."""
@@ -148,7 +149,7 @@ class QuickReturnStore:
             finally:
                 os.close(descriptor)
             value = json.loads(raw)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError):
             return []
         if not isinstance(value, list):
             return []

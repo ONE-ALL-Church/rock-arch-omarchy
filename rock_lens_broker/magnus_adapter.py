@@ -92,20 +92,46 @@ def validate_magnus_server(value: str) -> str:
         raise MagnusError("magnus_server_not_allowed") from error
 
 
+def _decoded_path_for_validation(path: str) -> str:
+    """Decode nested escapes before checking route and traversal boundaries."""
+
+    decoded = path
+    for _ in range(10):
+        try:
+            candidate = urllib.parse.unquote(decoded, errors="strict")
+        except UnicodeDecodeError as error:
+            raise MagnusError("invalid_magnus_path") from error
+        if candidate == decoded:
+            break
+        decoded = candidate
+    else:
+        raise MagnusError("invalid_magnus_path")
+    # A remaining percent sign is malformed or escaped beyond the decode cap.
+    if "%" in decoded:
+        raise MagnusError("invalid_magnus_path")
+    return decoded
+
+
 def validate_tree_path(value: str) -> str:
     path = value.strip().lstrip("/")
+    decoded = _decoded_path_for_validation(path)
     if (
         not path.startswith(TREE_PATH_PREFIX)
+        or not decoded.startswith(TREE_PATH_PREFIX)
         or len(path) == len(TREE_PATH_PREFIX)
         or "://" in path
         or "?" in path
         or "#" in path
         or "\\" in path
+        or "://" in decoded
+        or "?" in decoded
+        or "#" in decoded
+        or "\\" in decoded
         or len(path) > 800
-        or any(ord(char) < 32 for char in path)
+        or any(ord(char) < 32 for char in decoded)
     ):
         raise MagnusError("invalid_magnus_tree_path")
-    if any(part in ("", ".", "..") for part in PurePosixPath(path).parts):
+    if any(part in ("", ".", "..") for part in PurePosixPath(decoded).parts):
         raise MagnusError("invalid_magnus_tree_path")
     return path
 
@@ -114,20 +140,42 @@ def validate_file_path(value: str) -> str:
     path = value.strip()
     if path.startswith(MAGNUS_API_PREFIX + FILE_PATH_PREFIX):
         path = path.removeprefix(MAGNUS_API_PREFIX)
+    decoded = _decoded_path_for_validation(path)
     if (
         not path.startswith(FILE_PATH_PREFIX)
+        or not decoded.startswith(FILE_PATH_PREFIX)
         or len(path) == len(FILE_PATH_PREFIX)
         or "://" in path
         or "?" in path
         or "#" in path
         or "\\" in path
+        or "://" in decoded
+        or "?" in decoded
+        or "#" in decoded
+        or "\\" in decoded
         or len(path) > 800
-        or any(ord(char) < 32 for char in path)
+        or any(ord(char) < 32 for char in decoded)
     ):
         raise MagnusError("invalid_magnus_file_path")
-    if any(part in (".", "..") for part in PurePosixPath(path).parts):
+    if any(part in (".", "..") for part in PurePosixPath(decoded).parts):
         raise MagnusError("invalid_magnus_file_path")
     return path
+
+
+def _validate_http_path(path: str, method: str) -> None:
+    if method == "GET" and path == MAGNUS_API_PREFIX + "/GetServer":
+        return
+    if method == "GET" and path.startswith("/" + TREE_PATH_PREFIX):
+        validate_tree_path(path.lstrip("/"))
+        return
+    if method == "GET" and path.startswith(MAGNUS_API_PREFIX + FILE_PATH_PREFIX):
+        validate_file_path(path)
+        return
+    if method == "POST" and path.startswith(MOBILE_APP_BUILD_PREFIX):
+        app_id = path.removeprefix(MOBILE_APP_BUILD_PREFIX)
+        if app_id.isdigit() and int(app_id) > 0 and "/" not in app_id:
+            return
+    raise MagnusError("invalid_magnus_path")
 
 
 class MagnusHttpClient:
@@ -140,7 +188,7 @@ class MagnusHttpClient:
         raw = self._get(origin, path, cookie, MAX_TREE_OUTPUT_BYTES)
         try:
             return json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
             raise MagnusError("invalid_magnus_response") from error
 
     def get_bytes(self, origin: str, path: str, cookie: str) -> bytes:
@@ -152,7 +200,7 @@ class MagnusHttpClient:
         )
         try:
             return json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
             raise MagnusError("invalid_magnus_response") from error
 
     def _get(self, origin: str, path: str, cookie: str, maximum: int) -> bytes:
@@ -178,6 +226,7 @@ class MagnusHttpClient:
             or any(ord(char) < 32 for char in path)
         ):
             raise MagnusError("invalid_magnus_path")
+        _validate_http_path(path, method)
         if (
             not isinstance(cookie, str)
             or not cookie.startswith(".ROCK=")

@@ -3,6 +3,24 @@
 Rock Lens follows [Semantic Versioning](https://semver.org/). The GitHub
 repository's default branch is the source used by Omarchy plugin updates.
 
+## [Unreleased]
+
+### Security
+
+- Fail closed when Secret Service cannot delete profile credentials or legacy
+  records during migration.
+- Reject raw, percent-encoded, and multiply encoded Magnus traversal plus every
+  HTTP route outside the explicit read/build allowlist.
+- Refuse unsafe runtime socket objects and revalidate stale sockets before
+  unlinking them.
+- Purge unsent QML credential requests on connection timeout or panel close.
+- Report local Recent Links deletion failures instead of presenting stale
+  history as cleared.
+- Treat excessively nested local or remote JSON as a stable fail-closed error.
+- Return a bounded public error when a socket request exceeds the stream limit.
+- Pin CI actions and lint/type-check tool versions to immutable revisions.
+- Launch the broker with the absolute system Python path.
+
 ## [0.14.0] - 2026-09-02
 
 ### Changed

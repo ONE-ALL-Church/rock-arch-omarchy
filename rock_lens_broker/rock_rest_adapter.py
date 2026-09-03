@@ -128,7 +128,7 @@ class RockRestHttpClient:
             raise RockRestError("rock_response_out_of_bounds")
         try:
             return json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
             raise RockRestError("invalid_rock_response") from error
 
 

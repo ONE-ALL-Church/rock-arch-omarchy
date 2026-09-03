@@ -110,6 +110,12 @@ class RockRestAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(RockRestError, "out_of_bounds"):
             oversized.get_json("/api/People", {}, ".ROCK=test-session")
 
+    def test_http_client_reports_deep_json_as_a_stable_failure(self):
+        payload = b"[" * 100_000 + b"]" * 100_000
+        client = RockRestHttpClient(FakeOpener(payload))
+        with self.assertRaisesRegex(RockRestError, "invalid_rock_response"):
+            client.get_json("/api/People", {}, ".ROCK=test-session")
+
     def test_search_uses_only_fixed_get_specs_and_opaque_results(self):
         http = FakeHttp(
             {
