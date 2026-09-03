@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.25.3` release boundary. Historical feature
+This record describes the current `0.25.4` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 190 passing tests. Release-contract coverage keeps
+The suite contains 191 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.

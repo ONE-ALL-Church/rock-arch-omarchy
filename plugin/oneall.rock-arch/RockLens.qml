@@ -38,7 +38,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.25.3"
+  property string currentVersion: "0.25.4"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -157,7 +157,7 @@ Panel {
   implicitHeight: preferenceShowMenuBar ? button.implicitHeight : 0
   function request(payload) {
     var next = []
-    var coalesce = payload.op === "search" || payload.op === "knowledge_search" ||
+    var coalesce = payload.op === "search" || payload.op === "knowledge_search" || payload.op === "search_capabilities" ||
       payload.op === "status" || payload.op === "navigation_status"
     for (var index = 0; index < requestQueue.length; index++) {
       var queued = requestQueue[index]
@@ -342,7 +342,6 @@ Panel {
   function onboardingCategoryEnabled(category) {
     return onboardingEnabledCategories.indexOf(category) >= 0
   }
-
   function toggleOnboardingCategory(category) {
     var next = []
     for (var index = 0; index < onboardingEnabledCategories.length; index++)
@@ -359,7 +358,6 @@ Panel {
     onboardingAutomaticUpdates = preferenceAutomaticUpdates
     onboardingSetupPrepared = true
   }
-
   function toggleCategory(category) {
     var next = []
     for (var index = 0; index < enabledCategories.length; index++)
@@ -369,7 +367,6 @@ Panel {
     request({op: "preferences_update", preferences: {enabledCategories: next}})
     if (viewMode === "search") scheduleSearch()
   }
-
   function scopeLabelForKey(key) {
     return SearchScopes.labelForKey(key)
   }
@@ -1695,6 +1692,9 @@ Panel {
     }
     onError: function(error) {
       connected = false
+      if (root.searchCapabilitiesInFlight) {
+        root.searchCapabilitiesInFlight = false; root.searchCapabilitiesState = "unknown"; root.probeSearchCapabilities(false)
+      }
       if (root.requestQueue.length) brokerReconnectTimer.restart()
     }
     parser: SplitParser { onRead: function(line) { root.accept(line) } }

@@ -260,6 +260,17 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("controller.availableCategoryOptions()", finish)
         self.assertIn('text: "Check again"', settings)
 
+    def test_socket_failure_requeues_an_in_flight_capability_probe(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        error_handler = source[source.index("onError: function(error)") :]
+        error_handler = error_handler[:600]
+
+        self.assertIn('payload.op === "search_capabilities"', source)
+        self.assertIn("if (root.searchCapabilitiesInFlight)", error_handler)
+        self.assertIn("root.searchCapabilitiesInFlight = false", error_handler)
+        self.assertIn('root.searchCapabilitiesState = "unknown"', error_handler)
+        self.assertIn("root.probeSearchCapabilities(false)", error_handler)
+
     def test_existing_profiles_have_a_keyboard_accessible_rename_form(self):
         source = all_qml_source()
 

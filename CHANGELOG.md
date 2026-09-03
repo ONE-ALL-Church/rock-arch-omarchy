@@ -5,6 +5,13 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.25.4] - 2026-09-03
+
+### Fixed
+
+- Retry account search-capability detection after a broker socket interruption
+  instead of leaving Search indefinitely on its checking state.
+
 ## [0.25.3] - 2026-09-03
 
 ### Security
