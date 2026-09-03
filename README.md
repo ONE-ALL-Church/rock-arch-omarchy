@@ -238,7 +238,8 @@ full capability boundary.
   cookies, SQL, unselected PII, URLs, and exceptions are not logged or
   forwarded to QML.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+See [docs/DESIGN.md](docs/DESIGN.md),
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and
 [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 ## Development

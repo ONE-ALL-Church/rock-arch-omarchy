@@ -5,6 +5,26 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-03
+
+### Changed
+
+- Rebuilt every Rock Arch surface around the current Omarchy shell design
+  system: first-party panel geometry, hero anatomy, theme typography, semantic
+  spacing, native controls, separators, and cursor/focus states.
+- Reduced the panel to the same compact width and height used by the official
+  Basecamp and HEY Omarchy plugins, with profile identity moved into the hero
+  and persistent tutorial copy removed from the footer.
+- Simplified Search, Recent Links, Personal Links, and Magnus into consistent
+  title-and-metadata rows with restrained selection chrome and clearer empty,
+  loading, preview, and production-build states.
+- Reorganized Settings into four clear groups: profiles, preferences, search
+  categories, and updates. Replaced platform-default checkboxes with Omarchy
+  toggle rows and selected category buttons.
+- Added a documented Rock Arch design system grounded in the official Omarchy
+  shell, Basecamp-owned plugins, desktop HIG guidance, and visible-focus
+  requirements.
+
 ## [0.16.2] - 2026-09-03
 
 ### Fixed
@@ -122,6 +142,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.17.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.17.0
 [0.16.2]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.2
 [0.16.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.1
 [0.16.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.0

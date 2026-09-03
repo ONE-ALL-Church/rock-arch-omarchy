@@ -1,5 +1,5 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as QQC
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -34,7 +34,7 @@ Panel {
   property bool preferenceAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.16.2"
+  property string currentVersion: "0.17.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -244,44 +244,12 @@ Panel {
   function guidanceText() {
     if (setupBusy)
       return setupSlow ? setupBusyText + " Rock is taking longer than usual." : setupBusyText
-    if (pendingClearRecent)
-      return "Press Enter to clear Recent Links, or Esc to cancel."
     if ((contextName === "DEV" || rockConfigured) && searchInFlight)
       return "Looking for matches…"
     if (!statusLoaded) return "Getting your Rock workspace ready…"
-    if (contextName === "PROD" && !rockConfigured)
-      return "Sign in from Settings to search Rock."
-    if (viewMode === "settings")
-      return updateState === "updating" ?
-        "The update is running through Omarchy. Rock Arch will restart when it finishes." :
-        "Changes save automatically. Press Esc to return to Search."
-    if (viewMode === "personal")
-      return personalLinks.length ?
-        "Use Up/Down to choose a Personal Link. Enter opens it in Rock." :
-        (showMagnus ?
-          "Press Tab for Magnus; Shift+Tab returns to Search." :
-          "Press Tab for Settings; Shift+Tab returns to Search.")
-    if (viewMode === "magnus") {
-      if (pendingMagnusBuildId !== "")
-        return "Press Enter to deploy, or Esc to cancel."
-      if (magnusPreview)
-        return "D downloads · C copies · H copies the hash · O opens in Rock · R refreshes"
-      if (magnusCursor >= 0 && magnusCursor < magnusItems.length) {
-        var item = magnusItems[magnusCursor]
-        if (item.actions && item.actions.indexOf("build") >= 0)
-          return "Press B to prepare this deployment, then Enter to confirm."
-      }
-      return "Use Up/Down to choose an item. Enter opens it; R refreshes."
-    }
-    if (scopeKey)
-      return "Showing " + scopeLabel + " only. Esc returns to all categories."
-    if (showRecentLinks)
-      return quickReturns.length ?
-        "Start typing to search, or use Up/Down and Enter to open a recent item. X or Delete clears the list." :
-        (contextName === "PROD" ?
-          "Start typing to search Rock. Opened items will appear here." :
-          "Start typing to search preview data.")
-    return "Narrow results with p:, g:, w:, j:, pg:, or c:. Any ID or GUID checks every category."
+    if (updateState === "updating")
+      return "Installing the update… Rock Arch will restart when it finishes."
+    return ""
   }
 
   function categoryEnabled(category) {
@@ -1294,8 +1262,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: root.onboardingRequired ? onboardingForm.profileNameField : searchField
-    contentWidth: panel.fittedContentWidth(Style.space(520))
-    contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
+    contentWidth: panel.fittedContentWidth(Style.space(430))
+    contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(600))
 
     RockLensKeyCatcher {
       id: keyCatcher
@@ -1319,7 +1287,14 @@ Panel {
       Column {
         id: content
         width: parent.width
-        spacing: Style.spacing.sm
+        spacing: Style.spacing.panelGap
+
+        RockLensHero {
+          width: parent.width
+          controller: root
+        }
+
+        PanelSeparator {}
 
         RockLensNavigationTabs {
           width: parent.width
@@ -1336,7 +1311,9 @@ Panel {
             Layout.fillWidth: true
             enabled: root.contextName === "DEV" || (root.statusLoaded && root.rockConfigured)
             maximumLength: 120
-            placeholderText: root.contextName === "PROD" && root.statusLoaded && !root.rockConfigured ? "Save a Rock login to search" : "Search Rock… (try g: name or ID)"
+            placeholderText: root.contextName === "PROD" && root.statusLoaded && !root.rockConfigured
+              ? "Sign in to search Rock"
+              : "Search Rock…  g: groups · p: people"
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {
@@ -1369,59 +1346,66 @@ Panel {
             }
           }
 
-          Rectangle {
+          Button {
             visible: root.scopeKey !== ""
-            Layout.preferredWidth: scopeBadgeLabel.implicitWidth + 20
             Layout.preferredHeight: searchField.implicitHeight
-            radius: 7
-            color: Style.selectedFillFor(Color.foreground, Color.accent)
-            Text {
-              id: scopeBadgeLabel
-              anchors.centerIn: parent
-              text: root.scopeLabel
-              color: Color.foreground
-              font.bold: true
-            }
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.clearScope()
-            }
+            text: root.scopeLabel + "  ×"
+            tooltipText: "Clear category filter · Alt+0"
+            selected: true
+            bordered: true
+            fontSize: Style.font.caption
+            horizontalPadding: Style.spacing.lg
+            focusable: false
+            onClicked: root.clearScope()
           }
-        }
-        Text {
-          visible: !root.onboardingRequired
-          width: parent.width
-          text: root.connectionText
-          color: Color.foreground
-          opacity: 0.58
-          font.pixelSize: Style.font.bodySmall
-          textFormat: Text.PlainText
-          elide: Text.ElideRight
         }
 
         Column {
           visible: !root.onboardingRequired && root.viewMode !== "settings" && root.contextName === "PROD" && !root.rockConfigured
           width: content.width
           height: visible ? implicitHeight : 0
-          spacing: Style.spacing.sm
+          topPadding: Style.spacing.xxxl
+          bottomPadding: Style.spacing.huge
+          spacing: Style.spacing.labelGap
           Text {
             width: parent.width
-            text: root.profiles.length ? "This profile is signed out. Update its login in Settings." : "Add a Rock profile to begin live search."
+            text: root.profiles.length ? "This profile is signed out" : "Connect Rock to begin"
+            horizontalAlignment: Text.AlignHCenter
             color: Color.foreground
-            opacity: 0.65
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            font.weight: Font.DemiBold
+            wrapMode: Text.WordWrap
+            textFormat: Text.PlainText
+          }
+          Text {
+            width: parent.width
+            text: root.profiles.length
+              ? "Update the saved login to search and open links."
+              : "Add a profile with the Rock website and account to use."
+            horizontalAlignment: Text.AlignHCenter
+            color: Qt.darker(Color.foreground, 1.4)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
             wrapMode: Text.WordWrap
             textFormat: Text.PlainText
           }
           Button {
+            anchors.horizontalCenter: parent.horizontalCenter
             text: root.profiles.length ? "Open Settings" : "Add Rock profile"
+            bordered: true
+            focusable: true
             onClicked: root.openSettings(root.profiles.length === 0)
           }
         }
 
         Flickable {
           id: panelFlick
-          readonly property real maximumHeight: Style.space(root.onboardingRequired ? 340 : (root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 420)))
+          readonly property real maximumHeight: Style.space(root.onboardingRequired
+            ? 420
+            : (root.viewMode === "settings"
+              ? 440
+              : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 400)))
           width: content.width
           height: Math.min(maximumHeight, Math.max(Style.space(72), body.implicitHeight))
           contentWidth: width
@@ -1429,12 +1413,12 @@ Panel {
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           interactive: contentHeight > height
-          ScrollBar.vertical: ScrollBar {}
+          QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
 
           Column {
             id: body
             width: parent.width
-            spacing: Style.spacing.sm
+            spacing: Style.spacing.rowGap
 
             RockLensLoginPanel {
               id: onboardingForm
@@ -1478,8 +1462,11 @@ Panel {
           visible: text.length > 0
           width: parent.width
           text: root.feedbackText || (root.onboardingRequired ? "" : root.guidanceText())
-          color: Color.foreground
-          opacity: 0.55
+          color: root.feedbackText && root.feedbackText.indexOf("couldn't") >= 0
+            ? Color.urgent
+            : Qt.darker(Color.foreground, 1.4)
+          font.family: Style.font.family
+          font.pixelSize: Style.font.bodySmall
           wrapMode: Text.WordWrap
           textFormat: Text.PlainText
         }

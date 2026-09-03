@@ -1,106 +1,201 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Ui
 
 Column {
   id: searchPanel
+
   required property var controller
   required property var searchField
   property alias resultRepeater: resultRepeater
   property alias quickReturnRepeater: quickReturnRepeater
   property alias clearButton: clearRecentButton
   property alias buildConfirmButton: recentBuildConfirmButton
+  readonly property color dim: Qt.darker(Color.foreground, 1.4)
 
   height: visible ? implicitHeight : 0
-  spacing: Style.spacing.sm
+  spacing: Style.spacing.rowGap
 
   Column {
     visible: !searchPanel.controller.showRecentLinks
     width: searchPanel.width
     height: visible ? implicitHeight : 0
-    spacing: Style.spacing.sm
+    spacing: Style.spacing.rowGap
 
     Repeater {
       id: resultRepeater
       model: searchPanel.controller.results
-      delegate: Rectangle {
+
+      delegate: Item {
         id: resultRow
+
         required property var modelData
         required property int index
         readonly property bool rowSelected: resultRow.index === searchPanel.controller.resultCursor ||
-          (searchPanel.controller.resultCursor < 0 && resultRow.index === 0 && searchPanel.searchField.activeFocus && searchPanel.controller.results.length > 0)
+          (searchPanel.controller.resultCursor < 0 && resultRow.index === 0 &&
+            searchPanel.searchField.activeFocus && searchPanel.controller.results.length > 0)
+
         width: searchPanel.width
-        height: Style.space(52)
-        radius: 7
-        color: "transparent"
+        height: Style.space(54)
         clip: true
-        RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
+
+        RockLensSelectionChrome {
+          anchors.fill: parent
+          selected: resultRow.rowSelected
+        }
+
         Column {
           anchors.left: parent.left
           anchors.right: openButton.visible ? openButton.left : parent.right
           anchors.verticalCenter: parent.verticalCenter
-          anchors.leftMargin: 16
-          anchors.rightMargin: 10
-          Text { width: parent.width; text: resultRow.modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-          Text { width: parent.width; text: searchPanel.controller.displayCategory(resultRow.modelData.category) + " · " + resultRow.modelData.subtitle + " · " + resultRow.modelData.status; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
+          anchors.leftMargin: Style.spacing.rowPaddingX
+          anchors.rightMargin: Style.spacing.rowPaddingX
+          spacing: Style.spacing.xxs
+
+          Text {
+            width: parent.width
+            text: resultRow.modelData.title
+            textFormat: Text.PlainText
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+          }
+
+          Text {
+            width: parent.width
+            text: searchPanel.controller.displayCategory(resultRow.modelData.category) +
+              " · " + resultRow.modelData.subtitle + " · " + resultRow.modelData.status
+            textFormat: Text.PlainText
+            color: searchPanel.dim
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
         }
+
         MouseArea {
           anchors.fill: parent
+          anchors.rightMargin: openButton.visible ? openButton.width + Style.spacing.sm : 0
+          cursorShape: Qt.PointingHandCursor
           onClicked: {
             searchPanel.controller.selectResult(resultRow.index)
             if (resultRow.modelData.category === "People")
               searchPanel.controller.request({op: "person_quick_look", safeId: resultRow.modelData.safeId})
           }
+          onDoubleClicked: {
+            searchPanel.controller.resultCursor = resultRow.index
+            searchPanel.controller.activateResult(resultRow.index)
+          }
         }
-        Rectangle {
+
+        Button {
           id: openButton
-          visible: resultRow.modelData.canOpen === true && searchPanel.controller.contextName === "PROD" && resultRow.index === searchPanel.controller.resultCursor
-          width: visible ? Style.space(54) : 0
-          height: Style.space(32)
+          visible: resultRow.modelData.canOpen === true &&
+            searchPanel.controller.contextName === "PROD" && resultRow.rowSelected
           anchors.right: parent.right
-          anchors.rightMargin: 7
+          anchors.rightMargin: Style.spacing.sm
           anchors.verticalCenter: parent.verticalCenter
-          radius: 6
-          color: "#14532d"
+          text: "Open"
+          tooltipText: "Open in Rock · Enter"
+          fontSize: Style.font.caption
+          bordered: true
+          focusable: false
           z: 2
-          Text { anchors.centerIn: parent; text: "Open"; color: "white"; font.bold: true }
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              searchPanel.controller.resultCursor = resultRow.index
-              searchPanel.controller.request({op: "open_navigation", safeId: resultRow.modelData.safeId})
-            }
+          onClicked: {
+            searchPanel.controller.resultCursor = resultRow.index
+            searchPanel.controller.request({op: "open_navigation", safeId: resultRow.modelData.safeId})
           }
         }
       }
     }
 
-    Text {
+    Column {
       visible: searchPanel.controller.results.length === 0
-      width: searchPanel.width
-      text: searchPanel.controller.contextName === "PROD" && !searchPanel.controller.rockConfigured ? "Live results stay empty until a Rock login is saved." : "No matching results."
-      color: Color.foreground
-      opacity: 0.6
-      wrapMode: Text.WordWrap
+      width: parent.width
+      topPadding: Style.spacing.xxxl
+      bottomPadding: Style.spacing.huge
+      spacing: Style.spacing.labelGap
+
+      Text {
+        width: parent.width
+        text: searchPanel.controller.contextName === "PROD" && !searchPanel.controller.rockConfigured
+          ? "Rock login required"
+          : "No matching results"
+        textFormat: Text.PlainText
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        font.weight: Font.DemiBold
+        horizontalAlignment: Text.AlignHCenter
+      }
+
+      Text {
+        width: parent.width
+        text: searchPanel.controller.contextName === "PROD" && !searchPanel.controller.rockConfigured
+          ? "Open Settings to sign in."
+          : "Try a name, ID, GUID, or category prefix."
+        textFormat: Text.PlainText
+        color: searchPanel.dim
+        font.family: Style.font.family
+        font.pixelSize: Style.font.bodySmall
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
+      }
     }
 
-    Rectangle {
+    BorderSurface {
       visible: searchPanel.controller.quickLook !== null
-      width: searchPanel.width
-      height: visible ? Style.space(100) : 0
-      radius: 9
-      color: Style.selectedFillFor(Color.foreground, Color.accent)
+      width: parent.width
+      implicitHeight: quickLookContent.implicitHeight + Style.spacing.rowPaddingX * 2
+      color: Style.normalFillFor(Color.foreground, Color.accent)
+      borderSpec: Border.controlSpec("normal", Color.foreground, Color.accent)
+      radius: Style.cornerRadius
+
       Column {
-        anchors.fill: parent
-        anchors.margins: 12
-        spacing: 4
-        Text { text: searchPanel.controller.quickLook ? searchPanel.controller.quickLook.displayName : ""; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true; textFormat: Text.PlainText }
-        Text { text: searchPanel.controller.quickLook ? searchPanel.controller.quickLook.subtitle : ""; color: Color.foreground; textFormat: Text.PlainText }
-        Text { text: searchPanel.controller.quickLook ? searchPanel.controller.quickLook.campus : ""; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText }
+        id: quickLookContent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: Style.spacing.rowPaddingX
+        anchors.rightMargin: Style.spacing.rowPaddingX
+        spacing: Style.spacing.xxs
+
+        Text {
+          width: parent.width
+          text: searchPanel.controller.quickLook ? searchPanel.controller.quickLook.displayName : ""
+          textFormat: Text.PlainText
+          color: Color.foreground
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          font.weight: Font.DemiBold
+          elide: Text.ElideRight
+        }
+
+        Text {
+          width: parent.width
+          text: searchPanel.controller.quickLook ? searchPanel.controller.quickLook.subtitle : ""
+          textFormat: Text.PlainText
+          color: searchPanel.dim
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+
+        Text {
+          visible: text !== ""
+          width: parent.width
+          text: searchPanel.controller.quickLook ? searchPanel.controller.quickLook.campus : ""
+          textFormat: Text.PlainText
+          color: searchPanel.dim
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
       }
     }
   }
@@ -109,65 +204,112 @@ Column {
     visible: searchPanel.controller.showRecentLinks
     width: searchPanel.width
     height: visible ? implicitHeight : 0
-    spacing: Style.spacing.sm
+    spacing: Style.spacing.rowGap
 
     RowLayout {
       width: parent.width
-      Text {
-        text: "Recent Links"
-        color: Color.foreground
-        font.pixelSize: Style.font.heading
-        font.bold: true
+
+      PanelSectionHeader {
+        text: "RECENT LINKS"
+        Layout.fillWidth: true
       }
-      Item { Layout.fillWidth: true }
+
       Button {
         id: clearRecentButton
-        Layout.preferredHeight: Style.space(30)
         visible: searchPanel.controller.contextName === "PROD"
-        text: searchPanel.controller.pendingClearRecent ? "Confirm clear" : "X · Clear"
-        activeFocusOnTab: enabled
+        text: searchPanel.controller.pendingClearRecent ? "Confirm clear" : "Clear"
+        tooltipText: "Clear Recent Links · X"
+        foreground: searchPanel.controller.pendingClearRecent ? Color.urgent : Color.foreground
+        bordered: searchPanel.controller.pendingClearRecent
+        focusable: true
+        fontSize: Style.font.caption
+        horizontalPadding: Style.spacing.lg
+        verticalPadding: Style.spacing.xs
         enabled: searchPanel.controller.quickReturns.length > 0 && !searchPanel.controller.setupBusy
-        background: Rectangle {
-          radius: 6
-          color: searchPanel.controller.pendingClearRecent ? "#7f1d1d" :
-            Style.selectedFillFor(Color.foreground, Color.accent)
-        }
         KeyNavigation.tab: clearRecentButton
         KeyNavigation.backtab: clearRecentButton
         onActiveFocusChanged: searchPanel.controller.revealFocusedControl(clearRecentButton)
         onClicked: searchPanel.controller.clearRecentLinks()
       }
     }
-    Text {
+
+    Column {
       visible: searchPanel.controller.quickReturns.length === 0
-      width: searchPanel.width
-      text: searchPanel.controller.contextName === "PROD" ?
-        "Items opened from Rock Arch will appear here (up to 20)." :
-        "Recent Links are available in PROD. Start typing to search preview data."
-      color: Color.foreground
-      opacity: 0.6
-      wrapMode: Text.WordWrap
+      width: parent.width
+      topPadding: Style.spacing.xxxl
+      bottomPadding: Style.spacing.huge
+      spacing: Style.spacing.labelGap
+
+      Text {
+        width: parent.width
+        text: searchPanel.controller.contextName === "PROD"
+          ? "No recent links yet"
+          : "Recent Links are hidden in preview mode"
+        textFormat: Text.PlainText
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        font.weight: Font.DemiBold
+        horizontalAlignment: Text.AlignHCenter
+      }
+
+      Text {
+        width: parent.width
+        text: searchPanel.controller.contextName === "PROD"
+          ? "Search Rock and open an item to add it here."
+          : "Start typing to search preview data."
+        textFormat: Text.PlainText
+        color: searchPanel.dim
+        font.family: Style.font.family
+        font.pixelSize: Style.font.bodySmall
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
+      }
     }
-    Rectangle {
-      visible: searchPanel.controller.pendingMagnusBuildId !== "" && searchPanel.controller.pendingMagnusBuildRecent
-      width: searchPanel.width
-      height: visible ? buildRecentConfirm.implicitHeight + 24 : 0
-      radius: 9
-      color: Qt.rgba(0.45, 0.2, 0.05, 0.35)
-      border.width: 1
-      border.color: "#f59e0b"
+
+    BorderSurface {
+      visible: searchPanel.controller.pendingMagnusBuildId !== "" &&
+        searchPanel.controller.pendingMagnusBuildRecent
+      width: parent.width
+      implicitHeight: buildRecentConfirm.implicitHeight + Style.spacing.rowPaddingX * 2
+      color: Style.normalFillFor(Color.urgent, Color.urgent)
+      borderSpec: Border.controlSpec("normal", Color.urgent, Color.urgent)
+      radius: Style.cornerRadius
+
       ColumnLayout {
         id: buildRecentConfirm
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
-        Text { Layout.fillWidth: true; text: "Deploy " + searchPanel.controller.pendingMagnusBuildTitle + " again?"; color: Color.foreground; font.bold: true; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
-        Text { Layout.fillWidth: true; text: "Press Enter to start the production build, or Esc to cancel. You can deploy it again later from Recent Links."; color: Color.foreground; opacity: 0.68; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
+        anchors.margins: Style.spacing.rowPaddingX
+        spacing: Style.spacing.labelGap
+
+        Text {
+          Layout.fillWidth: true
+          text: "Deploy " + searchPanel.controller.pendingMagnusBuildTitle + " again?"
+          textFormat: Text.PlainText
+          color: Color.foreground
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          font.weight: Font.DemiBold
+          wrapMode: Text.WordWrap
+        }
+
+        Text {
+          Layout.fillWidth: true
+          text: "This starts a production mobile-app build."
+          textFormat: Text.PlainText
+          color: searchPanel.dim
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.WordWrap
+        }
+
         RowLayout {
+          Item { Layout.fillWidth: true }
+
           Button {
             id: recentBuildCancelButton
             text: "Cancel"
-            activeFocusOnTab: true
+            focusable: true
             enabled: !searchPanel.controller.magnusActionBusy
             KeyNavigation.right: recentBuildConfirmButton
             KeyNavigation.tab: recentBuildConfirmButton
@@ -175,10 +317,13 @@ Column {
             Keys.onEscapePressed: searchPanel.controller.cancelMagnusBuild()
             onClicked: searchPanel.controller.cancelMagnusBuild()
           }
+
           Button {
             id: recentBuildConfirmButton
             text: searchPanel.controller.magnusActionBusy ? "Deploying…" : "Deploy again"
-            activeFocusOnTab: true
+            foreground: Color.urgent
+            bordered: true
+            focusable: true
             enabled: !searchPanel.controller.magnusActionBusy
             KeyNavigation.left: recentBuildCancelButton
             KeyNavigation.tab: recentBuildCancelButton
@@ -186,43 +331,65 @@ Column {
             Keys.onEscapePressed: searchPanel.controller.cancelMagnusBuild()
             onClicked: searchPanel.controller.confirmMagnusBuild()
           }
-          Item { Layout.fillWidth: true }
         }
       }
     }
+
     Repeater {
       id: quickReturnRepeater
       model: searchPanel.controller.quickReturns
-      delegate: Rectangle {
+
+      delegate: Item {
         id: recentRow
+
         required property var modelData
         required property int index
         readonly property bool rowSelected: recentRow.index === searchPanel.controller.recentCursor ||
-          (searchPanel.controller.recentCursor < 0 && recentRow.index === 0 && searchPanel.searchField.activeFocus && searchPanel.controller.quickReturns.length > 0)
+          (searchPanel.controller.recentCursor < 0 && recentRow.index === 0 &&
+            searchPanel.searchField.activeFocus && searchPanel.controller.quickReturns.length > 0)
+
         width: searchPanel.width
-        height: Style.space(52)
-        radius: 7
-        color: "transparent"
+        height: Style.space(54)
         clip: true
-        RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
+
+        RockLensSelectionChrome {
+          anchors.fill: parent
+          selected: recentRow.rowSelected
+        }
+
         Column {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          anchors.leftMargin: 16
-          anchors.rightMargin: 10
-          Text { width: parent.width; text: recentRow.modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
+          anchors.leftMargin: Style.spacing.rowPaddingX
+          anchors.rightMargin: Style.spacing.rowPaddingX
+          spacing: Style.spacing.xxs
+
           Text {
             width: parent.width
-            text: recentRow.modelData.kind === "Magnus Build" ?
-              "Last deployed " + searchPanel.controller.relativeTime(recentRow.modelData.lastUsedAt) + " · Enter to deploy again" :
-              recentRow.modelData.kind
-            color: Color.foreground
-            opacity: 0.65
+            text: recentRow.modelData.title
             textFormat: Text.PlainText
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.body
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+          }
+
+          Text {
+            width: parent.width
+            text: recentRow.modelData.kind === "Magnus Build"
+              ? "Last deployed " + searchPanel.controller.relativeTime(recentRow.modelData.lastUsedAt) +
+                " · Enter to deploy again"
+              : recentRow.modelData.kind
+            textFormat: Text.PlainText
+            color: searchPanel.dim
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
             elide: Text.ElideRight
           }
         }
+
         MouseArea {
           anchors.fill: parent
           cursorShape: Qt.PointingHandCursor

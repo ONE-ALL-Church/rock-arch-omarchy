@@ -1,15 +1,17 @@
 import QtQuick
-import QtQuick.Controls
 import qs.Commons
+import qs.Ui
 
 Column {
   id: loginPanel
+
   required property var controller
   property alias profileNameField: onboardingProfileNameField
   property alias domainField: onboardingDomainField
+  readonly property color dim: Qt.darker(Color.foreground, 1.4)
   readonly property bool inputActive: onboardingProfileNameField.activeFocus ||
-    onboardingDomainField.activeFocus ||
-    onboardingUsernameField.activeFocus || onboardingPasswordField.activeFocus
+    onboardingDomainField.activeFocus || onboardingUsernameField.activeFocus ||
+    onboardingPasswordField.activeFocus
 
   function domainKey(value) {
     return String(value || "").trim().toLowerCase()
@@ -33,72 +35,127 @@ Column {
   }
 
   height: visible ? implicitHeight : 0
-  spacing: Style.spacing.sm
+  spacing: Style.spacing.panelGap
 
-  Text {
-    text: "Connect to Rock"
-    color: Color.foreground
-    font.pixelSize: Style.font.heading
-    font.bold: true
-  }
-  TextField {
-    id: onboardingProfileNameField
+  Column {
     width: parent.width
-    enabled: !loginPanel.controller.setupBusy
-    maximumLength: 80
-    placeholderText: "Profile name (for example Rock Solid Church Production)"
-    text: loginPanel.controller.newProfileName
-    selectByMouse: true
-    KeyNavigation.tab: onboardingDomainField
-    KeyNavigation.backtab: onboardingConnectButton
-    onTextChanged: loginPanel.controller.newProfileName = text
-    onAccepted: onboardingDomainField.forceActiveFocus(Qt.TabFocusReason)
+    spacing: Style.spacing.labelGap
+
+    Text {
+      width: parent.width
+      text: "Connect to Rock"
+      textFormat: Text.PlainText
+      color: Color.foreground
+      font.family: Style.font.family
+      font.pixelSize: Style.font.heading
+      font.bold: true
+    }
+
+    Text {
+      width: parent.width
+      text: "Sign in with the same account used on the Rock website."
+      textFormat: Text.PlainText
+      color: loginPanel.dim
+      font.family: Style.font.family
+      font.pixelSize: Style.font.bodySmall
+      wrapMode: Text.WordWrap
+    }
   }
-  TextField {
-    id: onboardingDomainField
+
+  Column {
     width: parent.width
-    enabled: !loginPanel.controller.setupBusy
-    maximumLength: 250
-    placeholderText: "Rock domain (rock.example.org)"
-    text: loginPanel.controller.newProfileDomain
-    selectByMouse: true
-    inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-    KeyNavigation.tab: onboardingUsernameField
-    KeyNavigation.backtab: onboardingProfileNameField
-    onTextChanged: loginPanel.controller.newProfileDomain = text
-    onAccepted: onboardingUsernameField.forceActiveFocus(Qt.TabFocusReason)
+    spacing: Style.spacing.labelGap
+
+    PanelSectionHeader { text: "PROFILE NAME" }
+    TextField {
+      id: onboardingProfileNameField
+      width: parent.width
+      enabled: !loginPanel.controller.setupBusy
+      activeFocusOnTab: true
+      maximumLength: 80
+      placeholderText: "Rock Solid Church Production"
+      text: loginPanel.controller.newProfileName
+      selectByMouse: true
+      KeyNavigation.tab: onboardingDomainField
+      KeyNavigation.backtab: onboardingConnectButton
+      onTextChanged: loginPanel.controller.newProfileName = text
+      onAccepted: onboardingDomainField.forceActiveFocus(Qt.TabFocusReason)
+    }
   }
-  TextField {
-    id: onboardingUsernameField
+
+  Column {
     width: parent.width
-    enabled: !loginPanel.controller.setupBusy
-    maximumLength: 200
-    placeholderText: "Rock username"
-    text: loginPanel.controller.setupUsername
-    selectByMouse: true
-    KeyNavigation.tab: onboardingPasswordField
-    KeyNavigation.backtab: onboardingDomainField
-    onTextChanged: loginPanel.controller.setupUsername = text
-    onAccepted: onboardingPasswordField.forceActiveFocus(Qt.TabFocusReason)
+    spacing: Style.spacing.labelGap
+
+    PanelSectionHeader { text: "ROCK DOMAIN" }
+    TextField {
+      id: onboardingDomainField
+      width: parent.width
+      enabled: !loginPanel.controller.setupBusy
+      activeFocusOnTab: true
+      maximumLength: 250
+      placeholderText: "rock.example.org"
+      text: loginPanel.controller.newProfileDomain
+      selectByMouse: true
+      inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
+      KeyNavigation.tab: onboardingUsernameField
+      KeyNavigation.backtab: onboardingProfileNameField
+      onTextChanged: loginPanel.controller.newProfileDomain = text
+      onAccepted: onboardingUsernameField.forceActiveFocus(Qt.TabFocusReason)
+    }
   }
-  TextField {
-    id: onboardingPasswordField
+
+  Column {
     width: parent.width
-    enabled: !loginPanel.controller.setupBusy
-    placeholderText: "Rock password"
-    text: loginPanel.controller.setupPassword
-    echoMode: TextInput.Password
-    selectByMouse: true
-    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-    KeyNavigation.tab: onboardingConnectButton
-    KeyNavigation.backtab: onboardingUsernameField
-    onTextChanged: loginPanel.controller.setupPassword = text
-    onAccepted: loginPanel.completeOnboarding()
+    spacing: Style.spacing.labelGap
+
+    PanelSectionHeader { text: "USERNAME" }
+    TextField {
+      id: onboardingUsernameField
+      width: parent.width
+      enabled: !loginPanel.controller.setupBusy
+      activeFocusOnTab: true
+      maximumLength: 200
+      placeholderText: "Rock username"
+      text: loginPanel.controller.setupUsername
+      selectByMouse: true
+      KeyNavigation.tab: onboardingPasswordField
+      KeyNavigation.backtab: onboardingDomainField
+      onTextChanged: loginPanel.controller.setupUsername = text
+      onAccepted: onboardingPasswordField.forceActiveFocus(Qt.TabFocusReason)
+    }
   }
+
+  Column {
+    width: parent.width
+    spacing: Style.spacing.labelGap
+
+    PanelSectionHeader { text: "PASSWORD" }
+    TextField {
+      id: onboardingPasswordField
+      width: parent.width
+      enabled: !loginPanel.controller.setupBusy
+      activeFocusOnTab: true
+      placeholderText: "Rock password"
+      text: loginPanel.controller.setupPassword
+      password: true
+      selectByMouse: true
+      inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+      KeyNavigation.tab: onboardingConnectButton
+      KeyNavigation.backtab: onboardingUsernameField
+      onTextChanged: loginPanel.controller.setupPassword = text
+      onAccepted: loginPanel.completeOnboarding()
+    }
+  }
+
   Button {
     id: onboardingConnectButton
-    text: loginPanel.controller.setupBusy ? (loginPanel.controller.setupSlow ? "Still connecting…" : "Connecting…") : "Connect"
-    activeFocusOnTab: true
+    anchors.right: parent.right
+    text: loginPanel.controller.setupBusy
+      ? (loginPanel.controller.setupSlow ? "Still connecting…" : "Connecting…")
+      : "Connect"
+    focusable: true
+    bordered: true
     enabled: loginPanel.controller.newProfileDomain.trim().length > 0 &&
       loginPanel.controller.newProfileName.trim().length > 0 &&
       loginPanel.controller.setupUsername.trim().length > 0 &&

@@ -9,6 +9,8 @@ QML_PATH = (
 )
 SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
 BAR_BUTTON_PATH = QML_PATH.with_name("RockArchBarButton.qml")
+ICON_PATH = QML_PATH.with_name("RockArchIcon.qml")
+HERO_PATH = QML_PATH.with_name("RockLensHero.qml")
 KEY_CATCHER_PATH = QML_PATH.with_name("RockLensKeyCatcher.qml")
 LOGIN_PATH = QML_PATH.with_name("RockLensLoginPanel.qml")
 MAGNUS_PATH = QML_PATH.with_name("RockLensMagnusPanel.qml")
@@ -18,6 +20,8 @@ SEARCH_PATH = QML_PATH.with_name("RockLensSearchPanel.qml")
 SETTINGS_PATH = QML_PATH.with_name("RockLensSettingsPanel.qml")
 PANEL_PATHS = (
     BAR_BUTTON_PATH,
+    ICON_PATH,
+    HERO_PATH,
     LOGIN_PATH,
     MAGNUS_PATH,
     NAVIGATION_PATH,
@@ -54,19 +58,21 @@ class QmlNavigationTests(unittest.TestCase):
         selection = SELECTION_PATH.read_text(encoding="utf-8")
 
         self.assertEqual(source.count("readonly property bool rowSelected:"), 4)
-        self.assertEqual(source.count("height: Style.space(52)"), 4)
-        self.assertGreaterEqual(source.count("anchors.leftMargin: 16"), 4)
+        self.assertEqual(source.count("height: Style.space(54)"), 4)
+        self.assertGreaterEqual(
+            source.count("anchors.leftMargin: Style.spacing.rowPaddingX"), 4
+        )
         self.assertGreaterEqual(source.count("anchors.rightMargin:"), 4)
-        self.assertIn("border.width: 2", selection)
-        self.assertIn("border.color: Color.accent", selection)
-        self.assertIn("color: Qt.rgba(Color.accent.r", selection)
+        self.assertIn('Border.controlSpec("hover-cursor"', selection)
+        self.assertIn("Style.hoverFillFor(Color.foreground, Color.accent)", selection)
+        self.assertNotIn("border.width:", selection)
 
     def test_settings_fold_connection_and_magnus_into_active_profile(self):
         source = all_qml_source()
 
         self.assertNotIn('text: "Connection"', source)
-        self.assertIn('"Login saved · Magnus available"', source)
-        self.assertIn('"Login saved · No Magnus access"', source)
+        self.assertIn('"Connected · Magnus available"', source)
+        self.assertIn('"Connected · Search and Personal Links"', source)
         self.assertIn(
             'text: "Sign in to " + settingsPanel.controller.activeProfileName()',
             source,
@@ -106,11 +112,10 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
         self.assertEqual(form.count("TextField {"), 4)
-        self.assertIn(
-            'placeholderText: "Profile name (for example Rock Solid Church Production)"',
-            form,
-        )
-        self.assertIn('placeholderText: "Rock domain (rock.example.org)"', form)
+        self.assertIn('PanelSectionHeader { text: "PROFILE NAME" }', form)
+        self.assertIn('placeholderText: "Rock Solid Church Production"', form)
+        self.assertIn('PanelSectionHeader { text: "ROCK DOMAIN" }', form)
+        self.assertIn('placeholderText: "rock.example.org"', form)
         self.assertIn('placeholderText: "Rock username"', form)
         self.assertIn('placeholderText: "Rock password"', form)
         self.assertIn("property alias profileNameField", form)
@@ -130,7 +135,10 @@ class QmlNavigationTests(unittest.TestCase):
             "cancelProfileRenameButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("activeFocusOnTab: true", source[start : start + 350])
+            excerpt = source[start : start + 500]
+            self.assertTrue(
+                "focusable: true" in excerpt or "activeFocusOnTab: true" in excerpt
+            )
         self.assertIn('request({op: "profile_rename", profileId: profileId, name: name})', source)
         self.assertIn("Keys.onEscapePressed:", source)
 
@@ -180,11 +188,13 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
 
-    def test_settings_controls_use_native_keyboard_focus_chain(self):
+    def test_settings_controls_use_omarchy_keyboard_focus_chain(self):
         source = all_qml_source()
         key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
 
-        self.assertNotIn("focusable:", source)
+        self.assertIn("import qs.Ui", SETTINGS_PATH.read_text(encoding="utf-8"))
+        self.assertNotIn("CheckBox {", source)
+        self.assertIn("Toggle {", source)
         self.assertIn("property bool formMode: false", key_catcher)
         self.assertLess(
             key_catcher.index("if (event.key === Qt.Key_Escape)"),
@@ -210,44 +220,44 @@ class QmlNavigationTests(unittest.TestCase):
             "saveLoginButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("activeFocusOnTab: true", source[start : start + 350])
+            self.assertIn("focusable: true", source[start : start + 500])
         self.assertGreaterEqual(
             source.count("onActiveFocusChanged:"),
             16,
         )
-        self.assertGreaterEqual(source.count("Keys.onReturnPressed:"), 7)
-        self.assertGreaterEqual(source.count("Keys.onEnterPressed:"), 7)
+        self.assertGreaterEqual(source.count("focusable: true"), 18)
 
     def test_menu_bar_item_can_be_hidden_without_removing_shortcut_access(self):
         source = all_qml_source()
 
-        self.assertIn('text: "Show Rock Arch in the menu bar"', source)
+        self.assertIn('label: "Show in the menu bar"', source)
         self.assertIn("implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0", source)
         self.assertIn("visible: controller.preferenceShowMenuBar", source)
-        self.assertIn('updatePreference("showMenuBar", checked)', source)
+        self.assertIn(
+            'updatePreference("showMenuBar", controller.preferenceShowMenuBar)', source
+        )
         self.assertIn("Super+R still opens Rock Arch", source)
 
     def test_menu_bar_uses_the_theme_colored_rock_arch_mark(self):
         source = all_qml_source()
 
-        self.assertIn("ShapePath.OddEvenFill", source)
+        self.assertIn("ShapePath.OddEvenFill", ICON_PATH.read_text(encoding="utf-8"))
         self.assertIn("hasVisualContent: true", source)
-        self.assertIn("fillColor: button.active ? button.activeColor : button.foreground", source)
+        self.assertIn(
+            "color: button.active ? button.activeColor : button.foreground", source
+        )
         self.assertIn('tooltipText: "Rock Arch"', source)
 
     def test_settings_exposes_bounded_opt_in_plugin_updates(self):
         source = all_qml_source()
 
-        self.assertIn('text: "Settings" + (navigation.controller.updateAvailable ? "  ●" : "")', source)
-        self.assertIn('text: "Install updates automatically"', source)
+        self.assertIn('text: "Settings" + (navigation.controller.updateAvailable ? "  •" : "")', source)
+        self.assertIn('label: "Install updates automatically"', source)
         self.assertIn('request({op: "update_check"})', source)
         self.assertIn('request({op: "update_start"})', source)
         self.assertIn('property bool preferenceAutomaticUpdates: false', source)
         self.assertIn("interval: 86400000", source)
-        self.assertIn(
-            '"Rock Arch checks once a day. Automatic installation is optional',
-            source,
-        )
+        self.assertIn('"Check daily and install only after Omarchy validation."', source)
 
     def test_every_panel_has_a_keyboard_route_and_contextual_guidance(self):
         source = all_qml_source()
@@ -260,17 +270,11 @@ class QmlNavigationTests(unittest.TestCase):
             'readonly property bool showMagnus: contextName === "PROD" && magnusAvailable',
             source,
         )
-        self.assertIn(
-            'navigation.controller.showMagnus ? ["search", "personal", "magnus"]',
-            source,
-        )
-        self.assertIn('"X · Clear"', source)
+        self.assertIn('{ key: "magnus", label: "Magnus", shortcut: "Ctrl+3" }', source)
+        self.assertIn('tooltipText: "Clear Recent Links · X"', source)
         self.assertIn("onDeleteRequested: root.deleteCurrentItem()", source)
         self.assertIn("event.key === Qt.Key_Delete", key_catcher)
-        self.assertIn(
-            '"Use Up/Down to choose a Personal Link. Enter opens it in Rock."',
-            source,
-        )
+        self.assertIn('text: "PERSONAL LINKS"', source)
         self.assertIn("if (changedView) panelFlick.contentY = 0", source)
 
     def test_magnus_preview_actions_are_tabbable_and_keep_shortcuts(self):
@@ -294,7 +298,7 @@ class QmlNavigationTests(unittest.TestCase):
             "magnusOpenButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("activeFocusOnTab: true", source[start : start + 350])
+            self.assertIn("focusable: true", source[start : start + 500])
         self.assertIn("commandMode: root.magnusPreviewCommandsEnabled", source)
         self.assertIn('"dchor".indexOf(event.text.toLowerCase())', key_catcher)
         for key in ("d", "c", "h", "o", "r"):
@@ -302,11 +306,11 @@ class QmlNavigationTests(unittest.TestCase):
         for label in (
             "D · Download",
             "C · Copy",
-            "H · Copy hash",
-            "O · Open in Rock",
-            "R · Refresh",
+            "H · Hash",
+            "O · Open",
         ):
             self.assertIn(label, source)
+        self.assertIn('tooltipText: "Refresh Magnus · R"', source)
 
     def test_magnus_actions_and_recent_builds_are_explicit(self):
         source = all_qml_source()
@@ -324,7 +328,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("confirmed: true", source)
         self.assertIn('key === "b"', source)
         self.assertIn('text: "B · Deploy"', source)
-        self.assertIn('"Press Enter to deploy, or Esc to cancel."', source)
+        self.assertIn('". This starts a production mobile-app build."', source)
         self.assertIn('"Last deployed " + searchPanel.controller.relativeTime', source)
         self.assertIn('function deploymentSummary(title)', source)
         self.assertIn(
@@ -337,29 +341,44 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn(
             "searchPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
-        self.assertGreaterEqual(source.count("activeFocusOnTab: true"), 4)
+        self.assertGreaterEqual(source.count("focusable: true"), 4)
         self.assertGreaterEqual(
             source.count("Keys.onEscapePressed:"), 4
         )
         self.assertNotIn("Server actions:", source)
 
-    def test_footer_copy_is_user_centered(self):
+    def test_footer_is_reserved_for_transient_status(self):
         source = all_qml_source()
 
         self.assertIn(
             'text: root.feedbackText || (root.onboardingRequired ? "" : root.guidanceText())',
             source,
         )
-        self.assertIn('"Changes save automatically. Press Esc to return to Search."', source)
         self.assertIn('"Getting your Rock workspace ready…"', source)
-        self.assertIn("Any ID or GUID checks every category.", source)
-        for old_copy in (
+        self.assertIn('if (updateState === "updating")', source)
+        self.assertIn('return ""', source[source.index("function guidanceText()") :])
+        for persistent_tutorial in (
+            "Changes save automatically. Press Esc",
+            "Use Up/Down to choose a Personal Link",
+            "Any ID or GUID checks every category",
             "Checking saved Rock login",
             "Tab Search · Shift+Tab previous",
             "↑↓ browse · Enter opens",
             "Try g: groups or w: workflow types",
         ):
-            self.assertNotIn(old_copy, source)
+            self.assertNotIn(persistent_tutorial, source)
+
+    def test_panel_matches_first_party_omarchy_anatomy(self):
+        source = all_qml_source()
+
+        self.assertIn("RockLensHero {", source)
+        self.assertIn("PanelSeparator {}", source)
+        self.assertIn("panel.fittedContentWidth(Style.space(430))", source)
+        self.assertIn("panel.fittedContentHeight(content.implicitHeight, Style.space(600))", source)
+        self.assertIn("spacing: Style.spacing.panelGap", source)
+        self.assertIn("Border.controlSpec", source)
+        self.assertNotIn('color: "#14532d"', source)
+        self.assertNotIn('color: "#86efac"', source)
 
     def test_panels_are_composed_from_focused_components(self):
         source = QML_PATH.read_text(encoding="utf-8")
@@ -371,6 +390,7 @@ class QmlNavigationTests(unittest.TestCase):
             "RockLensMagnusPanel",
             "RockLensSettingsPanel",
             "RockLensNavigationTabs",
+            "RockLensHero",
             "RockArchBarButton",
         ):
             self.assertIn(f"{component} {{", source)
