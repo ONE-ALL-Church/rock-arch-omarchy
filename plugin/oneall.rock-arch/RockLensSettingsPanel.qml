@@ -591,7 +591,51 @@ Column {
     width: parent.width
     spacing: Style.spacing.rowGap
 
-    PanelSectionHeader { text: "SEARCH CATEGORIES" }
+    RowLayout {
+      width: parent.width
+
+      PanelSectionHeader {
+        text: "SEARCH CATEGORIES"
+        Layout.fillWidth: true
+      }
+
+      Button {
+        id: accessRetryButton
+        visible: settingsPanel.controller.rockConfigured &&
+          settingsPanel.controller.searchCapabilitiesState === "error"
+        text: "Check again"
+        bordered: true
+        focusable: true
+        fontSize: Style.font.caption
+        horizontalPadding: Style.spacing.lg
+        verticalPadding: Style.spacing.xs
+        enabled: !settingsPanel.controller.searchCapabilitiesInFlight
+        onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(accessRetryButton)
+        onClicked: settingsPanel.controller.probeSearchCapabilities(true)
+      }
+    }
+
+    Text {
+      width: parent.width
+      text: !settingsPanel.controller.rockConfigured
+        ? "Sign in to choose search categories."
+        : settingsPanel.controller.searchCapabilitiesInFlight &&
+          !settingsPanel.controller.searchCapabilitiesReady
+          ? "Checking what this Rock account can search…"
+          : settingsPanel.controller.searchCapabilitiesState === "error"
+            ? "Couldn't check search access. Check your connection and try again."
+            : settingsPanel.controller.hiddenSearchCategoryCount > 0
+              ? settingsPanel.controller.hiddenSearchCategoryCount +
+                (settingsPanel.controller.hiddenSearchCategoryCount === 1
+                  ? " unavailable category is hidden for this account."
+                  : " unavailable categories are hidden for this account.")
+              : "Only categories this Rock account can search are shown."
+      textFormat: Text.PlainText
+      color: settingsPanel.dim
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.WordWrap
+    }
 
     GridLayout {
       width: parent.width
@@ -600,7 +644,7 @@ Column {
       rowSpacing: Style.spacing.sm
 
       Repeater {
-        model: settingsPanel.controller.searchCategories
+        model: settingsPanel.controller.availableCategoryOptions()
 
         delegate: Button {
           id: categoryCheckBox
@@ -618,6 +662,18 @@ Column {
           onClicked: settingsPanel.controller.toggleCategory(categoryCheckBox.modelData.key)
         }
       }
+    }
+
+    Text {
+      visible: settingsPanel.controller.searchCapabilitiesReady &&
+        settingsPanel.controller.availableCategoryOptions().length === 0
+      width: parent.width
+      text: "This account has no searchable entity categories."
+      textFormat: Text.PlainText
+      color: settingsPanel.dim
+      font.family: Style.font.family
+      font.pixelSize: Style.font.bodySmall
+      wrapMode: Text.WordWrap
     }
   }
 

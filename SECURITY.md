@@ -20,7 +20,9 @@ to isolate against arbitrary code already executing as that same user, a
 compromised Quickshell process, a compromised Python runtime, or a malicious
 Rock server that returns semantically deceptive but structurally valid display
 text. Rock permissions remain the authorization boundary for tenant data and
-the mobile-app build action.
+the mobile-app build action. Rock Arch probes only its eight fixed read
+endpoints after login, hides denied categories, and independently enforces the
+detected allowlist in the broker before search requests are issued.
 
 Update checks are limited to the canonical Git-managed Rock Arch installation.
 They fetch the public `origin HEAD`, refuse local tracked changes or diverged

@@ -1,6 +1,7 @@
 import json
 import threading
 import unittest
+import urllib.error
 from contextlib import contextmanager
 
 from rock_lens_broker.navigation import NavigationError, validate_rock_url
@@ -40,6 +41,21 @@ class FakeHttp:
         return self.responses.get(path, [])
 
 
+class CapabilityHttp(FakeHttp):
+    def __init__(self, unavailable=(), transient=()):
+        super().__init__()
+        self.unavailable = set(unavailable)
+        self.transient = set(transient)
+
+    def get_json(self, path, params, cookie):
+        self.calls.append((path, params, cookie))
+        if path in self.unavailable:
+            raise RockRestError("rock_endpoint_unavailable")
+        if path in self.transient:
+            raise RockRestError("rock_request_failed")
+        return []
+
+
 class ConcurrentHttp:
     def __init__(self):
         self.barrier = threading.Barrier(len(SEARCH_SPECS))
@@ -71,6 +87,16 @@ class FakeOpener:
     def open(self, request, timeout):
         self.calls.append((request, timeout))
         return FakeResponse(self.payload)
+
+
+class FailingOpener:
+    def __init__(self, status):
+        self.status = status
+
+    def open(self, request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url, self.status, "request failed", {}, None
+        )
 
 
 class RockRestAdapterTests(unittest.TestCase):
@@ -116,6 +142,20 @@ class RockRestAdapterTests(unittest.TestCase):
         client = RockRestHttpClient(FakeOpener(payload))
         with self.assertRaisesRegex(RockRestError, "invalid_rock_response"):
             client.get_json("/api/People", {}, ".ROCK=test-session")
+
+    def test_http_client_distinguishes_denied_endpoints_from_transient_failures(self):
+        for status, expected in (
+            (401, "rock_endpoint_unavailable"),
+            (403, "rock_endpoint_unavailable"),
+            (404, "rock_endpoint_unavailable"),
+            (500, "rock_request_failed"),
+        ):
+            with self.subTest(status=status), self.assertRaisesRegex(
+                RockRestError, expected
+            ):
+                RockRestHttpClient(FailingOpener(status)).get_json(
+                    "/api/People", {"$select": "Id"}, ".ROCK=test-session"
+                )
 
     def test_search_uses_only_fixed_get_specs_and_opaque_results(self):
         http = FakeHttp(
@@ -371,6 +411,35 @@ class RockRestAdapterTests(unittest.TestCase):
         )
         self.assertEqual(batch.results, [])
         self.assertEqual(batch.unavailable, ())
+
+    def test_searchable_categories_are_probed_once_and_cached(self):
+        http = CapabilityHttp(
+            unavailable={"/api/WorkflowTypes", "/api/ServiceJobs"}
+        )
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+
+        first = adapter.searchable_categories()
+        second = adapter.searchable_categories()
+
+        self.assertEqual(first, second)
+        self.assertEqual(first.unavailable, ("Workflows", "Jobs"))
+        self.assertNotIn("Workflows", first.available)
+        self.assertNotIn("Jobs", first.available)
+        self.assertEqual(len(http.calls), len(SEARCH_SPECS))
+        self.assertTrue(
+            all(params == {"$select": "Id", "$top": "1"} for _, params, _ in http.calls)
+        )
+
+        adapter.clear()
+        adapter.searchable_categories()
+        self.assertEqual(len(http.calls), len(SEARCH_SPECS) * 2)
+
+    def test_searchable_categories_fail_closed_on_transient_errors(self):
+        adapter = RockRestReadOnlyAdapter(
+            FakeCookieProvider(), CapabilityHttp(transient={"/api/People"})
+        )
+        with self.assertRaisesRegex(RockRestError, "capability_check_failed"):
+            adapter.searchable_categories()
 
     def test_scoped_search_calls_only_one_endpoint_and_allows_an_empty_term(self):
         http = FakeHttp(

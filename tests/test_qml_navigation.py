@@ -148,8 +148,8 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('PanelSectionHeader { text: "UPDATES" }', prompt)
         self.assertIn('"Automatic updates · On"', prompt)
         self.assertIn('"Continue to Search"', prompt)
-        self.assertIn("controller.searchCategories", prompt)
-        self.assertIn("onboardingEnabledCategories.length > 0", prompt)
+        self.assertIn("controller.availableCategoryOptions()", prompt)
+        self.assertIn("searchCapabilitiesInFlight", prompt)
         self.assertGreaterEqual(prompt.count("Keys.onEscapePressed:"), 3)
         self.assertIn(
             'op: "onboarding_setup_complete"',
@@ -172,6 +172,21 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('onActivated: root.applyScope("gt")', source)
         self.assertIn('sequence: "Alt+Shift+C"', source)
         self.assertIn('onActivated: root.applyScope("ct")', source)
+
+    def test_search_categories_follow_the_active_accounts_detected_access(self):
+        source = all_qml_source()
+        settings = SETTINGS_PATH.read_text(encoding="utf-8")
+        finish = FINISH_SETUP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('op: "search_capabilities"', source)
+        self.assertIn("root.searchCapabilitiesReady", source)
+        self.assertIn(
+            'root.effectiveCategoryEnabled("Jobs")',
+            source,
+        )
+        self.assertIn("controller.availableCategoryOptions()", settings)
+        self.assertIn("controller.availableCategoryOptions()", finish)
+        self.assertIn('text: "Check again"', settings)
 
     def test_existing_profiles_have_a_keyboard_accessible_rename_form(self):
         source = all_qml_source()
@@ -443,7 +458,7 @@ class QmlNavigationTests(unittest.TestCase):
             "RockArchBarButton",
         ):
             self.assertIn(f"{component} {{", source)
-        self.assertLess(len(source.splitlines()), 1_600)
+        self.assertLess(len(source.splitlines()), 1_750)
 
 
 if __name__ == "__main__":

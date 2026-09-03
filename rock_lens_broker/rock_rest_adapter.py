@@ -36,6 +36,7 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_TARGETS = 256
 MAX_PERSONAL_LINKS = 200
 PERSONAL_LINK_CACHE_SECONDS = 5 * 60
+SEARCH_CAPABILITY_CACHE_SECONDS = 5 * 60
 ROWS_PER_CATEGORY = 3
 ROCK_ARCH_USER_AGENT = HTTP_USER_AGENT
 GUID_PATTERN = re.compile(
@@ -121,7 +122,13 @@ class RockRestHttpClient:
             opener = redirect_free_opener(self._opener)
             with opener.open(request, timeout=20) as response:
                 raw = response.read(MAX_RESPONSE_BYTES + 1)
-        except (OSError, urllib.error.URLError, urllib.error.HTTPError) as error:
+        except urllib.error.HTTPError as error:
+            status = error.code
+            error.close()
+            if status in {401, 403, 404}:
+                raise RockRestError("rock_endpoint_unavailable") from error
+            raise RockRestError("rock_request_failed") from error
+        except (OSError, urllib.error.URLError) as error:
             raise RockRestError("rock_request_failed") from error
         if len(raw) > MAX_RESPONSE_BYTES:
             raise RockRestError("rock_response_out_of_bounds")
@@ -151,6 +158,12 @@ class _SearchSpec:
 @dataclass(frozen=True)
 class SearchBatch:
     results: list[dict[str, Any]]
+    unavailable: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SearchCapabilities:
+    available: tuple[str, ...]
     unavailable: tuple[str, ...]
 
 
@@ -295,6 +308,9 @@ class RockRestReadOnlyAdapter:
         self._personal_links_cache: list[dict[str, Any]] = []
         self._personal_links_cache_deadline = 0.0
         self._personal_links_loaded = False
+        self._search_capabilities = SearchCapabilities((), ())
+        self._search_capabilities_deadline = 0.0
+        self._search_capabilities_loaded = False
 
     def set_origin(self, origin: str) -> None:
         try:
@@ -312,6 +328,67 @@ class RockRestReadOnlyAdapter:
         self._personal_links_cache = []
         self._personal_links_cache_deadline = 0.0
         self._personal_links_loaded = False
+        self._search_capabilities = SearchCapabilities((), ())
+        self._search_capabilities_deadline = 0.0
+        self._search_capabilities_loaded = False
+
+    def searchable_categories(
+        self, force_refresh: bool = False
+    ) -> SearchCapabilities:
+        if (
+            not force_refresh
+            and self._search_capabilities_loaded
+            and time.monotonic() < self._search_capabilities_deadline
+        ):
+            return self._search_capabilities
+
+        available: list[str] = []
+        unavailable: list[str] = []
+        transient_failure = False
+        try:
+            with (
+                self._cookie_provider.authenticated_cookie() as cookie,
+                ThreadPoolExecutor(
+                    max_workers=len(SEARCH_SPECS),
+                    thread_name_prefix="rock-arch-access",
+                ) as executor,
+            ):
+                requests = [
+                    executor.submit(
+                        self._http.get_json,
+                        spec.path,
+                        {"$select": "Id", "$top": "1"},
+                        cookie,
+                    )
+                    for spec in SEARCH_SPECS
+                ]
+                for spec, request in zip(SEARCH_SPECS, requests, strict=True):
+                    try:
+                        value = request.result()
+                        if not isinstance(value, list) or len(value) > 1_000:
+                            raise RockRestError("invalid_rock_response")
+                        available.append(spec.category)
+                    except RockRestError as error:
+                        if str(error) == "rock_endpoint_unavailable":
+                            unavailable.append(spec.category)
+                        else:
+                            transient_failure = True
+        except RockSessionError as error:
+            raise RockRestError("rock_login_failed") from error
+
+        if transient_failure:
+            if self._search_capabilities_loaded:
+                return self._search_capabilities
+            raise RockRestError("rock_capability_check_failed")
+
+        self._search_capabilities = SearchCapabilities(
+            tuple(available), tuple(unavailable)
+        )
+        self._search_capabilities_deadline = (
+            time.monotonic() + SEARCH_CAPABILITY_CACHE_SECONDS
+        )
+        self._search_capabilities_loaded = True
+        return self._search_capabilities
 
     def search(
         self,

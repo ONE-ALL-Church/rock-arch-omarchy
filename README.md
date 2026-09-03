@@ -34,10 +34,10 @@ asks for four values:
 Select **Connect**. The broker verifies the login before saving it to the
 desktop password manager. No Rock administrator setup or client secret is
 required. After the first successful connection, **Finish setup** lets the user
-choose which Rock entities Search includes and whether a Git-managed install
-should update automatically. Every search category is enabled and automatic
-updates are off by default; pressing Enter accepts those defaults. Both choices
-remain editable in Settings.
+choose among the Rock entities that account can actually search and whether a
+Git-managed install should update automatically. Accessible search categories
+are enabled and automatic updates are off by default; pressing Enter accepts
+those defaults. Both choices remain editable in Settings.
 
 Credentials cross the owner-only local socket only in an explicit login
 request and are never returned. The launcher clears its password field
@@ -135,10 +135,12 @@ first match. Unscoped searches include matching **Personal Links** by title or
 section; an entity prefix keeps the search limited to that Rock category.
 Personal Links are refreshed when the panel opens, then held briefly in memory
 so searching them adds no request per keystroke. **Open** is offered for every
-search category: People, Groups, Group Types, Workflow Types, Scheduled Jobs,
-Pages, Content Channel Types, and Content Channel Items. Each target uses a
-fixed Rock route and must resolve to the exact configured Rock origin; Personal
-Links have the same origin restriction.
+accessible search category. Rock Arch checks the eight supported entity
+endpoints after login, hides categories that return an authorization or
+unsupported-endpoint response, and caches that result for five minutes per
+active profile. Settings can retry the check. Each target uses a fixed Rock
+route and must resolve to the exact configured Rock origin; Personal Links have
+the same origin restriction.
 
 All searches use fixed Rock REST v1 endpoints; Rock Arch does not use the v2
 API or accept arbitrary endpoint paths. Start a query with an entity prefix to
@@ -158,12 +160,14 @@ prefix such as `g:` lists the first three items in that category.
 
 For example, `g: youth` calls only the Groups endpoint. Every scope also accepts
 an exact Rock ID or GUID, such as `g: 42` or `p: a81b7c6d-1234-4abc-9876-0123456789ab`.
-An ID or GUID entered without a prefix is checked across all enabled categories,
-so a numeric ID can return several entity types when their IDs overlap. Add a
-prefix when you know the entity type and want only that match. The active scope
-appears as a badge beside the search field. `Esc` clears the scope before closing
-the panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary
-search text; no slash-command mode is required.
+An ID or GUID entered without a prefix is checked across all enabled categories
+that the active Rock account can search, so a numeric ID can return several
+entity types when their IDs overlap. A prefix or keyboard shortcut for an
+unavailable category is blocked before any entity request is made. Add a prefix
+when you know the entity type and want only that match. The active scope appears
+as a badge beside the search field. `Esc` clears the scope before closing the
+panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary search
+text; no slash-command mode is required.
 
 ## Keyboard navigation
 
@@ -219,6 +223,10 @@ full capability boundary.
 - PROD never falls back to synthetic results. Without a configured Rock login
   the affected live category is empty; missing Magnus access affects only the
   Magnus tab.
+- Entity access is detected with bounded fixed-endpoint reads after login. The
+  broker intersects that per-profile result with saved preferences, so hidden
+  categories cannot be reached through a manually typed prefix or direct socket
+  request. A failed access check disables entity search until it can be retried.
 - Live reads are fixed REST v1 GET operations with bounded responses and field-level
   output allowlists. QML cannot supply a URL, API path, OData field, or filter
   expression.

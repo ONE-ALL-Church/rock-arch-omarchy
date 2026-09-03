@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.15.0` release boundary. Historical feature
+This record describes the current `0.20.0` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 121 passing tests. Release-contract coverage keeps
+The suite contains 139 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
@@ -52,6 +52,12 @@ push to `main` and on pull requests.
 - Search uses eight fixed Rock REST v1 resources with fixed projections, bounded
   results, and exact-origin navigation targets. It exposes no generic HTTP,
   REST v2, SQL, mutation, job-run, or Run Now transport.
+- A bounded post-login probe checks those same eight endpoints with only
+  `$select=Id&$top=1`. Denied or unsupported categories are hidden, and the
+  broker independently excludes them from scoped and unscoped requests.
+- Transient access-check failures disable entity search until retry instead of
+  treating an unknown category as authorized. The cached result is cleared when
+  the active profile, origin, credentials, or context changes.
 - Personal Links are same-origin and represented outside the broker by opaque
   IDs. Recent Links are owner-only, profile-scoped, deduplicated, and capped at
   20 entries.

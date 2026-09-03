@@ -122,6 +122,13 @@ and `ContentChannelItems`, with fixed `$select`, `$orderby`, `$top=3`, and
 generated `startswith` filters. The eight fixed reads share one native Rock
 session cookie and start in
 parallel; results are still transformed in a deterministic category order.
+After login, a separate bounded capability pass sends `$select=Id&$top=1` to
+those same eight endpoints in parallel. A successful list response marks a
+category searchable even when it contains no rows; authorization and missing-
+endpoint responses mark only that category unavailable. Transient failures make
+the access check fail closed instead of guessing. The result is cached in broker
+memory for five minutes and cleared on profile, origin, credential, or context
+changes.
 The Groups projection also expands only `GroupType.Name` for its subtitle.
 People project age, Giving Group, marital/connection/record status, then perform
 at most one bounded Groups read for the returned family IDs. That second read
@@ -145,8 +152,11 @@ PROD never falls back to mock data. There is no raw HTTP, generic entity, SQL,
 mutation, job execution, or Run Now operation.
 
 The cookie authenticates the actor but does not override Rock authorization.
-Rock controller/action permissions still apply; endpoints that enforce entity
-security continue to do so for the signed-in Rock account.
+The broker intersects saved category preferences with the detected account
+capabilities before every search. QML receives only the category names, hides
+unavailable choices and shortcuts, and cannot make a scoped or unscoped request
+reach an unavailable endpoint. Rock controller/action permissions remain the
+authoritative server-side boundary.
 
 ## Optional Magnus boundary
 

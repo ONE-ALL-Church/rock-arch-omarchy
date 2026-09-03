@@ -20,7 +20,7 @@ from rock_lens_broker.instance import InstanceStore
 from rock_lens_broker.magnus_adapter import MagnusBuildOutcome
 from rock_lens_broker.navigation import NavigationTarget
 from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.rock_rest_adapter import SearchBatch
+from rock_lens_broker.rock_rest_adapter import SearchBatch, SearchCapabilities
 
 
 class FakeSession:
@@ -191,6 +191,9 @@ class FakeLive:
         self.search_categories = []
         self.personal_link_calls = 0
         self.cleared = False
+        self.available_categories = list(CATEGORIES)
+        self.capability_calls = []
+        self.requested_enabled_categories = []
         self.target = NavigationTarget(
             "Ada Rivera",
             "Person",
@@ -206,6 +209,17 @@ class FakeLive:
     def clear(self):
         self.cleared = True
 
+    def searchable_categories(self, force_refresh=False):
+        self.capability_calls.append(force_refresh)
+        unavailable = [
+            category
+            for category in CATEGORIES
+            if category not in self.available_categories
+        ]
+        return SearchCapabilities(
+            tuple(self.available_categories), tuple(unavailable)
+        )
+
     def search(
         self,
         query,
@@ -215,6 +229,7 @@ class FakeLive:
     ):
         self.search_calls.append(query)
         self.search_categories.append(category)
+        self.requested_enabled_categories.append(categories)
         return SearchBatch(
             [
                 {
@@ -561,6 +576,40 @@ class BrokerContractTests(unittest.TestCase):
         broker.handle({"op": "search", "query": "g: Delta"})
         self.assertEqual(live.search_calls[-1], "Delta")
         self.assertEqual(live.search_categories[-1], "Groups")
+
+    def test_prod_search_detects_and_enforces_account_entity_access(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        live = FakeLive()
+        live.available_categories = ["People", "Groups", "Pages"]
+        broker = Broker(
+            self.state,
+            session=FakeSession(True),
+            magnus=FakeMagnus(False),
+            live=live,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        detected = broker.handle({"op": "search_capabilities"})
+        self.assertEqual(detected["searchCapabilities"]["state"], "ready")
+        self.assertEqual(
+            detected["searchCapabilities"]["availableCategories"],
+            ["People", "Groups", "Pages"],
+        )
+        self.assertIn(
+            "Jobs", detected["searchCapabilities"]["unavailableCategories"]
+        )
+
+        denied = broker.handle({"op": "search", "query": "j: nightly"})
+        self.assertEqual(denied["source"], "not_authorized")
+        self.assertEqual(denied["results"], [])
+        self.assertEqual(live.search_calls, [])
+
+        allowed = broker.handle({"op": "search", "query": "Ada"})
+        self.assertEqual(allowed["source"], "live")
+        self.assertEqual(
+            live.requested_enabled_categories[-1], ["People", "Groups", "Pages"]
+        )
 
     def test_unscoped_search_includes_matching_personal_links_first(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

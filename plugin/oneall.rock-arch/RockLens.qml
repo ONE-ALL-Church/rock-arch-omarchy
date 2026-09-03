@@ -38,7 +38,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.19.0"
+  property string currentVersion: "0.20.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -55,6 +55,10 @@ Panel {
     {key: "Content Channel Items", label: "Content Items"}
   ]
   property var enabledCategories: searchCategories.map(function(item) { return item.key })
+  property string searchCapabilitiesState: "unknown"
+  property bool searchCapabilitiesInFlight: false
+  property var availableSearchCategories: []
+  property var unavailableSearchCategories: []
   property var onboardingEnabledCategories: []
   property var quickLook: null
   property var requestQueue: []
@@ -116,6 +120,10 @@ Panel {
   readonly property bool onboardingFlowActive: onboardingRequired ||
     finishSetupOnboardingRequired
   readonly property bool queryIsEmpty: query.trim().length === 0
+  readonly property bool searchCapabilitiesReady: contextName === "DEV" ||
+    searchCapabilitiesState === "ready"
+  readonly property int hiddenSearchCategoryCount: contextName === "DEV" ? 0 :
+    unavailableSearchCategories.length
   readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
   readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
   readonly property string scopeKey: scopeKeyForQuery(query)
@@ -284,6 +292,34 @@ Panel {
     return enabledCategories.indexOf(category) >= 0
   }
 
+  function categoryAvailable(category) {
+    return contextName === "DEV" ||
+      (searchCapabilitiesState === "ready" &&
+       availableSearchCategories.indexOf(category) >= 0)
+  }
+
+  function effectiveCategoryEnabled(category) {
+    return categoryEnabled(category) && categoryAvailable(category)
+  }
+
+  function availableCategoryOptions() {
+    if (contextName === "DEV") return searchCategories
+    if (searchCapabilitiesState !== "ready") return []
+    return searchCategories.filter(function(item) {
+      return availableSearchCategories.indexOf(item.key) >= 0
+    })
+  }
+
+  function resetSearchCapabilities() {
+    searchCapabilitiesState = contextName === "DEV" ? "ready" : "unknown"
+    searchCapabilitiesInFlight = false
+    availableSearchCategories = contextName === "DEV"
+      ? searchCategories.map(function(item) { return item.key })
+      : []
+    unavailableSearchCategories = []
+    onboardingSetupPrepared = false
+  }
+
   function displayCategory(category) {
     for (var index = 0; index < searchCategories.length; index++)
       if (searchCategories[index].key === category) return searchCategories[index].label
@@ -304,8 +340,10 @@ Panel {
   }
 
   function initializeOnboardingSetup() {
-    if (onboardingSetupPrepared) return
-    onboardingEnabledCategories = enabledCategories.slice(0)
+    if (onboardingSetupPrepared || !searchCapabilitiesReady) return
+    onboardingEnabledCategories = enabledCategories.filter(function(category) {
+      return categoryAvailable(category)
+    })
     onboardingAutomaticUpdates = preferenceAutomaticUpdates
     onboardingSetupPrepared = true
   }
@@ -339,6 +377,16 @@ Panel {
   }
 
   function applyScope(key) {
+    var targetCategory = ""
+    if (key === "p") targetCategory = "People"
+    else if (key === "g") targetCategory = "Groups"
+    else if (key === "gt") targetCategory = "Group Types"
+    else if (key === "w") targetCategory = "Workflows"
+    else if (key === "j") targetCategory = "Jobs"
+    else if (key === "page") targetCategory = "Pages"
+    else if (key === "ct") targetCategory = "Content Channel Types"
+    else if (key === "c") targetCategory = "Content Channel Items"
+    if (targetCategory && !effectiveCategoryEnabled(targetCategory)) return
     var term = scopeKey ? queryWithoutScope(query) : query.trim()
     viewMode = "search"
     query = key + ":" + (term ? " " + term : "")
@@ -455,6 +503,7 @@ Panel {
     if (response.rock) {
       rockAvailable = response.rock.available === true
       rockConfigured = response.rock.configured === true
+      if (!rockConfigured) resetSearchCapabilities()
     }
     if (response.magnus) {
       magnusAvailable = response.magnus.available === true
@@ -519,6 +568,7 @@ Panel {
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
     if (response.profiles) {
+      var previousProfileId = activeProfileId
       profilesLoaded = true
       activeProfileId = String(response.profiles.activeProfileId || "")
       profiles = Array.isArray(response.profiles.profiles) ? response.profiles.profiles : []
@@ -531,6 +581,7 @@ Panel {
       preferenceOnboardingSetupCompleted = preferences.onboardingSetupCompleted === true
       if (Array.isArray(preferences.enabledCategories))
         enabledCategories = preferences.enabledCategories
+      if (previousProfileId !== activeProfileId) resetSearchCapabilities()
       if (profiles.length === 0 && opened) {
         viewMode = "settings"
         addProfileMode = false
@@ -552,15 +603,37 @@ Panel {
         })
       }
     }
+    if (response.searchCapabilities) {
+      searchCapabilitiesInFlight = false
+      searchCapabilitiesState = String(response.searchCapabilities.state || "error")
+      availableSearchCategories = Array.isArray(
+        response.searchCapabilities.availableCategories)
+        ? response.searchCapabilities.availableCategories : []
+      unavailableSearchCategories = Array.isArray(
+        response.searchCapabilities.unavailableCategories)
+        ? response.searchCapabilities.unavailableCategories : []
+      onboardingSetupPrepared = false
+      if (searchCapabilitiesState === "ready") {
+        initializeOnboardingSetup()
+        if (query.trim().length > 0) Qt.callLater(function() { root.refreshSearch() })
+      } else if (searchCapabilitiesState === "error") {
+        results = []
+        feedbackText = "Rock Arch couldn't check what this account can search."
+      }
+    }
     if (isStatusResponse) {
       statusLoaded = true
       if (contextName === "PROD" && !rockConfigured) {
+        resetSearchCapabilities()
         searchInFlight = false
         searchPending = false
         searchInFlightQuery = ""
-      } else if (query.trim().length > 0) {
+      } else if (searchCapabilitiesReady && query.trim().length > 0) {
         Qt.callLater(function() { root.refreshSearch() })
       }
+      if (contextName === "PROD" && rockConfigured &&
+          !searchCapabilitiesReady && !searchCapabilitiesInFlight)
+        Qt.callLater(function() { root.probeSearchCapabilities(false) })
       if (contextName === "PROD" && rockConfigured &&
           (magnusState === "unknown" || magnusState === "error"))
         Qt.callLater(function() { root.probeMagnus() })
@@ -601,6 +674,7 @@ Panel {
     if (response.person) quickLook = response.person
     if (response.source && !staleSearch) searchSource = String(response.source)
     if (response.refreshLive === true) {
+      resetSearchCapabilities()
       var completedOnboarding = onboardingInProgress
       onboardingInProgress = false
       finishSetup()
@@ -657,6 +731,10 @@ Panel {
     }
     else if (response.source === "unavailable" && !staleSearch)
       feedbackText = "Live Rock search needs a saved Rock login"
+    else if (response.source === "not_authorized" && !staleSearch)
+      feedbackText = "This Rock account can't search " + (scopeLabel || "that category") + "."
+    else if (response.source === "access_check_failed" && !staleSearch)
+      feedbackText = "Rock Arch couldn't check what this account can search."
     else if (response.source && !staleSearch)
       feedbackText = ""
     if (staleSearch) Qt.callLater(function() { root.refreshSearch() })
@@ -668,6 +746,14 @@ Panel {
       searchPending = false
       searchInFlightQuery = ""
       results = []
+      return
+    }
+    if (contextName === "PROD" && !searchCapabilitiesReady) {
+      searchInFlight = false
+      searchPending = false
+      searchInFlightQuery = ""
+      results = []
+      probeSearchCapabilities(false)
       return
     }
     if (searchInFlight) {
@@ -690,6 +776,14 @@ Panel {
     magnusProbeInFlight = true
     magnusState = "checking"
     request({op: "magnus_status"})
+  }
+  function probeSearchCapabilities(forceRefresh) {
+    if (contextName !== "PROD" || !statusLoaded || !rockConfigured ||
+        searchCapabilitiesInFlight) return
+    if (!forceRefresh && searchCapabilitiesState === "ready") return
+    searchCapabilitiesInFlight = true
+    if (searchCapabilitiesState !== "ready") searchCapabilitiesState = "checking"
+    request({op: "search_capabilities", refresh: forceRefresh === true})
   }
   function refreshQuickReturns() { request({op: "navigation_status", section: "quick_returns"}) }
   function refreshPersonalLinks() { request({op: "navigation_status", section: "personal"}) }
@@ -735,6 +829,7 @@ Panel {
     panelFlick.contentY = 0
     request({op: "profiles_status"})
     request({op: "update_status"})
+    probeSearchCapabilities(false)
     Qt.callLater(function() {
       settingsPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)
       root.revealItem(settingsPanel.primaryButton)
@@ -763,8 +858,11 @@ Panel {
     updatePreference("automaticUpdates", preferenceAutomaticUpdates)
   }
   function completeOnboardingSetup() {
-    if (!finishSetupOnboardingRequired || onboardingSetupPending ||
-        !onboardingEnabledCategories.length) return
+    if (!finishSetupOnboardingRequired || onboardingSetupPending) return
+    if (!searchCapabilitiesReady) {
+      probeSearchCapabilities(true)
+      return
+    }
     onboardingSetupPending = true
     feedbackText = "Saving setup…"
     request({
@@ -1224,6 +1322,7 @@ Panel {
     pendingMagnusBuildTitle = ""
     pendingMagnusBuildRecent = false
     setupPassword = ""
+    resetSearchCapabilities()
     request({op: "set_context", context: contextName})
     request({op: "status", probeMagnus: true})
     refreshSearch()
@@ -1341,14 +1440,14 @@ Panel {
     }
   }
 
-  Shortcut { sequence: "Alt+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("p") }
-  Shortcut { sequence: "Alt+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("g") }
-  Shortcut { sequence: "Alt+Shift+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("gt") }
-  Shortcut { sequence: "Alt+W"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("w") }
-  Shortcut { sequence: "Alt+J"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("j") }
-  Shortcut { sequence: "Alt+Shift+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("page") }
-  Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("c") }
-  Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("ct") }
+  Shortcut { sequence: "Alt+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("People"); onActivated: root.applyScope("p") }
+  Shortcut { sequence: "Alt+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Groups"); onActivated: root.applyScope("g") }
+  Shortcut { sequence: "Alt+Shift+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Group Types"); onActivated: root.applyScope("gt") }
+  Shortcut { sequence: "Alt+W"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Workflows"); onActivated: root.applyScope("w") }
+  Shortcut { sequence: "Alt+J"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Jobs"); onActivated: root.applyScope("j") }
+  Shortcut { sequence: "Alt+Shift+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Pages"); onActivated: root.applyScope("page") }
+  Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Items"); onActivated: root.applyScope("c") }
+  Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.focusSearch() }
@@ -1420,11 +1519,19 @@ Panel {
           TextField {
             id: searchField
             Layout.fillWidth: true
-            enabled: root.contextName === "DEV" || (root.statusLoaded && root.rockConfigured)
+            enabled: root.contextName === "DEV" ||
+              (root.statusLoaded && root.rockConfigured && root.searchCapabilitiesReady)
             maximumLength: 120
             placeholderText: root.contextName === "PROD" && root.statusLoaded && !root.rockConfigured
               ? "Sign in to search Rock"
-              : "Search Rock…  g: groups · p: people"
+              : root.contextName === "PROD" && root.searchCapabilitiesState === "checking"
+                ? "Checking what this account can search…"
+                : root.contextName === "PROD" && root.searchCapabilitiesState === "error"
+                  ? "Search access check failed · open Settings"
+                  : root.contextName === "PROD" && root.searchCapabilitiesReady &&
+                    root.availableSearchCategories.length === 0
+                    ? "This account has no searchable entity categories"
+                    : "Search Rock…  g: groups · p: people"
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {

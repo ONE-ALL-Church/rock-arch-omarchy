@@ -25,7 +25,12 @@ from .navigation import NavigationTarget, open_rock_url
 from .origin import DEFAULT_ROCK_ORIGIN
 from .profiles import ProfileError, ProfileStore, RockProfile
 from .quick_return import QuickReturnStore
-from .rock_rest_adapter import RockRestError, RockRestReadOnlyAdapter, SearchBatch
+from .rock_rest_adapter import (
+    RockRestError,
+    RockRestReadOnlyAdapter,
+    SearchBatch,
+    SearchCapabilities,
+)
 from .rock_session import RockSessionError, RockSessionProvider
 from .updates import UpdateManager
 
@@ -82,6 +87,10 @@ class MagnusStatusProvider(Protocol):
 
 class LiveReadAdapter(Protocol):
     def clear(self) -> None: ...
+
+    def searchable_categories(
+        self, force_refresh: bool = False
+    ) -> SearchCapabilities: ...
 
     def search(
         self,

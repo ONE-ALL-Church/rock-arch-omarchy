@@ -5,6 +5,24 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-03
+
+### Added
+
+- Detect which of Rock Arch's eight fixed entity endpoints the signed-in Rock
+  account can read after login and cache that bounded capability result per
+  active profile.
+- Show only accessible entity categories during Finish setup and in Settings,
+  with a retry path when the access check cannot complete.
+
+### Security
+
+- Intersect saved search preferences with the account's detected Rock access
+  in the broker. Scoped prefixes and unscoped searches cannot request an
+  unavailable entity endpoint, even if a client bypasses the QML controls.
+- Fail closed on transient capability-check errors while preserving Personal
+  Links, Recent Links, and independently authorized Magnus features.
+
 ## [0.19.0] - 2026-09-03
 
 ### Added
@@ -171,6 +189,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.20.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.20.0
 [0.19.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.19.0
 [0.18.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.18.0
 [0.17.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.17.0

@@ -3,7 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from .contracts import Context, HealthState, parse_search_query, sanitize_text
+from .contracts import (
+    CATEGORIES,
+    Context,
+    HealthState,
+    parse_search_query,
+    sanitize_text,
+)
 from .magnus_adapter import MagnusError
 from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, RockProfile, default_profile_name
@@ -26,6 +32,7 @@ class BrokerOperations:
             "status": self._status,
             "set_context": self._set_context,
             "magnus_status": self._magnus_status,
+            "search_capabilities": self._search_capabilities,
             "rock_configure": self._rock_configure,
             "magnus_configure": self._rock_configure,
             "profiles_status": self._profiles_status,
@@ -104,6 +111,45 @@ class BrokerOperations:
     def _magnus_status(self, _raw: dict[str, Any]) -> dict[str, Any]:
         self.broker._probe_magnus()
         return self.broker._ok(magnus=self.broker._magnus.status())
+
+    def _search_capability_payload(
+        self, *, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        broker = self.broker
+        if broker._context is Context.DEV:
+            return {
+                "state": "ready",
+                "availableCategories": list(CATEGORIES),
+                "unavailableCategories": [],
+            }
+        if not broker._origin or not broker._session.status()["configured"]:
+            return {
+                "state": "signed_out",
+                "availableCategories": [],
+                "unavailableCategories": [],
+            }
+        try:
+            capabilities = broker._live.searchable_categories(force_refresh)
+        except RockRestError:
+            broker._live_health = HealthState.FAILED
+            return {
+                "state": "error",
+                "availableCategories": [],
+                "unavailableCategories": [],
+            }
+        broker._live_health = HealthState.HEALTHY
+        return {
+            "state": "ready",
+            "availableCategories": list(capabilities.available),
+            "unavailableCategories": list(capabilities.unavailable),
+        }
+
+    def _search_capabilities(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return self.broker._ok(
+            searchCapabilities=self._search_capability_payload(
+                force_refresh=raw.get("refresh") is True
+            )
+        )
 
     def _rock_configure(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
@@ -241,9 +287,20 @@ class BrokerOperations:
         if (
             not isinstance(automatic_updates, bool)
             or not isinstance(categories, list)
-            or not categories
         ):
             return broker._error("invalid_onboarding_preferences")
+        capabilities = self._search_capability_payload()
+        if capabilities["state"] != "ready":
+            return broker._error("search_access_not_ready")
+        available = set(capabilities["availableCategories"])
+        if not set(categories).issubset(available):
+            return broker._error("invalid_onboarding_preferences")
+        current = broker._profile_store.preferences()["enabledCategories"]
+        categories = [
+            item
+            for item in CATEGORIES
+            if item in categories or (item not in available and item in current)
+        ]
         try:
             preferences = broker._profile_store.update_preferences(
                 {
@@ -429,12 +486,39 @@ class BrokerOperations:
                 rock=broker._session.status(),
                 magnus=broker._magnus.status(),
             )
+        capabilities = self._search_capability_payload()
+        if capabilities["state"] != "ready":
+            return broker._ok(
+                context=broker._context.value,
+                results=[],
+                source="access_check_failed",
+                unavailable=[],
+                searchCapabilities=capabilities,
+                rock=broker._session.status(),
+                magnus=broker._magnus.status(),
+            )
+        available = set(capabilities["availableCategories"])
+        effective_categories = [
+            item for item in enabled_categories if item in available
+        ]
+        unavailable_categories = [category] if category else effective_categories
+        if category and category not in available:
+            return broker._ok(
+                context=broker._context.value,
+                results=[],
+                source="not_authorized",
+                unavailable=[],
+                searchCapabilities=capabilities,
+                rock=broker._session.status(),
+                magnus=broker._magnus.status(),
+            )
         if not query and category is None:
             return broker._ok(
                 context=broker._context.value,
                 results=[],
                 source="live",
                 unavailable=[],
+                searchCapabilities=capabilities,
                 rock=broker._session.status(),
                 magnus=broker._magnus.status(),
             )
@@ -442,7 +526,7 @@ class BrokerOperations:
             batch = broker._live.search(
                 query,
                 category,
-                categories=enabled_categories,
+                categories=effective_categories,
                 include_person_context=preferences["showPersonContext"],
             )
         except RockRestError:
@@ -474,6 +558,7 @@ class BrokerOperations:
             unavailable=unavailable,
             rock=broker._session.status(),
             magnus=broker._magnus.status(),
+            searchCapabilities=capabilities,
         )
 
     def _person_quick_look(self, raw: dict[str, Any]) -> dict[str, Any]:

@@ -33,7 +33,11 @@ Column {
 
     Text {
       width: parent.width
-      text: "Choose what Rock Arch searches. Everything is included by default."
+      text: finishSetup.controller.searchCapabilitiesReady
+        ? "Choose from the categories this Rock account can search."
+        : finishSetup.controller.searchCapabilitiesState === "error"
+          ? "Rock Arch couldn't check this account's search access."
+          : "Checking what this Rock account can search…"
       textFormat: Text.PlainText
       color: finishSetup.dim
       font.family: Style.font.family
@@ -43,7 +47,9 @@ Column {
   }
 
   Column {
+    visible: finishSetup.controller.searchCapabilitiesReady
     width: parent.width
+    height: visible ? implicitHeight : 0
     spacing: Style.spacing.rowGap
 
     PanelSectionHeader { text: "SEARCH CATEGORIES" }
@@ -56,7 +62,7 @@ Column {
 
       Repeater {
         id: categoryRepeater
-        model: finishSetup.controller.searchCategories
+        model: finishSetup.controller.availableCategoryOptions()
 
         delegate: Button {
           id: categoryButton
@@ -88,9 +94,9 @@ Column {
     }
 
     Text {
-      visible: finishSetup.controller.onboardingEnabledCategories.length === 0
+      visible: finishSetup.controller.availableCategoryOptions().length === 0
       width: parent.width
-      text: "Choose at least one search category."
+      text: "This Rock account can't search any of Rock Arch's supported entity categories. Personal Links and other available features will still work."
       textFormat: Text.PlainText
       color: Color.urgent
       font.family: Style.font.family
@@ -120,7 +126,9 @@ Column {
       fontSize: Style.font.bodySmall
       enabled: !finishSetup.controller.onboardingSetupPending
       KeyNavigation.tab: continueButton
-      KeyNavigation.backtab: categoryRepeater.itemAt(categoryRepeater.count - 1)
+      KeyNavigation.backtab: categoryRepeater.count > 0
+        ? categoryRepeater.itemAt(categoryRepeater.count - 1)
+        : continueButton
       Keys.onEscapePressed: finishSetup.controller.completeOnboardingSetup()
       onActiveFocusChanged: finishSetup.controller.revealFocusedControl(
         automaticUpdatesButton)
@@ -156,15 +164,23 @@ Column {
       id: continueButton
       text: finishSetup.controller.onboardingSetupPending
         ? "Saving…"
+        : finishSetup.controller.searchCapabilitiesInFlight
+          ? "Checking access…"
+          : !finishSetup.controller.searchCapabilitiesReady
+            ? "Check access again"
         : "Continue to Search"
       bordered: true
       focusable: true
       enabled: !finishSetup.controller.onboardingSetupPending &&
-        finishSetup.controller.onboardingEnabledCategories.length > 0
-      KeyNavigation.tab: categoryRepeater.itemAt(0)
+        !finishSetup.controller.searchCapabilitiesInFlight
+      KeyNavigation.tab: categoryRepeater.count > 0
+        ? categoryRepeater.itemAt(0)
+        : (finishSetup.controller.updateManaged ? automaticUpdatesButton : continueButton)
       KeyNavigation.backtab: finishSetup.controller.updateManaged
         ? automaticUpdatesButton
-        : categoryRepeater.itemAt(categoryRepeater.count - 1)
+        : (categoryRepeater.count > 0
+          ? categoryRepeater.itemAt(categoryRepeater.count - 1)
+          : continueButton)
       Keys.onEscapePressed: finishSetup.controller.completeOnboardingSetup()
       onClicked: finishSetup.controller.completeOnboardingSetup()
     }

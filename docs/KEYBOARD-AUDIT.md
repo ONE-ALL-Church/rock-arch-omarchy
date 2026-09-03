@@ -17,9 +17,10 @@ only in PROD and only when the active Rock profile reports access.
 
 1. **Onboarding — healthy.** Profile name, domain, username, password, and Connect form a
    closed Tab/Shift+Tab loop. Enter advances fields or submits from the
-   password field. After login, Finish setup offers all eight search categories
-   plus automatic updates in one keyboard-complete screen. Navigation remains
-   hidden until setup succeeds.
+   password field. After login, Finish setup checks all eight supported entity
+   categories, offers only those the account can search, and includes automatic
+   updates in one keyboard-complete screen. Navigation remains hidden until
+   setup succeeds; a failed access check leaves a focused retry action.
 2. **Header — healthy.** Tab/Shift+Tab continue to cycle the launcher views.
    `Ctrl+1` through `Ctrl+4` provide deterministic access to Search, Personal
    Links, Magnus when available, and Settings. These shortcuts use application
@@ -45,7 +46,8 @@ only in PROD and only when the active Rock profile reports access.
    production build was started during this audit.
 8. **Settings — healthy.** Tab/Shift+Tab walk profile controls, inline profile
    renaming, login fields, preferences, categories, update actions, and toggles;
-   focused controls are scrolled into view.
+   focused controls are scrolled into view. Unavailable entity categories are
+   omitted and a failed access check exposes a keyboard-focusable retry action.
 
 ## Privacy-safe visual evidence
 
