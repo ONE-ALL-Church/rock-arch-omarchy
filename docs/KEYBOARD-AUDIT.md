@@ -3,7 +3,7 @@
 Audited 2026-09-02 against the installed Omarchy shell. The review covered
 every Rock Arch surface: login and Finish setup onboarding, header navigation, Search and Recent
 Links, Personal Links, Magnus browsing and file actions, build confirmation,
-and Settings.
+Settings, and the explicit public Knowledge scope.
 
 ## Outcome
 
@@ -30,21 +30,25 @@ only in PROD and only when the active Rock profile reports access.
    returns to the search field while deleting at the cursor. `X` or `Delete`
    opens a focused, escapable clear confirmation. Empty-state guidance now
    reflects the actual view.
-4. **Personal Links — healthy.** The first item is selected on entry, Up/Down
+4. **Rock Knowledge — healthy.** The visible Knowledge selector and `Alt+K`
+   enter the same `kb:` scope. Up/Down selects results, Enter opens the selected
+   detail, Tab moves between Back and Open source, and Esc returns to the result
+   list. The scope visibly warns that its query goes to a public service.
+5. **Personal Links — healthy.** The first item is selected on entry, Up/Down
    moves, Enter opens, and the view resets and reveals its selection instead of
    inheriting a stale scroll offset from another panel.
-5. **Magnus browser — healthy.** The first item is selected, Up/Down and Enter
+6. **Magnus browser — healthy.** The first item is selected, Up/Down and Enter
    browse, Backspace or Esc returns, `R` refreshes, and `B` opens the selected
    mobile-app build confirmation. DEV no longer exposes an unusable Magnus tab.
-6. **Magnus file preview — healthy with a privacy-bounded live check.** The
+7. **Magnus file preview — healthy with a privacy-bounded live check.** The
    Download action receives focus when a preview opens. Tab walks every visible
    action; `D`, `C`, `H`, `O`, and `R` remain direct shortcuts. Code structure,
    lint parsing, and navigation tests cover the preview without retaining a
    screenshot of private file content.
-7. **Build confirmation — healthy.** Deploy now receives focus on entry, Tab
+8. **Build confirmation — healthy.** Deploy now receives focus on entry, Tab
    moves to Cancel, Enter activates the focused action, and Esc cancels. No
    production build was started during this audit.
-8. **Settings — healthy.** Tab/Shift+Tab walk profile controls, inline profile
+9. **Settings — healthy.** Tab/Shift+Tab walk profile controls, inline profile
    renaming, login fields, preferences, categories, update actions, and toggles;
    focused controls are scrolled into view. Unavailable entity categories are
    omitted and a failed access check exposes a keyboard-focusable retry action.
@@ -66,6 +70,8 @@ only the update controls.
 |---|---|---|---|---|
 | Views | Tab / Shift+Tab | — | Esc | Ctrl+1 Search, Ctrl+2 Personal, Ctrl+3 Magnus, Ctrl+4 Settings |
 | Search / Recent | Up / Down | Enter or Space | Backspace edits search | X or Delete clears Recent Links |
+| Knowledge results | Up / Down | Enter opens detail | Backspace edits search | `Alt+K` enters scope |
+| Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc returns to results | Open source |
 | Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | R refresh, B deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | D download, C copy, H hash, O open, R refresh |

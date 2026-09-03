@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "oneall.rock-arch",
   "name": "Rock Arch",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "author": "ONE&ALL",
   "license": "MIT",
   "description": "Bridging Rock RMS and Omarchy",
@@ -13,7 +13,7 @@
     "displayName": "Rock Arch",
     "description": "Bridging Rock RMS and Omarchy",
     "category": "Productivity",
-    "aliases": ["rock", "arch", "launcher", "magnus"],
+    "aliases": ["rock", "arch", "launcher", "knowledge", "magnus"],
     "allowMultiple": false
   }
 }

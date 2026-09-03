@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from .contracts import (
     CATEGORIES,
+    KNOWLEDGE_CATEGORY,
     Context,
     HealthState,
     parse_search_query,
@@ -13,6 +14,7 @@ from .contracts import (
 from .magnus_adapter import MagnusError
 from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, RockProfile, default_profile_name
+from .rock_kb_adapter import RockKbError
 from .rock_rest_adapter import RockRestError
 from .rock_session import RockSessionError
 from .updates import UpdateError
@@ -56,6 +58,8 @@ class BrokerOperations:
             "magnus_open": self._magnus_open,
             "magnus_build": self._magnus_build,
             "search": self._search,
+            "knowledge_result": self._knowledge_result,
+            "knowledge_open_source": self._knowledge_open_source,
             "person_quick_look": self._person_quick_look,
             "navigation_status": self._navigation_status,
             "open_navigation": self._open_navigation,
@@ -456,6 +460,29 @@ class BrokerOperations:
     def _search(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
         query, category = parse_search_query(raw.get("query"))
+        if category == KNOWLEDGE_CATEGORY:
+            if len(query) < 3:
+                return broker._ok(
+                    context=broker._context.value,
+                    results=[],
+                    source="knowledge",
+                    unavailable=[],
+                )
+            try:
+                results = broker._knowledge.search(query)
+            except RockKbError:
+                return broker._ok(
+                    context=broker._context.value,
+                    results=[],
+                    source="knowledge_unavailable",
+                    unavailable=[],
+                )
+            return broker._ok(
+                context=broker._context.value,
+                results=results,
+                source="knowledge",
+                unavailable=[],
+            )
         preferences = broker._profile_store.preferences()
         enabled_categories = preferences["enabledCategories"]
         unavailable_categories = [category] if category else enabled_categories
@@ -559,6 +586,16 @@ class BrokerOperations:
             rock=broker._session.status(),
             magnus=broker._magnus.status(),
             searchCapabilities=capabilities,
+        )
+
+    def _knowledge_result(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return self.broker._knowledge_detail(
+            sanitize_text(raw.get("safeId"), 100)
+        )
+
+    def _knowledge_open_source(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return self.broker._open_knowledge_source(
+            sanitize_text(raw.get("safeId"), 100)
         )
 
     def _person_quick_look(self, raw: dict[str, Any]) -> dict[str, Any]:

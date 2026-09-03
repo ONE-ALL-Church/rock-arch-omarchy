@@ -38,6 +38,9 @@ CATEGORIES = (
     "Content Channel Items",
 )
 
+KNOWLEDGE_CATEGORY = "Knowledge"
+KNOWLEDGE_SCOPE_ALIASES = frozenset({"kb", "knowledge"})
+
 SEARCH_SCOPE_ALIASES = {
     "p": "People",
     "person": "People",
@@ -98,10 +101,12 @@ def sanitize_text(value: Any, limit: int) -> str:
 
 
 def parse_search_query(value: Any) -> tuple[str, str | None]:
-    """Split a recognized entity prefix from a bounded search query."""
+    """Split a recognized entity or public-knowledge prefix from a query."""
 
     text = sanitize_text(value, 120)
     prefix, separator, remainder = text.partition(":")
+    if separator and prefix.lower() in KNOWLEDGE_SCOPE_ALIASES:
+        return remainder.strip(), KNOWLEDGE_CATEGORY
     category = SEARCH_SCOPE_ALIASES.get(prefix.lower()) if separator else None
     return (remainder.strip(), category) if category else (text, None)
 

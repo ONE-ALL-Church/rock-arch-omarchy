@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.20.0` release boundary. Historical feature
+This record describes the current `0.21.0` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -13,15 +13,18 @@ uvx --from ruff==0.16.5 ruff check rock_lens_broker tests
 uvx --from ty==0.0.78 ty check rock_lens_broker
 python3 -m compileall -q rock_lens_broker
 omarchy plugin validate .
-/usr/lib/qt6/bin/qmllint plugin/oneall.rock-arch/*.qml
+/usr/lib/qt6/bin/qmllint plugin/oneall.rock-arch/*.qml plugin/oneall.rock-arch/*.js
 git diff --check
 ```
 
-The suite contains 139 passing tests. Release-contract coverage keeps
+The suite contains 148 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
-Updater coverage verifies remote revision detection, manifest identity and
+Public-KB coverage verifies explicit scope parsing, fixed-origin credentialless
+requests, response limits, schema validation, opaque IDs, cache behavior,
+public-source URL validation, and keyboard-complete detail navigation. Updater
+coverage verifies remote revision detection, manifest identity and
 version validation, local-change refusal, fixed worker launch arguments, private
 state permissions, broker routing, and the opt-in automatic-update preference.
 
@@ -47,8 +50,8 @@ push to `main` and on pull requests.
 ## Data and navigation boundary
 
 - The QML process receives no credentials, cookies, raw Rock IDs, raw server
-  URLs, response bodies, or exception text. A user-selected bounded Magnus text
-  preview is the sole content exception.
+  URLs, or exception text. Content is limited to a user-selected bounded Magnus
+  text preview and a user-selected bounded public Knowledge result.
 - Search uses eight fixed Rock REST v1 resources with fixed projections, bounded
   results, and exact-origin navigation targets. It exposes no generic HTTP,
   REST v2, SQL, mutation, job-run, or Run Now transport.
@@ -64,6 +67,22 @@ push to `main` and on pull requests.
 - Person context is limited to age, conservatively inferred spouse, family
   campus, and connection status. Contact details, addresses, and full birth
   dates are not fetched.
+
+## Public Knowledge boundary
+
+- Knowledge is an explicit scope entered with `kb:`, `knowledge:`, the visible
+  selector, or `Alt+K`; unscoped and entity-prefixed searches remain local to
+  the selected Rock instance.
+- Requests use redirect-free GETs to the fixed public Rock Agent KB origin and
+  include no Rock cookie, credentials, profile details, or instance origin.
+- Searches require at least three characters, return at most ten transformed
+  rows, and are capped at 512 KiB. Exact details are capped at 2 MiB, with at
+  most 20,000 characters of plain body text exposed to QML.
+- Result IDs and external source URLs remain broker-private. QML receives an
+  opaque ID; opening a source is a separate action guarded by strict public
+  HTTPS URL validation.
+- Search and detail caches are memory-only and expire after five minutes.
+  Knowledge results are not added to Recent Links.
 
 ## Magnus boundary
 

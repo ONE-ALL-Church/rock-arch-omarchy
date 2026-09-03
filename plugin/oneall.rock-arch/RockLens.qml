@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "RockLensSearchScopes.js" as SearchScopes
 
 Panel {
   id: root
@@ -38,7 +39,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.20.0"
+  property string currentVersion: "0.21.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -61,6 +62,8 @@ Panel {
   property var unavailableSearchCategories: []
   property var onboardingEnabledCategories: []
   property var quickLook: null
+  property var knowledgeDetail: null
+  property bool knowledgeBusy: false
   property var requestQueue: []
   property string searchSource: "synthetic"
   property string feedbackText: ""
@@ -124,11 +127,14 @@ Panel {
     searchCapabilitiesState === "ready"
   readonly property int hiddenSearchCategoryCount: contextName === "DEV" ? 0 :
     unavailableSearchCategories.length
-  readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
+  readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty &&
+    knowledgeDetail === null
   readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
+  readonly property bool knowledgeScope: scopeKey === "kb"
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
+    knowledgeDetail === null &&
     !onboardingFlowActive && !onboardingForm.inputActive &&
     !finishSetupPanel.inputActive && !settingsPanel.inputActive
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
@@ -176,23 +182,7 @@ Panel {
   }
 
   function scopeKeyForQuery(value) {
-    var text = String(value || "")
-    var colon = text.indexOf(":")
-    if (colon < 1) return ""
-    var prefix = text.substring(0, colon).trim().toLowerCase()
-    if (prefix === "p" || prefix === "person" || prefix === "people") return "p"
-    if (prefix === "g" || prefix === "group" || prefix === "groups") return "g"
-    if (prefix === "gt" || prefix === "grouptype" || prefix === "grouptypes") return "gt"
-    if (prefix === "w" || prefix === "wt" || prefix === "workflow" ||
-        prefix === "workflows" || prefix === "workflowtype" ||
-        prefix === "workflowtypes") return "w"
-    if (prefix === "j" || prefix === "job" || prefix === "jobs") return "j"
-    if (prefix === "pg" || prefix === "page" || prefix === "pages") return "page"
-    if (prefix === "ct" || prefix === "contenttype" || prefix === "contenttypes" ||
-        prefix === "channeltype" || prefix === "channeltypes") return "ct"
-    if (prefix === "c" || prefix === "content" || prefix === "contents" ||
-        prefix === "item" || prefix === "items") return "c"
-    return ""
+    return SearchScopes.keyForQuery(value)
   }
 
   function activeProfileName() {
@@ -254,6 +244,13 @@ Panel {
       return "The clipboard isn't available right now."
     if (code === "recent_links_clear_failed")
       return "Recent Links couldn't be cleared from this computer. Try again."
+    if (code === "knowledge_result_not_found")
+      return "That knowledge result is no longer available. Search again."
+    if (code === "knowledge_source_not_found")
+      return "That result doesn't have a public source to open."
+    if (code === "knowledge_unavailable" || code === "invalid_knowledge_response" ||
+        code === "knowledge_response_out_of_bounds")
+      return "Rock Knowledge isn't available right now. Try again when you're online."
     if (code === "no_update_available")
       return "Rock Arch is already up to date."
     if (code === "invalid_update_preference")
@@ -280,8 +277,8 @@ Panel {
   function guidanceText() {
     if (setupBusy)
       return setupSlow ? setupBusyText + " Rock is taking longer than usual." : setupBusyText
-    if ((contextName === "DEV" || rockConfigured) && searchInFlight)
-      return "Looking for matches…"
+    if ((contextName === "DEV" || rockConfigured || knowledgeScope) && searchInFlight)
+      return knowledgeScope ? "Searching Rock Knowledge…" : "Looking for matches…"
     if (!statusLoaded) return "Getting your Rock workspace ready…"
     if (updateState === "updating")
       return "Installing the update… Rock Arch will restart when it finishes."
@@ -359,33 +356,15 @@ Panel {
   }
 
   function scopeLabelForKey(key) {
-    if (key === "p") return "People"
-    if (key === "g") return "Groups"
-    if (key === "gt") return "Group Types"
-    if (key === "w") return "Workflow Types"
-    if (key === "j") return "Jobs"
-    if (key === "page") return "Pages"
-    if (key === "ct") return "Content Channel Types"
-    if (key === "c") return "Content"
-    return ""
+    return SearchScopes.labelForKey(key)
   }
 
   function queryWithoutScope(value) {
-    var text = String(value || "")
-    if (!scopeKeyForQuery(text)) return text.trim()
-    return text.substring(text.indexOf(":") + 1).trim()
+    return SearchScopes.withoutScope(value)
   }
 
   function applyScope(key) {
-    var targetCategory = ""
-    if (key === "p") targetCategory = "People"
-    else if (key === "g") targetCategory = "Groups"
-    else if (key === "gt") targetCategory = "Group Types"
-    else if (key === "w") targetCategory = "Workflows"
-    else if (key === "j") targetCategory = "Jobs"
-    else if (key === "page") targetCategory = "Pages"
-    else if (key === "ct") targetCategory = "Content Channel Types"
-    else if (key === "c") targetCategory = "Content Channel Items"
+    var targetCategory = SearchScopes.categoryForKey(key)
     if (targetCategory && !effectiveCategoryEnabled(targetCategory)) return
     var term = scopeKey ? queryWithoutScope(query) : query.trim()
     viewMode = "search"
@@ -394,6 +373,8 @@ Panel {
     recentCursor = -1
     linkCursor = -1
     quickLook = null
+    knowledgeDetail = null
+    knowledgeBusy = false
     feedbackText = ""
     panelFlick.contentY = 0
     scheduleSearch()
@@ -409,6 +390,8 @@ Panel {
     resultCursor = -1
     recentCursor = -1
     quickLook = null
+    knowledgeDetail = null
+    knowledgeBusy = false
     feedbackText = ""
     scheduleSearch()
     if (query.trim().length === 0) refreshQuickReturns()
@@ -427,6 +410,10 @@ Panel {
     }
     if (onboardingRequired) {
       close()
+      return
+    }
+    if (knowledgeDetail !== null) {
+      searchPanel.closeKnowledgeDetail()
       return
     }
     if (editingProfileId !== "") {
@@ -463,6 +450,7 @@ Panel {
       searchInFlight = false
       searchPending = false
       searchInFlightQuery = ""
+      knowledgeBusy = false
       magnusActionBusy = false
       feedbackText = "Rock Arch couldn't read Rock's response. Try again."
       return
@@ -475,6 +463,7 @@ Panel {
       searchInFlight = false
       searchPending = false
       searchInFlightQuery = ""
+      knowledgeBusy = false
       magnusBusy = false
       magnusActionBusy = false
       magnusProbeInFlight = false
@@ -566,6 +555,17 @@ Panel {
       feedbackText = String(response.magnusBuild.message || "Build started successfully") +
         (preferenceRecentLinks ? " · Added to Recent Links" : "")
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    }
+    if (response.knowledgeDetail) {
+      knowledgeBusy = false
+      knowledgeDetail = response.knowledgeDetail
+      feedbackText = ""
+      panelFlick.contentY = 0
+      Qt.callLater(function() {
+        if (root.knowledgeDetail === null) return
+        searchPanel.knowledgeBackButton.forceActiveFocus(Qt.TabFocusReason)
+        root.revealFocusedControl(searchPanel.knowledgeBackButton)
+      })
     }
     if (response.profiles) {
       var previousProfileId = activeProfileId
@@ -731,16 +731,34 @@ Panel {
     }
     else if (response.source === "unavailable" && !staleSearch)
       feedbackText = "Live Rock search needs a saved Rock login"
+    else if (response.source === "knowledge_unavailable" && !staleSearch)
+      feedbackText = "Rock Knowledge isn't available right now. Try again when you're online."
     else if (response.source === "not_authorized" && !staleSearch)
       feedbackText = "This Rock account can't search " + (scopeLabel || "that category") + "."
     else if (response.source === "access_check_failed" && !staleSearch)
       feedbackText = "Rock Arch couldn't check what this account can search."
     else if (response.source && !staleSearch)
       feedbackText = ""
+    if (response.knowledgeOpened === true) {
+      knowledgeBusy = false
+      feedbackText = "Opened the knowledge source"
+    }
     if (staleSearch) Qt.callLater(function() { root.refreshSearch() })
   }
 
   function refreshSearch() {
+    if (knowledgeDetail !== null) return
+    if (knowledgeScope) {
+      if (searchInFlight) {
+        searchPending = true
+        return
+      }
+      searchInFlight = true
+      searchPending = false
+      searchInFlightQuery = query
+      request({op: "search", query: query})
+      return
+    }
     if (contextName === "PROD" && (!statusLoaded || !rockConfigured)) {
       searchInFlight = false
       searchPending = false
@@ -802,6 +820,8 @@ Panel {
   }
   function focusSearch() {
     viewMode = "search"
+    knowledgeDetail = null
+    knowledgeBusy = false
     resultCursor = -1
     recentCursor = -1
     linkCursor = -1
@@ -813,6 +833,8 @@ Panel {
 
   function openSettings(showAdd) {
     viewMode = "settings"
+    knowledgeDetail = null
+    knowledgeBusy = false
     addProfileMode = showAdd === true || (profilesLoaded && profiles.length === 0)
     resultCursor = -1
     recentCursor = -1
@@ -936,6 +958,7 @@ Panel {
     recentCursor = -1
     linkCursor = -1
     quickLook = null
+    knowledgeDetail = null
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
       root.revealItem(searchPanel.resultRepeater.itemAt(root.resultCursor))
@@ -1177,7 +1200,13 @@ Panel {
   function activateResult(index) {
     if (index < 0 || index >= results.length) return
     var item = results[index]
-    if (item.canOpen === true)
+    if (item.category === "Knowledge") {
+      if (knowledgeBusy) return
+      knowledgeBusy = true
+      feedbackText = "Opening knowledge…"
+      request({op: "knowledge_result", safeId: item.safeId})
+    }
+    else if (item.canOpen === true)
       request({op: "open_navigation", safeId: item.safeId})
     else if (item.category === "People")
       request({op: "person_quick_look", safeId: item.safeId})
@@ -1315,6 +1344,8 @@ Panel {
     recentCursor = -1
     linkCursor = -1
     quickLook = null
+    knowledgeDetail = null
+    knowledgeBusy = false
     magnusItems = []
     magnusPreview = null
     magnusHistory = []
@@ -1339,6 +1370,8 @@ Panel {
       focusSearch()
     recentCursor = quickReturns.length ? 0 : -1
     quickLook = null
+    knowledgeDetail = null
+    knowledgeBusy = false
     feedbackText = ""
     statusLoaded = false
     searchInFlight = false
@@ -1375,7 +1408,7 @@ Panel {
       brokerSocket.connected = true
     }
   }
-  Timer { id: searchTimer; interval: 250; onTriggered: root.refreshSearch() }
+  Timer { id: searchTimer; interval: root.knowledgeScope ? 400 : 250; onTriggered: root.refreshSearch() }
   Timer {
     interval: 60000
     repeat: true
@@ -1448,6 +1481,7 @@ Panel {
   Shortcut { sequence: "Alt+Shift+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Pages"); onActivated: root.applyScope("page") }
   Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Items"); onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
+  Shortcut { sequence: "Alt+K"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("kb") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.focusSearch() }
@@ -1478,7 +1512,8 @@ Panel {
       id: keyCatcher
       anchors.fill: parent
       formMode: root.onboardingFlowActive || root.viewMode === "settings" ||
-        root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null
+        root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null ||
+        root.knowledgeDetail !== null
       commandMode: root.magnusPreviewCommandsEnabled
       blocked: searchField.activeFocus || onboardingForm.inputActive ||
         finishSetupPanel.inputActive || settingsPanel.inputActive || magnusPanel.inputActive
@@ -1512,14 +1547,15 @@ Panel {
         }
 
         RowLayout {
-          visible: root.viewMode === "search" && !root.onboardingFlowActive
+          visible: root.viewMode === "search" && !root.onboardingFlowActive &&
+            root.knowledgeDetail === null
           width: parent.width
           spacing: Style.spacing.sm
 
           TextField {
             id: searchField
             Layout.fillWidth: true
-            enabled: root.contextName === "DEV" ||
+            enabled: root.knowledgeScope || root.contextName === "DEV" ||
               (root.statusLoaded && root.rockConfigured && root.searchCapabilitiesReady)
             maximumLength: 120
             placeholderText: root.contextName === "PROD" && root.statusLoaded && !root.rockConfigured
@@ -1531,7 +1567,7 @@ Panel {
                   : root.contextName === "PROD" && root.searchCapabilitiesReady &&
                     root.availableSearchCategories.length === 0
                     ? "This account has no searchable entity categories"
-                    : "Search Rock…  g: groups · p: people"
+                    : "Search Rock…  kb: knowledge · g: groups"
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {
@@ -1540,6 +1576,8 @@ Panel {
               root.pendingClearRecent = false
               root.results = []
               root.quickLook = null
+              root.knowledgeDetail = null
+              root.knowledgeBusy = false
               root.feedbackText = ""
               root.scheduleSearch()
               if (text.trim().length === 0) root.refreshQuickReturns()
@@ -1565,16 +1603,20 @@ Panel {
           }
 
           Button {
-            visible: root.scopeKey !== ""
             Layout.preferredHeight: searchField.implicitHeight
-            text: root.scopeLabel + "  ×"
-            tooltipText: "Clear category filter · Alt+0"
-            selected: true
+            text: root.scopeKey !== "" ? root.scopeLabel + "  ×" : "Knowledge"
+            tooltipText: root.scopeKey !== ""
+              ? "Clear search scope · Alt+0"
+              : "Search Rock Knowledge · Alt+K"
+            selected: root.scopeKey !== ""
             bordered: true
             fontSize: Style.font.caption
             horizontalPadding: Style.spacing.lg
             focusable: false
-            onClicked: root.clearScope()
+            onClicked: {
+              if (root.scopeKey !== "") root.clearScope()
+              else root.applyScope("kb")
+            }
           }
         }
 

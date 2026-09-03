@@ -3,11 +3,15 @@
 Rock Arch is a keyboard-first Omarchy launcher for Rock RMS. Search People,
 Groups, Group Types, Workflow Types, Scheduled Jobs, Pages, Content Channel
 Types, and Content Channel Items; open Rock Personal Links; and return to
-recently opened records without navigating the full admin UI.
+recently opened records without navigating the full admin UI. An explicit
+Knowledge scope searches the public Rock Agent Knowledge Base for guides,
+troubleshooting, recipes, Model Map records, Lava context, issues, and ideas.
 
 Every user signs directly into their own Rock instance. Rock Arch uses Rock's
-native `.ROCK` session for Search, Personal Links, and optional Magnus features.
-It does not require an OpenID client, Rock MCP, Magnus CLI, Node.js, or npm.
+native `.ROCK` session for entity Search, Personal Links, and optional Magnus
+features. Public Knowledge search is credentialless and isolated from that
+session. Rock Arch does not require an OpenID client, Rock MCP, Rock KB client,
+Magnus CLI, Node.js, or npm.
 
 ![Current Rock Arch search with a selected result](outputs/keyboard-audit/02-search-results.png)
 
@@ -126,7 +130,7 @@ forces PROD, rewrites a previously saved DEV context to PROD, hides the switch,
 and rejects direct socket requests to enter DEV. Values such as `true` or `yes`
 do not enable it.
 
-## Search, Personal Links, and Recent Links
+## Search, Knowledge, Personal Links, and Recent Links
 
 In the launcher, an empty **Search** view shows local **Recent Links**, with a
 confirmed **Clear** action in the section header and the first recent item
@@ -142,9 +146,10 @@ active profile. Settings can retry the check. Each target uses a fixed Rock
 route and must resolve to the exact configured Rock origin; Personal Links have
 the same origin restriction.
 
-All searches use fixed Rock REST v1 endpoints; Rock Arch does not use the v2
-API or accept arbitrary endpoint paths. Start a query with an entity prefix to
-search only that Rock category. A bare
+Searches against the configured Rock instance use fixed Rock REST v1 endpoints;
+Rock Arch does not use the v2 API or accept arbitrary endpoint paths. The
+`kb:` scope uses a separate public, credentialless Knowledge service. Start a
+query with an entity prefix to search only that Rock category. A bare
 prefix such as `g:` lists the first three items in that category.
 
 | Category | Short prefix | Full aliases | Shortcut |
@@ -157,6 +162,7 @@ prefix such as `g:` lists the first three items in that category.
 | Pages | `pg:` | `page:`, `pages:` | `Alt+Shift+P` |
 | Content Channel Types | `ct:` | `contenttype:`, `channeltype:`, `channeltypes:` | `Alt+Shift+C` |
 | Content Channel Items | `c:` | `content:`, `item:`, `items:` | `Alt+C` |
+| Public Rock Knowledge | `kb:` | `knowledge:` | `Alt+K` |
 
 For example, `g: youth` calls only the Groups endpoint. Every scope also accepts
 an exact Rock ID or GUID, such as `g: 42` or `p: a81b7c6d-1234-4abc-9876-0123456789ab`.
@@ -169,14 +175,46 @@ as a badge beside the search field. `Esc` clears the scope before closing the
 panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary search
 text; no slash-command mode is required.
 
+### Public Rock Knowledge
+
+Click **Knowledge**, press `Alt+K`, or begin a query with `kb:` to enter the
+explicit public-KB scope. For example:
+
+```text
+kb: check-in labels not printing
+kb: Group model Members property
+kb: event duration feature request
+```
+
+Rock Arch sends only the text after `kb:` to the fixed public
+`rock-agent-kb.oneandall.church` search service. It does not send the selected
+Rock domain, profile, credentials, cookie, Personal Links, Recent Links, or
+entity results. Because the public service necessarily receives the query, the
+scope displays a reminder not to include names or private church data. Normal
+unscoped and entity-prefixed searches are never forwarded to the KB.
+
+Knowledge results can include guides, task cards, troubleshooting nodes,
+approved claims, structured references, recipes, Model Map records, Lava
+context, and public Rock issues or ideas. Results show their source authority;
+community issue and idea reports remain explicitly unreviewed. Enter opens a
+bounded plain-text detail inside Rock Arch. **Open source** is a separate action
+that validates the cited external HTTPS target before passing it to the browser.
+Esc returns to the result list. Search and detail responses are cached in broker
+memory for five minutes and are never added to Recent Links.
+
+Displayed knowledge is attributed to the [Rock Agent Knowledge Base by ONE&ALL
+Church](https://github.com/ONE-ALL-Church/rock-agent-kb). Rock Arch uses the
+service's intended public HTTPS interface directly, so installing a CLI, MCP
+server, or additional Python package is unnecessary.
+
 ## Keyboard navigation
 
 The search field keeps native editing behavior. Up and Down move through Recent
 Links or results and across the Search/Personal Links boundary. Tab cycles the
 search input, its displayed items, and Personal Links (Shift+Tab reverses), and
-Enter or Space opens the selected live target. Backspace on a highlighted item
-returns to the search field and deletes at the search cursor, so narrowing can
-continue without an extra navigation step.
+Enter or Space opens the selected live target or Knowledge detail. Backspace on
+a highlighted item returns to the search field and deletes at the search cursor,
+so narrowing can continue without an extra navigation step.
 
 Every main view also has a direct keyboard route: `Ctrl+1` opens Search,
 `Ctrl+2` opens Personal Links, `Ctrl+3` opens Magnus when the active profile has
@@ -186,6 +224,8 @@ Magnus folders use Up/Down and Enter; `B` prepares a selected mobile-app build.
 In a file preview, Tab walks the visible actions and the matching single-key
 commands are shown on each button (`D`, `C`, `H`, `O`, and `R`). Build and clear
 confirmations always move focus to an explicit action and remain escapable.
+Within Knowledge detail, Tab moves between **Back** and **Open source**; Esc
+returns to the selected result.
 
 People results include compact duplicate-name context when Rock provides it:
 age, conservatively identified spouse, family campus, and connection status.
@@ -230,6 +270,10 @@ full capability boundary.
 - Live reads are fixed REST v1 GET operations with bounded responses and field-level
   output allowlists. QML cannot supply a URL, API path, OData field, or filter
   expression.
+- Public Knowledge search is activated only by `kb:`, `knowledge:`, the visible
+  selector, or `Alt+K`. Its fixed-origin client is redirect-free,
+  credentialless, response-bounded, and unable to access the Rock session.
+  Result and source targets cross QML only as process-local opaque IDs.
 - Personal Links are read-only, restricted to same-origin HTTPS targets, and
   represented outside the broker by opaque IDs.
 - Recent Links (the local Quick Return store) contain only launcher-opened

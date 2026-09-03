@@ -19,6 +19,7 @@ NAVIGATION_PATH = QML_PATH.with_name("RockLensNavigationTabs.qml")
 PERSONAL_PATH = QML_PATH.with_name("RockLensPersonalPanel.qml")
 SEARCH_PATH = QML_PATH.with_name("RockLensSearchPanel.qml")
 SETTINGS_PATH = QML_PATH.with_name("RockLensSettingsPanel.qml")
+SCOPES_PATH = QML_PATH.with_name("RockLensSearchScopes.js")
 PANEL_PATHS = (
     BAR_BUTTON_PATH,
     ICON_PATH,
@@ -30,6 +31,7 @@ PANEL_PATHS = (
     PERSONAL_PATH,
     SEARCH_PATH,
     SETTINGS_PATH,
+    SCOPES_PATH,
 )
 
 
@@ -172,6 +174,25 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('onActivated: root.applyScope("gt")', source)
         self.assertIn('sequence: "Alt+Shift+C"', source)
         self.assertIn('onActivated: root.applyScope("ct")', source)
+
+    def test_public_knowledge_scope_is_discoverable_private_and_keyboard_complete(self):
+        source = all_qml_source()
+
+        self.assertIn('prefix === "kb" || prefix === "knowledge"', source)
+        self.assertIn('sequence: "Alt+K"', source)
+        self.assertIn('onActivated: root.applyScope("kb")', source)
+        self.assertIn("Search Rock Knowledge · Alt+K", source)
+        self.assertIn(
+            "Your query is sent to Rock Agent KB. Don't include names or private church data.",
+            source,
+        )
+        self.assertIn('request({op: "knowledge_result", safeId: item.safeId})', source)
+        self.assertIn('op: "knowledge_open_source", safeId: detail.safeId', source)
+        self.assertIn("function closeKnowledgeDetail()", source)
+        self.assertIn("searchPanel.knowledgeBackButton.forceActiveFocus", source)
+        self.assertIn('text: "Back"', source)
+        self.assertIn('text: searchPanel.controller.knowledgeBusy ? "Opening…" : "Open source"', source)
+        self.assertIn("Keys.onEscapePressed: searchPanel.closeKnowledgeDetail()", source)
 
     def test_search_categories_follow_the_active_accounts_detected_access(self):
         source = all_qml_source()

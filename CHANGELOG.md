@@ -5,6 +5,27 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-03
+
+### Added
+
+- Add an explicit public Rock Knowledge search scope through `kb:`,
+  `knowledge:`, `Alt+K`, or the visible Knowledge selector beside Search.
+- Open selected knowledge results inside Rock Arch with source authority,
+  claim tier, version scope, attribution, and a keyboard-accessible public
+  source action.
+
+### Security
+
+- Keep public KB requests completely separate from the authenticated Rock
+  client. Rock cookies, credentials, profile metadata, and instance domains are
+  never attached to KB requests.
+- Send queries to the fixed, redirect-free Rock Agent KB origin only after the
+  user explicitly enters Knowledge scope. Bound and validate every response,
+  expose opaque result IDs, and validate external HTTPS sources before opening.
+- Label the public-search boundary in the UI so users know not to enter person
+  names or private church data.
+
 ## [0.20.0] - 2026-09-03
 
 ### Added
