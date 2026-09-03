@@ -5,6 +5,8 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-09-03
+
 ### Security
 
 - Reject malformed or oversized Magnus mobile-app identifiers before any
