@@ -7,6 +7,7 @@ QML_PATH = (
     / "oneall.rock-lens"
     / "RockLens.qml"
 )
+SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
 
 
 class QmlNavigationTests(unittest.TestCase):
@@ -25,8 +26,19 @@ class QmlNavigationTests(unittest.TestCase):
             "                    (root.recentCursor < 0 && index === 0 && searchField.activeFocus && root.quickReturns.length > 0)",
             source,
         )
-        self.assertEqual(source.count("border.width: rowSelected ? 2 : 0"), 2)
-        self.assertEqual(source.count("border.color: Color.accent"), 2)
+        self.assertEqual(source.count("RockLensSelectionChrome {"), 4)
+
+    def test_all_navigable_rows_share_safe_selection_spacing(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        selection = SELECTION_PATH.read_text(encoding="utf-8")
+
+        self.assertEqual(source.count("readonly property bool rowSelected:"), 4)
+        self.assertEqual(source.count("height: Style.space(52)"), 4)
+        self.assertGreaterEqual(source.count("anchors.leftMargin: 16"), 4)
+        self.assertGreaterEqual(source.count("anchors.rightMargin:"), 4)
+        self.assertIn("border.width: 2", selection)
+        self.assertIn("border.color: Color.accent", selection)
+        self.assertIn("color: Qt.rgba(Color.accent.r", selection)
 
     def test_settings_fold_connection_and_magnus_into_active_profile(self):
         source = QML_PATH.read_text(encoding="utf-8")

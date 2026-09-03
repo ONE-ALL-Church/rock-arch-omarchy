@@ -1291,27 +1291,17 @@ Panel {
                   readonly property bool rowSelected: index === root.resultCursor ||
                     (root.resultCursor < 0 && index === 0 && searchField.activeFocus && root.results.length > 0)
                   width: body.width
-                  height: Style.space(50)
+                  height: Style.space(52)
                   radius: 7
-                  color: rowSelected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18) : "transparent"
-                  border.width: rowSelected ? 2 : 0
-                  border.color: Color.accent
-                  Rectangle {
-                    visible: parent.rowSelected
-                    width: 4
-                    height: parent.height - 12
-                    anchors.left: parent.left
-                    anchors.leftMargin: 5
-                    anchors.verticalCenter: parent.verticalCenter
-                    radius: 2
-                    color: Color.accent
-                  }
+                  color: "transparent"
+                  clip: true
+                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
                   Column {
                     anchors.left: parent.left
                     anchors.right: openButton.visible ? openButton.left : parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 15
-                    anchors.rightMargin: 8
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 10
                     Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
                     Text { width: parent.width; text: root.displayCategory(modelData.category) + " · " + modelData.subtitle + " · " + modelData.status; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
                   }
@@ -1469,27 +1459,17 @@ Panel {
                   readonly property bool rowSelected: index === root.recentCursor ||
                     (root.recentCursor < 0 && index === 0 && searchField.activeFocus && root.quickReturns.length > 0)
                   width: body.width
-                  height: Style.space(42)
+                  height: Style.space(52)
                   radius: 7
-                  color: rowSelected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18) : "transparent"
-                  border.width: rowSelected ? 2 : 0
-                  border.color: Color.accent
-                  Rectangle {
-                    visible: parent.rowSelected
-                    width: 4
-                    height: parent.height - 12
-                    anchors.left: parent.left
-                    anchors.leftMargin: 5
-                    anchors.verticalCenter: parent.verticalCenter
-                    radius: 2
-                    color: Color.accent
-                  }
+                  color: "transparent"
+                  clip: true
+                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
                   Column {
-                    anchors.fill: parent
-                    anchors.leftMargin: 15
-                    anchors.rightMargin: 7
-                    anchors.topMargin: 7
-                    anchors.bottomMargin: 7
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 10
                     Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
                     Text {
                       width: parent.width
@@ -1536,13 +1516,19 @@ Panel {
                 delegate: Rectangle {
                   required property var modelData
                   required property int index
+                  readonly property bool rowSelected: index === root.linkCursor
                   width: body.width
-                  height: Style.space(42)
+                  height: Style.space(52)
                   radius: 7
-                  color: index === root.linkCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  color: "transparent"
+                  clip: true
+                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
                   Column {
-                    anchors.fill: parent
-                    anchors.margins: 7
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 10
                     Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
                     Text { width: parent.width; text: modelData.section + (modelData.isShared ? " · Shared" : ""); color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
                   }
@@ -1713,14 +1699,19 @@ Panel {
                 delegate: Rectangle {
                   required property var modelData
                   required property int index
+                  readonly property bool rowSelected: index === root.magnusCursor
                   width: body.width
-                  height: Style.space(48)
+                  height: Style.space(52)
                   radius: 7
-                  color: index === root.magnusCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  color: "transparent"
+                  clip: true
+                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
                   Column {
-                    anchors.fill: parent
-                    anchors.margins: 7
-                    anchors.rightMargin: modelData.actions && modelData.actions.indexOf("build") >= 0 ? 108 : 7
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: modelData.actions && modelData.actions.indexOf("build") >= 0 ? 108 : 10
                     Text {
                       width: parent.width
                       text: (modelData.kind === "folder" ? "▸ " : "") + modelData.title

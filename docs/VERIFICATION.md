@@ -283,6 +283,10 @@
   section. The active Rock profile card now owns its login state, Magnus access
   indicator, and login/test/sign-out actions; add-profile and sign-in forms use
   distinct inset cards, while search preferences remain a separate section.
+- Search results, Recent Links, Personal Links, and Magnus items share one
+  accent-tint, outline, and side-marker component. Every two-line selectable row
+  uses the same 52-pixel height, clips its contents, and reserves consistent
+  left and right insets so labels cannot overlap the selection chrome.
 - Backspace on a highlighted search or link item is handled by the Rock
   Lens-local key catcher while the item owns focus. It returns focus to the
   search field, deletes the selection or character before the preserved cursor,
