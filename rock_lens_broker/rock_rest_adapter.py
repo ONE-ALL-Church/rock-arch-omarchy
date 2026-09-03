@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import urllib.error
 import urllib.parse
@@ -28,7 +29,11 @@ MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_TARGETS = 256
 MAX_PERSONAL_LINKS = 200
 ROWS_PER_CATEGORY = 3
-ROCK_LENS_USER_AGENT = "Rock-Lens/0.1"
+ROCK_LENS_USER_AGENT = "Rock-Lens/0.12"
+GUID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 ALLOWED_ENDPOINTS = frozenset(
     {
         "/api/People",
@@ -318,7 +323,12 @@ class RockRestReadOnlyAdapter:
                     executor.submit(
                         self._http.get_json,
                         spec.path,
-                        self._params(spec, normalized, include_person_context),
+                        self._params(
+                            spec,
+                            normalized,
+                            include_person_context,
+                            allow_numeric_id=category is not None,
+                        ),
                         cookie,
                     )
                     for spec in specs
@@ -421,22 +431,33 @@ class RockRestReadOnlyAdapter:
         return allowlist(dict(entry.person), ALLOWED_PERSON_KEYS)
 
     def _params(
-        self, spec: _SearchSpec, query: str, include_person_context: bool = True
+        self,
+        spec: _SearchSpec,
+        query: str,
+        include_person_context: bool = True,
+        allow_numeric_id: bool = False,
     ) -> dict[str, str]:
-        tokens = (
-            query.split() if spec.category == "People" else ([query] if query else [])
-        )
+        identity_filter = self._identity_filter(query, allow_numeric_id)
         clauses: list[str] = []
-        for token in tokens:
-            escaped = token.replace("'", "''")
-            alternatives = [
-                f"startswith({field},'{escaped}')" for field in spec.search_fields
-            ]
-            clauses.append(
-                alternatives[0]
-                if len(alternatives) == 1
-                else "(" + " or ".join(alternatives) + ")"
+        if identity_filter:
+            clauses.append(identity_filter)
+        else:
+            tokens = (
+                query.split()
+                if spec.category == "People"
+                else ([query] if query else [])
             )
+            for token in tokens:
+                escaped = token.replace("'", "''")
+                alternatives = [
+                    f"startswith({field},'{escaped}')"
+                    for field in spec.search_fields
+                ]
+                clauses.append(
+                    alternatives[0]
+                    if len(alternatives) == 1
+                    else "(" + " or ".join(alternatives) + ")"
+                )
         people_without_context = (
             spec.category == "People" and not include_person_context
         )
@@ -452,6 +473,14 @@ class RockRestReadOnlyAdapter:
         if spec.expand and not people_without_context:
             params["$expand"] = spec.expand
         return params
+
+    @staticmethod
+    def _identity_filter(query: str, allow_numeric_id: bool) -> str:
+        if allow_numeric_id and query.isdigit() and int(query) > 0:
+            return f"Id eq {int(query)}"
+        if GUID_PATTERN.fullmatch(query):
+            return f"Guid eq guid'{query.lower()}'"
+        return ""
 
     def _transform_rows(
         self,

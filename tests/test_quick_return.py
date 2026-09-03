@@ -28,6 +28,7 @@ class QuickReturnTests(unittest.TestCase):
         )
         items = self.store.public_items()
         self.assertEqual(items[0]["title"], "Ada Rivera")
+        self.assertRegex(items[0]["lastUsedAt"], r"^\d{4}-\d{2}-\d{2}T")
         self.assertNotIn("url", json.dumps(items).lower())
         self.assertEqual(self.path.parent.stat().st_mode & 0o777, 0o700)
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)

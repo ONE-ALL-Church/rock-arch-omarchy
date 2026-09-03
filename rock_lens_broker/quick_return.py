@@ -56,6 +56,7 @@ class QuickReturnStore:
                         "safeId": self._safe_id(row),
                         "title": row["title"],
                         "kind": row["kind"],
+                        "lastUsedAt": row["createdDateTime"],
                     },
                     ALLOWED_QUICK_RETURN_KEYS,
                 )

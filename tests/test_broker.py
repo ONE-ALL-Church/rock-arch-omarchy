@@ -566,6 +566,9 @@ class BrokerContractTests(unittest.TestCase):
 
         self.assertEqual(built["magnusBuild"]["message"], "Build queued.")
         self.assertEqual(built["quickReturns"][0]["kind"], "Magnus Build")
+        self.assertRegex(
+            built["quickReturns"][0]["lastUsedAt"], r"^\d{4}-\d{2}-\d{2}T"
+        )
         self.assertNotIn("Build/mobileapps/14", json.dumps(built))
         recent_id = built["quickReturns"][0]["safeId"]
         self.assertEqual(

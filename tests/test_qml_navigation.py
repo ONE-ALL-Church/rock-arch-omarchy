@@ -51,7 +51,36 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('item.kind === "Magnus Build"', source)
         self.assertIn("confirmed: true", source)
         self.assertIn('key === "b"', source)
+        self.assertIn('text: "B · Deploy"', source)
+        self.assertIn('"Press Enter to deploy, or Esc to cancel."', source)
+        self.assertIn('"Last deployed " + root.relativeTime', source)
+        self.assertIn('function deploymentSummary(title)', source)
+        self.assertIn(
+            "magnusBuildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
+        )
+        self.assertIn(
+            "recentBuildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
+        )
+        self.assertGreaterEqual(source.count("focusable: true"), 4)
+        self.assertGreaterEqual(
+            source.count("Keys.onEscapePressed: root.cancelMagnusBuild()"), 4
+        )
         self.assertNotIn("Server actions:", source)
+
+    def test_footer_copy_is_user_centered(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('text: root.feedbackText || root.guidanceText()', source)
+        self.assertIn('"Changes save automatically. Press Esc to return to Search."', source)
+        self.assertIn('"Getting your Rock workspace ready…"', source)
+        self.assertIn("Scoped IDs and any GUID work too.", source)
+        for old_copy in (
+            "Checking saved Rock login",
+            "Tab Search · Shift+Tab previous",
+            "↑↓ browse · Enter opens",
+            "Try g: groups or w: workflow types",
+        ):
+            self.assertNotIn(old_copy, source)
 
 
 if __name__ == "__main__":

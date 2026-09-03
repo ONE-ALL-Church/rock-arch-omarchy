@@ -67,7 +67,9 @@ ALLOWED_RESULT_KEYS = frozenset(
 )
 ALLOWED_PERSON_KEYS = frozenset({"safeId", "displayName", "subtitle", "campus"})
 ALLOWED_LINK_KEYS = frozenset({"safeId", "title", "section", "isShared"})
-ALLOWED_QUICK_RETURN_KEYS = frozenset({"safeId", "title", "kind"})
+ALLOWED_QUICK_RETURN_KEYS = frozenset(
+    {"safeId", "title", "kind", "lastUsedAt"}
+)
 
 
 @dataclass(frozen=True)

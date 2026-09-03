@@ -27,9 +27,9 @@
   cookie. A privacy-safe no-match query returned no records and no unavailable
   categories; Personal Links returned 15 same-origin entries, recorded only as
   a count during verification. The tenant edge returned 403 for Python's
-  default user-agent and 200 for the transparent `Rock-Lens/0.1` identifier,
+  default user-agent and 200 for the transparent `Rock-Lens/0.12` identifier,
   which is now fixed in the client.
-- Broker/auth/Magnus/REST/navigation/instance tests: 74 passing via
+- Broker/auth/Magnus/REST/navigation/instance tests: 77 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -235,6 +235,31 @@
   `build_confirmation_required`; no POST was sent. The replacement shell and
   broker responded normally, the runtime directory/socket remained
   `0700`/`0600`, plugin validation passed, and `hyprctl configerrors` was empty.
+- Plugin version `0.12.0` makes mobile-app keyboard deployment explicit on each
+  row (`B · Deploy`), repeats Enter/Esc instructions in the confirmation card,
+  and shows the active profile's last Rock Lens deployment as a compact relative
+  time or older local date/time. The live mobile-app descriptors were inspected
+  read-only and contain no date or deployment field, so the UI does not claim to
+  know about builds initiated elsewhere. A temporary panel-only visual check
+  exercised `B` into the focused confirmation action and cancelled with `Esc`,
+  which returned focus to the selected mobile app. No build POST was sent, and
+  the captures were deleted.
+- Scoped searches now use exact Rock `Id` or typed `Guid` OData filters for all
+  six supported entities. An unscoped GUID fans out only across enabled entity
+  types, while an unscoped number remains text because integer IDs overlap.
+  Privacy-bounded live no-match checks completed with zero unavailable
+  categories. Seventy-seven tests, Ruff, ty, bytecode compilation, the installed
+  socket checks, shell restart, `hyprctl reload`, and an empty
+  `hyprctl configerrors` check pass.
+- After the confirmation-focus fix, the user explicitly authorized one live
+  deployment of the mobile app named `Test`. A fresh shell session navigated to
+  that exact descriptor by keyboard, `B` opened the confirmation with **Deploy
+  now** visibly focused, and `Enter` submitted it once. Magnus returned
+  `Mobile application bundle deployed successfully.` The active profile's
+  owner-only Recent Links then contained a new opaque `Deploy Test` entry with
+  a current timestamp, and the app row rendered **Last deployed just now**.
+  No other build descriptor was submitted. Temporary panel captures were
+  deleted after inspection.
 - The search field recognizes `p:`, `g:`, `w:`, `j:`, `pg:`/`page:`, and `c:`
   plus documented full aliases. It shows the active category as a removable
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
@@ -269,5 +294,6 @@
   broker process replacement, state persistence, binding registration, and
   post-restart panel opening were verified in the active session.
 
-No telemetry, feedback, production file write, job trigger, live build, deploy,
-or publication was performed during verification.
+No telemetry, feedback, production file write, job trigger, or publication was
+performed during verification. The sole server-side mutation was the explicitly
+authorized `Test` mobile-app deployment documented above.

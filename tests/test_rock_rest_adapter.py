@@ -85,7 +85,7 @@ class RockRestAdapterTests(unittest.TestCase):
         request, timeout = opener.calls[0]
         self.assertEqual(request.get_method(), "GET")
         self.assertEqual(request.get_header("Cookie"), ".ROCK=test-session")
-        self.assertEqual(request.get_header("User-agent"), "Rock-Lens/0.1")
+        self.assertEqual(request.get_header("User-agent"), "Rock-Lens/0.12")
         self.assertTrue(
             request.full_url.startswith("https://rock.example.org/api/People?")
         )
@@ -369,6 +369,40 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertNotIn("$filter", http.calls[0][1])
         self.assertEqual(batch.results[0]["subtitle"], "Small Group")
         self.assertEqual(batch.unavailable, ())
+
+    def test_scoped_ids_and_guids_use_exact_identity_filters(self):
+        http = FakeHttp({"/api/Groups": []})
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+
+        adapter.search("004", "Groups")
+        self.assertEqual(http.calls[-1][1]["$filter"], "Id eq 4")
+
+        guid = "A81B7C6D-1234-4ABC-9876-0123456789AB"
+        adapter.search(guid, "Groups")
+        self.assertEqual(
+            http.calls[-1][1]["$filter"],
+            "Guid eq guid'a81b7c6d-1234-4abc-9876-0123456789ab'",
+        )
+
+    def test_unscoped_guid_searches_all_enabled_entities_but_number_is_text(self):
+        http = FakeHttp()
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+        guid = "a81b7c6d-1234-4abc-9876-0123456789ab"
+
+        adapter.search(guid)
+        self.assertEqual(len(http.calls), len(SEARCH_SPECS))
+        self.assertTrue(
+            all(
+                params["$filter"] == f"Guid eq guid'{guid}'"
+                for _, params, _ in http.calls
+            )
+        )
+
+        http.calls.clear()
+        adapter.search("17")
+        self.assertTrue(
+            all("Id eq" not in params["$filter"] for _, params, _ in http.calls)
+        )
 
     def test_scoped_search_rejects_unknown_internal_categories(self):
         with self.assertRaisesRegex(RockRestError, "invalid_search_scope"):

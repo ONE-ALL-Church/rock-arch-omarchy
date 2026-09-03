@@ -79,6 +79,18 @@ profile-scoped **Magnus Build** Recent Link without exposing the URI to QML.
 Rock Lens does not retry a timed-out build because the server may already have
 accepted it.
 
+The Magnus mobile-app descriptor does not include a deployment timestamp.
+Rock Lens therefore shows **Last deployed** from the most recent successful
+build it initiated for that profile. Recent times use compact relative labels
+such as `5 minutes ago`; older times show a local date and time. Clearing or
+disabling Recent Links also removes or hides this local observation, and builds
+started outside Rock Lens cannot be inferred from the Magnus descriptor.
+
+For keyboard deployment, open Magnus, select a mobile app with Up/Down, press
+`B`, and press `Enter` to confirm. The confirmation's Deploy button receives
+keyboard focus automatically; `Esc` cancels and returns focus to the selected
+mobile app before any request is sent. Recent Link reruns behave the same way.
+
 Magnus `write`, `rm`, `mkdir`, `touch`, and `upload` remain unavailable through
 QML, the broker socket, and the Python adapter. A future authoring workspace
 must add, in order:

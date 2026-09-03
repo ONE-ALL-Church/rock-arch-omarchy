@@ -167,10 +167,14 @@ prefix such as `g:` lists the first three items in that category.
 | Pages | `pg:` | `page:`, `pages:` | `Alt+Shift+P` |
 | Content Channel Items | `c:` | `content:`, `item:`, `items:` | `Alt+C` |
 
-For example, `g: youth` calls only the Groups endpoint. The active scope appears
-as a badge beside the search field. `Esc` clears the scope before closing the
-panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary search
-text; no slash-command mode is required.
+For example, `g: youth` calls only the Groups endpoint. Every scope also accepts
+an exact Rock ID or GUID, such as `g: 42` or `p: a81b7c6d-1234-4abc-9876-0123456789ab`.
+A GUID entered without a prefix is checked across all enabled categories. A bare
+numeric ID is not searched across categories because Rock IDs overlap between
+entity types; add the appropriate prefix instead. The active scope appears as a
+badge beside the search field. `Esc` clears the scope before closing the panel,
+and `Alt+0` clears it directly. Unknown prefixes remain ordinary search text;
+no slash-command mode is required.
 
 The search field keeps native editing behavior. Up and Down move through Recent
 Links or results and across the Search/Personal Links boundary. Tab cycles the
@@ -208,6 +212,9 @@ history.
   targets and successfully triggered mobile app builds, are capped at 20, are
   visible only in PROD, and are stored under
   `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
+- Magnus mobile-app rows show the time of the last successful deployment that
+  Rock Lens initiated for the active profile. Magnus does not provide a global
+  deployment timestamp, so builds started elsewhere are not represented.
 - There is no general mutation transport, SQL execution, job trigger, or Run
   Now UI. The sole server-side action is an explicitly confirmed mobile app
   build advertised by the selected Magnus descriptor.
