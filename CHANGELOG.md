@@ -5,6 +5,16 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.24.3] - 2026-09-03
+
+### Fixed
+
+- Match search terms anywhere in Rock entity names so general search finds
+  Workflow Types and other entities when the query is not the first word.
+- Keep existing results in place while a replacement search is running, block
+  stale-result activation, and reserve the transient status row so the panel's
+  bottom edge no longer jumps during search.
+
 ## [0.24.2] - 2026-09-03
 
 ### Fixed

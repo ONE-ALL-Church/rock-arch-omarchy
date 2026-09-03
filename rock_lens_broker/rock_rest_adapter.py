@@ -571,7 +571,7 @@ class RockRestReadOnlyAdapter:
             for token in tokens:
                 escaped = token.replace("'", "''")
                 alternatives = [
-                    f"startswith({field},'{escaped}')"
+                    f"substringof('{escaped}',{field})"
                     for field in spec.search_fields
                 ]
                 clauses.append(

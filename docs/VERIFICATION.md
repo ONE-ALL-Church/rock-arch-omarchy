@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.24.2` release boundary. Historical feature
+This record describes the current `0.24.3` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 179 passing tests. Release-contract coverage keeps
+The suite contains 180 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
@@ -83,8 +83,9 @@ push to `main` and on pull requests.
   URLs, or exception text. Content is limited to a user-selected bounded Magnus
   text preview and a user-selected bounded public Knowledge result.
 - Search uses eight fixed Rock REST v1 resources with fixed projections, bounded
-  results, and exact-origin navigation targets. It exposes no generic HTTP,
-  REST v2, SQL, mutation, job-run, or Run Now transport.
+  results, contains-style text matching, exact ID/GUID matching, and exact-origin
+  navigation targets. It exposes no generic HTTP, REST v2, SQL, mutation,
+  job-run, or Run Now transport.
 - A bounded post-login probe checks those same eight endpoints with only
   `$select=Id&$top=1`. Denied or unsupported categories are hidden, and the
   broker independently excludes them from scoped and unscoped requests.

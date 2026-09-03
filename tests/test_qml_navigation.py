@@ -283,6 +283,12 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("magnusProbeTimer.restart()", source)
         self.assertIn("clip: true", key_catcher)
         self.assertIn("id: panelCleanupTimer; interval: 180", source)
+        self.assertIn("readonly property bool resultsAreCurrent:", source)
+        self.assertIn("if (!resultsAreCurrent || index < 0", source)
+        text_edit = source[source.index("onTextEdited: {") :]
+        text_edit = text_edit[: text_edit.index("Keys.priority:")]
+        self.assertNotIn("root.results = []", text_edit)
+        self.assertNotIn('root.resultsQuery = ""', text_edit)
         reset = source[source.index("function resetPanel()") :]
         reset = reset[: reset.index("onOpenedChanged:")]
         self.assertNotIn("refreshPersonalLinks()", reset)
@@ -491,6 +497,8 @@ class QmlNavigationTests(unittest.TestCase):
             'text: root.feedbackText || (root.onboardingFlowActive ? "" : root.guidanceText())',
             source,
         )
+        self.assertIn("height: Math.max(Style.space(18), implicitHeight)", source)
+        self.assertIn("opacity: text.length > 0 ? 1 : 0", source)
         self.assertIn('"Getting your Rock workspace ready…"', source)
         self.assertIn('if (updateState === "updating")', source)
         self.assertIn('return ""', source[source.index("function guidanceText()") :])

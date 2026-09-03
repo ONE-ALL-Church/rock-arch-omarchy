@@ -36,11 +36,13 @@ Column {
         required property int index
         readonly property bool rowSelected: resultRow.index === searchPanel.controller.resultCursor ||
           (searchPanel.controller.resultCursor < 0 && resultRow.index === 0 &&
-            searchPanel.searchField.activeFocus && searchPanel.controller.results.length > 0)
+            searchPanel.searchField.activeFocus && searchPanel.controller.resultsAreCurrent &&
+            searchPanel.controller.results.length > 0)
 
         width: searchPanel.width
         height: Style.space(54)
         clip: true
+        opacity: searchPanel.controller.resultsAreCurrent ? 1 : 0.45
 
         RockLensSelectionChrome {
           anchors.fill: parent

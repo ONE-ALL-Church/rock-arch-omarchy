@@ -211,6 +211,8 @@ class RockRestAdapterTests(unittest.TestCase):
         calls_by_path = {path: params for path, params, _ in http.calls}
         person_params = calls_by_path["/api/People"]
         self.assertIn("D''Angelo", person_params["$filter"])
+        self.assertIn("substringof('D''Angelo',NickName)", person_params["$filter"])
+        self.assertNotIn("startswith(", person_params["$filter"])
         self.assertIn("Age", person_params["$select"])
         self.assertIn("GivingGroupId", person_params["$select"])
         self.assertEqual(
@@ -459,6 +461,18 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertNotIn("$filter", http.calls[0][1])
         self.assertEqual(batch.results[0]["subtitle"], "Small Group")
         self.assertEqual(batch.unavailable, ())
+
+    def test_text_search_matches_terms_anywhere_in_entity_names(self):
+        http = FakeHttp({"/api/WorkflowTypes": []})
+
+        RockRestReadOnlyAdapter(FakeCookieProvider(), http).search(
+            "Approval", "Workflows"
+        )
+
+        self.assertEqual(
+            http.calls[0][1]["$filter"],
+            "substringof('Approval',Name)",
+        )
 
     def test_scoped_ids_and_guids_use_exact_identity_filters(self):
         http = FakeHttp({"/api/Groups": []})

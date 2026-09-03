@@ -40,7 +40,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.24.2"
+  property string currentVersion: "0.24.3"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -139,12 +139,14 @@ Panel {
   readonly property bool onboardingFlowActive: onboardingRequired ||
     finishSetupOnboardingRequired
   readonly property bool queryIsEmpty: query.trim().length === 0
+  readonly property bool resultsAreCurrent: !queryIsEmpty && resultsQuery === query
   readonly property bool searchCapabilitiesReady: contextName === "DEV" ||
     searchCapabilitiesState === "ready"
   readonly property int hiddenSearchCategoryCount: contextName === "DEV" ? 0 :
     unavailableSearchCategories.length
   readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
-  readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
+  readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length :
+    (resultsAreCurrent ? results.length : 0)
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
@@ -153,7 +155,6 @@ Panel {
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
     rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
     rockAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Secure password storage unavailable"
-
   implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0
   implicitHeight: preferenceShowMenuBar ? button.implicitHeight : 0
 
@@ -1421,7 +1422,7 @@ Panel {
     }
   }
   function activateResult(index) {
-    if (index < 0 || index >= results.length) return
+    if (!resultsAreCurrent || index < 0 || index >= results.length) return
     var item = results[index]
     if (item.canOpen === true)
       request({op: "open_navigation", safeId: item.safeId})
@@ -1819,8 +1820,6 @@ Panel {
               root.resultCursor = -1
               root.recentCursor = -1
               root.pendingClearRecent = false
-              root.results = []
-              root.resultsQuery = ""
               root.quickLook = null
               root.feedbackText = ""
               if (root.scopeKeyForQuery(text) === "kb") {
@@ -1982,7 +1981,8 @@ Panel {
         }
 
         Text {
-          visible: text.length > 0
+          height: Math.max(Style.space(18), implicitHeight)
+          opacity: text.length > 0 ? 1 : 0
           width: parent.width
           text: root.feedbackText || (root.onboardingFlowActive ? "" : root.guidanceText())
           color: root.feedbackText && root.feedbackText.indexOf("couldn't") >= 0
