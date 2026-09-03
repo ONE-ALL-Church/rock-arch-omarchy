@@ -12,12 +12,19 @@ import time
 from pathlib import Path
 from typing import Any, NoReturn
 
+from .agent_protocol import PROTOCOL_VERSION, protocol_schema
 from .terminal_access import CLI_CLIENT
 from .version import VERSION
 
 MAX_REQUEST_BYTES = 16 * 1024
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 120.0
+MAX_QUERY_INPUT_BYTES = 8 * 1024
+IPC_TARGET = "oneall.rock-arch"
+OMARCHY_SHELL_PATHS = (
+    Path("/usr/bin/omarchy-shell"),
+    Path("/usr/share/omarchy/bin/omarchy-shell"),
+)
 
 ENTITY_PREFIXES = {
     "people": "p",
@@ -201,6 +208,11 @@ def _confirmation(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="confirm this external or destructive action",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="describe the action and its effects without executing it",
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -230,6 +242,9 @@ def _parser() -> argparse.ArgumentParser:
 
     status = commands.add_parser("status", help="show Rock Arch status")
     status.add_argument("--probe-magnus", action="store_true")
+    doctor = commands.add_parser("doctor", help="run redacted diagnostics")
+    doctor.add_argument("--refresh", action="store_true")
+    commands.add_parser("schema", help="show the versioned agent contract")
 
     capabilities = commands.add_parser(
         "capabilities", help="show searchable Rock entity types"
@@ -238,7 +253,10 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("login", help="interactively sign in the active profile")
 
     search = commands.add_parser("search", help="search enabled Rock entities")
-    search.add_argument("query")
+    search.add_argument("query", nargs="?")
+    search.add_argument(
+        "--stdin", action="store_true", help="read the query privately from stdin"
+    )
     search.add_argument("--entity", choices=sorted(ENTITY_PREFIXES))
 
     person = commands.add_parser("person", help="show bounded person context")
@@ -249,7 +267,10 @@ def _parser() -> argparse.ArgumentParser:
         dest="knowledge_command", required=True
     )
     knowledge_search = knowledge_commands.add_parser("search", help="search knowledge")
-    knowledge_search.add_argument("query")
+    knowledge_search.add_argument("query", nargs="?")
+    knowledge_search.add_argument(
+        "--stdin", action="store_true", help="read the query privately from stdin"
+    )
     knowledge_get = knowledge_commands.add_parser("get", help="read a result")
     knowledge_get.add_argument("safe_id")
     knowledge_open = knowledge_commands.add_parser("open", help="open a public source")
@@ -271,6 +292,11 @@ def _parser() -> argparse.ArgumentParser:
     open_item = commands.add_parser("open", help="open an opaque Rock result")
     open_item.add_argument("safe_id")
     _confirmation(open_item)
+
+    describe = commands.add_parser(
+        "describe", help="describe an opaque ID without taking an action"
+    )
+    describe.add_argument("safe_id")
 
     profiles = commands.add_parser("profiles", help="manage local Rock profiles")
     profile_commands = profiles.add_subparsers(dest="profiles_command", required=True)
@@ -296,6 +322,11 @@ def _parser() -> argparse.ArgumentParser:
     magnus = commands.add_parser("magnus", help="use controlled Magnus features")
     magnus_commands = magnus.add_subparsers(dest="magnus_command", required=True)
     magnus_commands.add_parser("status", help="probe Magnus access")
+    magnus_commands.add_parser("builds", help="list local build receipts")
+    magnus_build_status = magnus_commands.add_parser(
+        "build-status", help="show one local build receipt"
+    )
+    magnus_build_status.add_argument("build_id")
     magnus_browse = magnus_commands.add_parser("browse", help="browse a folder")
     magnus_browse.add_argument("safe_id", nargs="?", default="")
     magnus_help = {
@@ -321,6 +352,21 @@ def _parser() -> argparse.ArgumentParser:
     update_commands.add_parser("check")
     update_install = update_commands.add_parser("install")
     _confirmation(update_install)
+
+    ui = commands.add_parser("ui", help="handoff work to the Omarchy panel")
+    ui_commands = ui.add_subparsers(dest="ui_command", required=True)
+    ui_open = ui_commands.add_parser("open", help="open a Rock Arch panel view")
+    ui_open.add_argument(
+        "view",
+        nargs="?",
+        default="search",
+        choices=("search", "links", "knowledge", "magnus", "settings"),
+    )
+    ui_open.add_argument("query", nargs="?")
+    ui_open.add_argument(
+        "--stdin", action="store_true", help="read a search query privately from stdin"
+    )
+    ui_commands.add_parser("close", help="close the Rock Arch panel")
     return parser
 
 
@@ -329,15 +375,68 @@ def _require_confirmation(args: argparse.Namespace) -> None:
         raise CliError("confirmation_required", 2)
 
 
+def _read_query(
+    args: argparse.Namespace,
+    *,
+    prompt: str,
+    interactive_when_missing: bool = True,
+) -> str:
+    query = getattr(args, "query", None)
+    from_stdin = bool(getattr(args, "stdin", False) or query == "-")
+    if query not in (None, "-") and getattr(args, "stdin", False):
+        raise CliError("query_input_conflict", 2)
+    if from_stdin or (query is None and not sys.stdin.isatty()):
+        value = sys.stdin.read(MAX_QUERY_INPUT_BYTES + 1)
+    elif query is None and interactive_when_missing:
+        value = input(prompt)
+    else:
+        value = query or ""
+    value = value.rstrip("\r\n")
+    if len(value.encode("utf-8")) > MAX_QUERY_INPUT_BYTES:
+        raise CliError("query_too_large", 2)
+    return value
+
+
+def _dry_run_safe(
+    client: BrokerClient, safe_id: str, action: str
+) -> dict[str, Any]:
+    return client.request(
+        {"op": "action_preview", "safeId": safe_id, "action": action}
+    )
+
+
+def _static_dry_run(action: str, side_effects: list[str]) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "dryRun": {
+            "action": action,
+            "confirmationRequired": True,
+            "sideEffects": side_effects,
+            "executed": False,
+        },
+    }
+
+
 def _request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
     if args.command == "status":
         return client.request({"op": "status", "probeMagnus": args.probe_magnus})
+    if args.command == "doctor":
+        response = client.request({"op": "doctor", "refresh": args.refresh})
+        doctor = response.get("doctor")
+        if isinstance(doctor, dict) and isinstance(doctor.get("checks"), list):
+            doctor["checks"].insert(
+                0,
+                {"name": "broker_socket", "state": "healthy", "detail": "Connected"},
+            )
+        return response
+    if args.command == "schema":
+        return {"ok": True, "schema": protocol_schema()}
     if args.command == "capabilities":
         return client.request({"op": "search_capabilities", "refresh": args.refresh})
     if args.command == "login":
         return _login(client)
     if args.command == "search":
-        query = args.query
+        query = _read_query(args, prompt="Search: ")
         if args.entity:
             query = f"{ENTITY_PREFIXES[args.entity]}: {query}"
         return client.request({"op": "search", "query": query})
@@ -348,14 +447,20 @@ def _request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
     if args.command == "links":
         return _links_request(args, client)
     if args.command == "open":
+        if args.dry_run:
+            return _dry_run_safe(client, args.safe_id, "open")
         _require_confirmation(args)
         return client.request({"op": "open_navigation", "safeId": args.safe_id})
+    if args.command == "describe":
+        return client.request({"op": "describe", "safeId": args.safe_id})
     if args.command == "profiles":
         return _profiles_request(args, client)
     if args.command == "magnus":
         return _magnus_request(args, client)
     if args.command == "updates":
         return _updates_request(args, client)
+    if args.command == "ui":
+        return _ui_request(args, client)
     raise CliError("unsupported_command", 2)
 
 
@@ -363,9 +468,13 @@ def _knowledge_request(
     args: argparse.Namespace, client: BrokerClient
 ) -> dict[str, Any]:
     if args.knowledge_command == "search":
-        return client.request({"op": "knowledge_search", "query": args.query})
+        return client.request(
+            {"op": "knowledge_search", "query": _read_query(args, prompt="Knowledge search: ")}
+        )
     if args.knowledge_command == "get":
         return client.request({"op": "knowledge_result", "safeId": args.safe_id})
+    if args.dry_run:
+        return _dry_run_safe(client, args.safe_id, "knowledgeOpen")
     _require_confirmation(args)
     return client.request({"op": "knowledge_open_source", "safeId": args.safe_id})
 
@@ -374,9 +483,14 @@ def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, 
     if args.links_command in {"personal", "recent"}:
         section = "personal" if args.links_command == "personal" else "quick_returns"
         return client.request({"op": "navigation_status", "section": section})
-    _require_confirmation(args)
     if args.links_command == "clear":
+        if args.dry_run:
+            return _static_dry_run("clearRecentLinks", ["deletes_local_history"])
+        _require_confirmation(args)
         return client.request({"op": "recent_links_clear"})
+    if args.dry_run:
+        return _dry_run_safe(client, args.safe_id, "activate")
+    _require_confirmation(args)
     return client.request(
         {"op": "activate_recent", "safeId": args.safe_id, "confirmed": True}
     )
@@ -399,21 +513,47 @@ def _profiles_request(args: argparse.Namespace, client: BrokerClient) -> dict[st
                 "name": args.name,
             }
         )
-    _require_confirmation(args)
     if args.profiles_command == "sign-out":
+        if args.dry_run:
+            return _static_dry_run(
+                "signOut", ["deletes_saved_login", "clears_memory_cookie"]
+            )
+        _require_confirmation(args)
         return client.request({"op": "profile_sign_out"})
+    if args.dry_run:
+        return _static_dry_run(
+            "removeProfile",
+            ["deletes_profile", "deletes_saved_login", "deletes_local_history"],
+        )
+    _require_confirmation(args)
     return client.request({"op": "profile_remove", "profileId": args.profile_id})
 
 
 def _magnus_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
     if args.magnus_command == "status":
         return client.request({"op": "magnus_status"})
+    if args.magnus_command == "builds":
+        return client.request({"op": "magnus_builds"})
+    if args.magnus_command == "build-status":
+        return client.request(
+            {"op": "magnus_build_status", "buildId": args.build_id}
+        )
     if args.magnus_command == "browse":
         return client.request({"op": "magnus_browse", "safeId": args.safe_id})
     if args.magnus_command == "preview":
         return client.request({"op": "magnus_preview", "safeId": args.safe_id})
     if args.magnus_command == "hash":
         return client.request({"op": "magnus_hash", "safeId": args.safe_id})
+    if args.dry_run:
+        if args.magnus_command == "copy":
+            action = "copyHash" if args.value == "hash" else "copyContent"
+        else:
+            action = {
+                "download": "download",
+                "open": "open",
+                "build": "build",
+            }[args.magnus_command]
+        return _dry_run_safe(client, args.safe_id, action)
     _require_confirmation(args)
     if args.magnus_command == "download":
         payload: dict[str, Any] = {
@@ -442,8 +582,48 @@ def _updates_request(args: argparse.Namespace, client: BrokerClient) -> dict[str
         return client.request({"op": "update_status"})
     if args.updates_command == "check":
         return client.request({"op": "update_check"})
+    if args.dry_run:
+        return _static_dry_run(
+            "installUpdate", ["fast_forwards_plugin", "reloads_omarchy_shell"]
+        )
     _require_confirmation(args)
     return client.request({"op": "update_start"})
+
+
+def _omarchy_shell(method: str) -> None:
+    executable = next((path for path in OMARCHY_SHELL_PATHS if path.is_file()), None)
+    if executable is None:
+        raise CliError("omarchy_shell_unavailable", 3)
+    try:
+        completed = subprocess.run(
+            [str(executable), IPC_TARGET, method],
+            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        raise CliError("omarchy_shell_unavailable", 3) from None
+    if completed.returncode != 0:
+        raise CliError("ui_handoff_failed", 4)
+
+
+def _ui_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
+    if args.ui_command == "close":
+        _omarchy_shell("close")
+        return {"ok": True, "ui": {"state": "closed"}}
+    query = ""
+    if args.query is not None or args.stdin:
+        query = _read_query(
+            args, prompt="", interactive_when_missing=False
+        )
+    response = client.request(
+        {"op": "ui_handoff_set", "view": args.view, "query": query}
+    )
+    _omarchy_shell("handoff")
+    response["ui"] = {"state": "opened", "view": args.view}
+    return response
 
 
 def _login(client: BrokerClient) -> dict[str, Any]:
@@ -500,6 +680,8 @@ def _add_profile(args: argparse.Namespace, client: BrokerClient) -> dict[str, An
 
 
 def _emit(payload: dict[str, Any], *, pretty: bool, stream: Any) -> None:
+    payload = dict(payload)
+    payload.setdefault("protocolVersion", PROTOCOL_VERSION)
     json.dump(
         payload,
         stream,

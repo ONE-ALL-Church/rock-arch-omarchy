@@ -173,6 +173,23 @@ class FakeMagnus:
             "test.lava", "Magnus File", 80, self.server + "/page/123"
         )
 
+    def describe(self, safe_id):
+        if safe_id == "magnus-opaque-app":
+            return {
+                "safeId": safe_id,
+                "title": "ONE&ALL Mobile",
+                "kind": "Magnus Folder",
+                "actions": ["browse", "build"],
+                "expires": "broker_restart",
+            }
+        return {
+            "safeId": safe_id,
+            "title": "test.lava",
+            "kind": "Magnus File",
+            "actions": ["preview", "hash", "download", "copyHash", "open"],
+            "expires": "broker_restart",
+        }
+
     def build(self, safe_id):
         self.build_calls.append(("descriptor", safe_id))
         return self._build_outcome()
@@ -357,6 +374,19 @@ class FakeKnowledge:
             if safe_id == "kb-safe-result"
             else None
         )
+
+    def describe(self, safe_id):
+        if safe_id != "kb-safe-result":
+            from rock_lens_broker.rock_kb_adapter import RockKbError
+
+            raise RockKbError("knowledge_result_not_found")
+        return {
+            "safeId": safe_id,
+            "title": "Diagnose labels",
+            "kind": "Task card",
+            "actions": ["read", "openSource"],
+            "expires": "broker_restart",
+        }
 
 
 class BrokerContractTests(unittest.TestCase):
@@ -891,6 +921,7 @@ class BrokerContractTests(unittest.TestCase):
             magnus=magnus,
             live=FakeLive(),
             instance_file=self.instance,
+            build_notifier=lambda: True,
         )
         broker.handle({"op": "set_context", "context": "PROD"})
 
@@ -907,7 +938,26 @@ class BrokerContractTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(built["magnusBuild"]["message"], "Build queued.")
+        self.assertEqual(
+            built["magnusBuild"]["message"],
+            "Magnus accepted the deployment request.",
+        )
+        self.assertEqual(built["magnusBuild"]["state"], "accepted")
+        self.assertFalse(built["magnusBuild"]["completionVerifiable"])
+        self.assertTrue(built["notificationSent"])
+        build_id = built["magnusBuild"]["buildId"]
+        self.assertEqual(
+            broker.handle({"op": "magnus_build_status", "buildId": build_id})[
+                "magnusBuildStatus"
+            ]["state"],
+            "accepted",
+        )
+        self.assertEqual(
+            broker.handle({"op": "magnus_builds"})["magnusBuilds"][0][
+                "buildId"
+            ],
+            build_id,
+        )
         self.assertEqual(built["quickReturns"][0]["kind"], "Magnus Build")
         self.assertRegex(
             built["quickReturns"][0]["lastUsedAt"], r"^\d{4}-\d{2}-\d{2}T"
@@ -937,6 +987,54 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(len(magnus.build_calls), 2)
         self.assertEqual(magnus.build_calls[-1][0], "recent")
         self.assertEqual(repeated["quickReturns"][0]["kind"], "Magnus Build")
+
+    def test_describe_preview_doctor_and_ui_handoff_are_bounded(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        magnus = FakeMagnus(True)
+        broker = Broker(
+            self.state,
+            session=FakeSession(True),
+            magnus=magnus,
+            live=FakeLive(),
+            knowledge=FakeKnowledge(),
+            instance_file=self.instance,
+            updates=FakeUpdates(),
+            build_notifier=lambda: False,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        description = broker.handle(
+            {"op": "describe", "safeId": "magnus-opaque-app"}
+        )["description"]
+        self.assertEqual(description["actions"], ["browse", "build"])
+        preview = broker.handle(
+            {
+                "op": "action_preview",
+                "safeId": "magnus-opaque-app",
+                "action": "build",
+            }
+        )["dryRun"]
+        self.assertFalse(preview["executed"])
+        self.assertEqual(magnus.build_calls, [])
+
+        doctor = broker.handle({"op": "doctor"})["doctor"]
+        self.assertTrue(doctor["redacted"])
+        serialized = json.dumps(doctor)
+        self.assertNotIn("rock.example.org", serialized)
+        self.assertNotIn("profile", serialized.lower())
+
+        staged = broker.handle(
+            {"op": "ui_handoff_set", "view": "search", "query": "Ada Rivera"}
+        )
+        self.assertTrue(staged["uiHandoffReady"]["queryPending"])
+        self.assertEqual(
+            broker.handle({"op": "ui_handoff_take"})["uiHandoff"],
+            {"view": "search", "query": "Ada Rivera"},
+        )
+        self.assertEqual(
+            broker.handle({"op": "ui_handoff_take"})["error"],
+            "ui_handoff_not_found",
+        )
 
     def test_prod_without_rock_login_fails_closed_without_live_call(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

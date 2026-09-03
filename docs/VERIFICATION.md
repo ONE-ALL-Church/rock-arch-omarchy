@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.23.0` release boundary. Historical feature
+This record describes the current `0.24.0` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 165 passing tests. Release-contract coverage keeps
+The suite contains 176 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
@@ -27,8 +27,10 @@ public-source URL validation, and keyboard-complete detail navigation. Updater
 coverage verifies remote revision detection, manifest identity and
 version validation, local-change refusal, fixed worker launch arguments, private
 state permissions, broker routing, and the opt-in automatic-update preference.
-CLI coverage verifies command routing, masked interactive login, confirmation
-gates, bounded JSON transport, socket ownership checks, default-on preference
+CLI coverage verifies private stdin queries, the versioned schema, redacted
+diagnostics, target descriptions, side-effect-free dry runs, Omarchy UI
+handoffs, command routing, masked interactive login, confirmation gates,
+bounded JSON transport, socket ownership checks, default-on preference
 enforcement, and safe launcher installation without replacing another command.
 
 GitHub Actions runs the unit tests, Ruff, ty, and bytecode compilation on every
@@ -65,6 +67,12 @@ push to `main` and on pull requests.
   and unrelated existing commands, and contains no credentials or profile data.
 - `rock-arch login` always reads the password from a masked prompt. No password
   argument exists. JSON responses never contain submitted credentials.
+- Private Search and Knowledge queries can be read from bounded stdin. Native
+  UI handoff moves the query through a one-time, 30-second broker value rather
+  than an Omarchy process argument.
+- Every emitted object has protocol version 1. `doctor` contains no profile,
+  origin, path, query, target URL, or credential, while `describe` and
+  `--dry-run` do not execute the requested action.
 - Search, Knowledge, links, profiles, Magnus, and updates reuse the broker's
   allowlists and process-local opaque IDs. Browser, clipboard, download,
   deletion, sign-out, removal, update, and build actions require `--confirm`.
@@ -122,6 +130,10 @@ push to `main` and on pull requests.
 - Only a descriptor-advertised numeric mobile-app build endpoint can mutate the
   server, and every first or repeated build requires an explicit confirmation.
   No build is triggered by the automated suite.
+- Accepted build requests create a profile-scoped mode-`0600` receipt and a
+  privacy-minimized desktop notification. Status remains `accepted` with local
+  provenance and `completionVerifiable: false` because Magnus exposes no
+  dependable completion endpoint.
 
 ## Update boundary
 

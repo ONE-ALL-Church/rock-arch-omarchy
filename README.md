@@ -130,13 +130,18 @@ CLI requests fail with `terminal_access_disabled`.
 
 Commands return JSON, use the active Rock profile, and can safely start the
 local broker when the Omarchy panel is closed. Login is interactive: the
-password uses a masked prompt and is never accepted as an argument.
+password uses a masked prompt and is never accepted as an argument. Every JSON
+object includes a `protocolVersion`; `schema` documents the stable agent
+contract, and `doctor` reports useful diagnostics without returning profile
+names, instance origins, local paths, queries, or credentials.
 
 ```bash
 rock-arch status
+rock-arch doctor
+rock-arch schema
 rock-arch capabilities --refresh
 rock-arch login
-rock-arch search "Alex Smith"
+rock-arch search --stdin
 rock-arch search 42 --entity groups
 rock-arch knowledge search "mm: Group"
 rock-arch links personal
@@ -145,11 +150,24 @@ rock-arch magnus status
 rock-arch magnus browse
 ```
 
+For private terms such as a person's name, run `rock-arch search --stdin`, type
+or paste the query, and send end-of-file with `Ctrl+D`. A lone `-` works the
+same way. Omitting a query at an interactive terminal prompts for it. The older
+positional form remains available for non-sensitive terms and compatibility.
+
 Results and Magnus descriptors return process-local opaque `safeId` values for
-follow-up commands. Actions that open something, change local state, copy or
-download content, install an update, or start a mobile build require an
-explicit `--confirm`. The CLI provides no arbitrary endpoint, SQL, Magnus
+follow-up commands. `rock-arch describe SAFE_ID` explains what one represents
+without opening or reading it. Actions that open something, change local state,
+copy or download content, install an update, or start a mobile build require an
+explicit `--confirm`; use `--dry-run` instead to validate and inspect the action
+without executing it. The CLI provides no arbitrary endpoint, SQL, Magnus
 write/upload/delete, job-run, or generic Rock mutation command.
+
+Agents can hand work to the native panel with `rock-arch ui open search`,
+`links`, `knowledge`, `magnus`, or `settings`. Add `--stdin` to Search or
+Knowledge handoffs to keep the query out of the process list and shell history.
+`rock-arch ui close` closes the panel. The one-time query handoff remains only
+in broker memory and expires after 30 seconds if the panel does not claim it.
 
 See [docs/CLI.md](docs/CLI.md) for the complete command reference and agent
 safety model.

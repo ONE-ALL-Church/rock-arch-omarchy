@@ -31,6 +31,18 @@ status codes to QML. Installation always delegates to Omarchy's fixed plugin
 updater so its fast-forward, validation, rollback, and rescan safeguards remain
 authoritative. Automatic installation is disabled by default.
 
+The supported CLI uses the same owner-only broker and emits a versioned,
+bounded JSON contract. Private search input can be read from stdin so person
+names do not need to appear in process arguments. Confirmed actions have a
+side-effect-free dry-run path, and diagnostics omit tenant identity, local
+paths, queries, and secrets. Native UI handoffs store query text only in broker
+memory, consume it once, and erase an unclaimed handoff after 30 seconds.
+
+Magnus build tracking records only that the action endpoint accepted a request.
+Receipts are profile-scoped, owner-only local files without endpoint URLs and
+never claim server-side completion. Rock Arch does not synthesize deployment
+status when Magnus does not expose a dependable status endpoint.
+
 ## Secret handling
 
 Rock profile usernames and passwords are stored in desktop Secret Service. The

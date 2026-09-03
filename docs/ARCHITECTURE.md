@@ -26,15 +26,18 @@
 9. `RockKbReadOnlyAdapter`: explicit public Knowledge search and exact-result
    reads through a fixed, credentialless HTTPS origin, with bounded response
    transformation, short in-memory caches, and opaque result/source IDs.
-10. `QuickReturnStore`: same-origin launcher and successful-build history,
+10. `QuickReturnStore`: same-origin launcher and accepted-build shortcuts,
    deduplicated and capped at 20 in an owner-only JSON file. Build entries are
    executed only through the Magnus validator and require confirmation again.
-11. `BrokerOperations`: the explicit operation-name router and request handlers;
+11. `BuildReceiptStore`: profile-scoped, owner-only Magnus acceptance receipts
+    with persistent opaque build IDs. Receipts explicitly cannot verify server
+    completion.
+12. `BrokerOperations`: the explicit operation-name router and request handlers;
    broker construction, state ownership, and lifecycle transitions remain in
    `Broker`.
-12. `http_security`: shared redirect refusal, authenticated cookie-header
+13. `http_security`: shared redirect refusal, authenticated cookie-header
     validation, and bounded JSON decoding used by every Rock HTTP client.
-13. `UpdateManager`: daily public-Git revision checks plus a fixed detached
+14. `UpdateManager`: daily public-Git revision checks plus a fixed detached
     worker that delegates installation, validation, rollback, and plugin reload
     to Omarchy. Automatic installation is an explicit preference and defaults
     to off.
@@ -76,9 +79,14 @@ Python launcher pointing at that installation. It refuses source-checkout
 repointing, symlinks, foreign or unsafe paths, and any unrelated existing
 command. The launcher contains no credentials or profile data. CLI login reads
 the password from a masked terminal prompt and never accepts it in argv.
-Commands produce bounded JSON and use process-local opaque IDs; IDs expire when
-the broker restarts. Browser, clipboard, download, history deletion, sign-out,
+Commands produce versioned, bounded JSON and use process-local opaque IDs; IDs
+expire when the broker restarts. Private searches can read stdin, `doctor`
+returns redacted diagnostics, and `describe` plus `--dry-run` inspect an action
+without executing it. Browser, clipboard, download, history deletion, sign-out,
 profile removal, update installation, and mobile builds require `--confirm`.
+Omarchy panel handoff stages a one-time payload in broker memory, invokes the
+fixed plugin IPC method without putting the query in argv, and erases an
+unclaimed payload after 30 seconds.
 
 The updater is active only when the running repository is the canonical
 Git-managed `oneall.rock-arch` installation. It fetches only `origin HEAD`,
@@ -245,7 +253,9 @@ expose build only when Magnus supplies the exact numeric mobile app build path.
 Delete, upload, new-file, new-folder, broader build, arbitrary HTTP, and raw URL
 operations are discarded. Build uses the Magnus CLI-compatible POST contract,
 has no automatic retry, and requires confirmation in QML before the broker is
-called.
+called. The action response proves acceptance only. Rock Arch records that
+state in an owner-only receipt, sends an acceptance notification, and does not
+invent completion or deployment timestamps that Magnus does not expose.
 
 ## Navigation, Personal Links, and Recent Links
 
@@ -258,9 +268,9 @@ Item (`/ContentChannelItem/{Id}`). Personal Link targets may be relative but
 must resolve to HTTPS on the selected Rock origin; external and malformed
 links are omitted.
 
-Successful user-requested opens and successful mobile app builds are shown as
-Recent Links. The underlying Quick Return store keeps the title, type, order,
-target, and timestamp locally, but
+Successful user-requested opens and accepted mobile app build requests are
+shown as Recent Links. The underlying Quick Return store keeps the title, type,
+order, target, and timestamp locally, but
 returns only another process-local opaque ID, title, and type to QML. Its
 directory is `0700`, its file is `0600`, writes are atomic, entries are
 validated on every read, and the oldest entries are removed beyond 20. The
@@ -273,3 +283,8 @@ serves this local list independently from Personal Links,
 so showing the empty Search state never performs a Rock network request. This
 intentionally emulates Rock's useful return list without importing browser-local
 Rock history.
+
+Build acceptance history is stored separately from Recent Links, capped at 50,
+and keyed by stable random `build-` IDs. The store contains title, acceptance
+time, fixed acceptance copy, local status provenance, and the explicit fact
+that completion is unverifiable; it contains no build URI or Rock origin.

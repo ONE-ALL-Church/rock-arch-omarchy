@@ -258,6 +258,7 @@ class _KnowledgeEntry:
     target_kind: str
     target_id: str
     source_url: str
+    title: str
 
 
 class RockKbReadOnlyAdapter:
@@ -339,6 +340,23 @@ class RockKbReadOnlyAdapter:
         entry = self._registry.get(sanitize_text(safe_id, 100))
         return entry.source_url if entry and entry.source_url else None
 
+    def describe(self, safe_id: str) -> dict[str, Any]:
+        public_id = sanitize_text(safe_id, 100)
+        entry = self._registry.get(public_id)
+        if not entry:
+            raise RockKbError("knowledge_result_not_found")
+        self._registry.move_to_end(public_id)
+        actions = ["read"]
+        if entry.source_url:
+            actions.append("openSource")
+        return {
+            "safeId": public_id,
+            "title": entry.title or "Rock Knowledge result",
+            "kind": KIND_LABELS.get(entry.target_kind, "Knowledge"),
+            "actions": actions,
+            "expires": "broker_restart",
+        }
+
     def _results_from_payload(
         self, payload: Any, schemas: set[str]
     ) -> list[dict[str, Any]]:
@@ -383,7 +401,7 @@ class RockKbReadOnlyAdapter:
         claim_tier = sanitize_text(row.get("claim_tier"), 60)
         source_url = _first_source_url(row)
         self._registry[public_id] = _KnowledgeEntry(
-            entry.target_kind, entry.target_id, source_url
+            entry.target_kind, entry.target_id, source_url, title
         )
         self._registry.move_to_end(public_id)
 
@@ -457,7 +475,9 @@ class RockKbReadOnlyAdapter:
                 links.append(self._link("model", target, title_value or _humanize_slug(target), "Model Map", "via " + via if via else "Related model"))
                 if len(links) >= MAX_RELATED_LINKS:
                     break
-        self._registry[public_id] = _KnowledgeEntry("model", slug, MODEL_MAP_SOURCE)
+        self._registry[public_id] = _KnowledgeEntry(
+            "model", slug, MODEL_MAP_SOURCE, title
+        )
         return {
             "safeId": public_id,
             "title": title,
@@ -524,7 +544,9 @@ class RockKbReadOnlyAdapter:
             seen.add("concept\0" + concept_id.casefold())
             links.append(self._link("concept", concept_id, _humanize_slug(concept_id), "Guide", "Related guide"))
         source_url = _first_root_source(roots)
-        self._registry[public_id] = _KnowledgeEntry("lava", context_id, source_url)
+        self._registry[public_id] = _KnowledgeEntry(
+            "lava", context_id, source_url, title or _humanize_slug(context_id)
+        )
         return {
             "safeId": public_id,
             "title": title or _humanize_slug(context_id),
@@ -548,7 +570,9 @@ class RockKbReadOnlyAdapter:
         title = _markdown_title(body) or _humanize_slug(entry.target_id)
         body = _without_duplicate_title(body, title)
         source_url = ROCK_KB_ORIGIN + "/concepts/" + urllib.parse.quote(entry.target_id, safe="") + ".md"
-        self._registry[public_id] = _KnowledgeEntry("concept", entry.target_id, source_url)
+        self._registry[public_id] = _KnowledgeEntry(
+            "concept", entry.target_id, source_url, title
+        )
         return {
             "safeId": public_id,
             "title": title,
@@ -686,7 +710,7 @@ class RockKbReadOnlyAdapter:
         status: str,
         source_url: str,
     ) -> dict[str, Any]:
-        safe_id = self._register(target_kind, target_id, source_url)
+        safe_id = self._register(target_kind, target_id, source_url, title)
         return allowlist(
             {
                 "category": "Knowledge",
@@ -699,14 +723,21 @@ class RockKbReadOnlyAdapter:
             ALLOWED_RESULT_KEYS,
         )
 
-    def _register(self, target_kind: str, target_id: str, source_url: str) -> str:
+    def _register(
+        self, target_kind: str, target_id: str, source_url: str, title: str = ""
+    ) -> str:
         digest = hmac.new(
             self._key,
             ("rock-kb\0" + target_kind + "\0" + target_id).encode(),
             hashlib.sha256,
         ).hexdigest()[:32]
         safe_id = "kb-" + digest
-        self._registry[safe_id] = _KnowledgeEntry(target_kind, target_id, source_url)
+        self._registry[safe_id] = _KnowledgeEntry(
+            target_kind,
+            target_id,
+            source_url,
+            sanitize_text(title, 160),
+        )
         self._registry.move_to_end(safe_id)
         while len(self._registry) > MAX_REGISTERED_RESULTS:
             evicted, _ = self._registry.popitem(last=False)
@@ -717,7 +748,7 @@ class RockKbReadOnlyAdapter:
         self, target_kind: str, target_id: str, title: str, kind: str, subtitle: str
     ) -> dict[str, str]:
         return {
-            "safeId": self._register(target_kind, target_id, ""),
+            "safeId": self._register(target_kind, target_id, "", title),
             "title": sanitize_text(title, 160),
             "kind": sanitize_text(kind, 60),
             "subtitle": sanitize_text(subtitle, 160),

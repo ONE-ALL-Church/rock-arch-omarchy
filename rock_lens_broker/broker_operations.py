@@ -33,6 +33,11 @@ class BrokerOperations:
         self.broker = broker
         self._handlers: dict[str, OperationHandler] = {
             "status": self._status,
+            "doctor": self._doctor,
+            "describe": self._describe,
+            "action_preview": self._action_preview,
+            "ui_handoff_set": self._ui_handoff_set,
+            "ui_handoff_take": self._ui_handoff_take,
             "set_context": self._set_context,
             "magnus_status": self._magnus_status,
             "search_capabilities": self._search_capabilities,
@@ -59,6 +64,8 @@ class BrokerOperations:
             "magnus_copy": self._magnus_copy,
             "magnus_open": self._magnus_open,
             "magnus_build": self._magnus_build,
+            "magnus_builds": self._magnus_builds,
+            "magnus_build_status": self._magnus_build_status,
             "search": self._search,
             "knowledge_search": self._knowledge_search,
             "knowledge_result": self._knowledge_result,
@@ -103,6 +110,156 @@ class BrokerOperations:
             ),
             capabilities=broker.capabilities(rock, magnus),
             categories=list(broker._mock.categories()),
+            magnusBuilds=broker._build_receipts.public_items(),
+        )
+
+    def _doctor(self, raw: dict[str, Any]) -> dict[str, Any]:
+        broker = self.broker
+        refresh = raw.get("refresh") is True
+        rock = broker._session.status()
+        profiles = broker._profile_store.snapshot()
+        terminal = broker._terminal_access.status(
+            enabled=profiles["preferences"]["terminalAccess"]
+        )
+        if refresh:
+            broker._probe_magnus(force=True)
+        magnus = broker._magnus.status()
+        update = broker._updates.status(
+            refresh=refresh,
+            automatic_install=False,
+        )
+
+        checks: list[dict[str, str]] = []
+
+        def check(name: str, state: str, detail: str) -> None:
+            checks.append({"name": name, "state": state, "detail": detail})
+
+        check(
+            "secure_storage",
+            "healthy" if rock.get("available") else "error",
+            "Available" if rock.get("available") else "Unavailable",
+        )
+        check(
+            "rock_login",
+            "healthy" if rock.get("configured") else "warning",
+            "Configured" if rock.get("configured") else "Login required",
+        )
+        if rock.get("configured"):
+            capabilities = self._search_capability_payload(force_refresh=refresh)
+            available = capabilities.get("availableCategories", [])
+            unavailable = capabilities.get("unavailableCategories", [])
+            capability_state = capabilities.get("state")
+            check(
+                "entity_access",
+                "healthy" if capability_state == "ready" else "error",
+                (
+                    f"{len(available)} available, {len(unavailable)} unavailable"
+                    if capability_state == "ready"
+                    else "Access check failed"
+                ),
+            )
+        else:
+            check("entity_access", "blocked", "Rock login required")
+        magnus_state = str(magnus.get("state") or "unknown")
+        check(
+            "magnus",
+            "healthy" if magnus_state == "available" else (
+                "error" if magnus_state == "error" else "optional"
+            ),
+            {
+                "available": "Available",
+                "error": "Access check failed",
+                "signed_out": "Rock login required",
+                "unavailable": "Not available for this account",
+            }.get(magnus_state, "Not checked"),
+        )
+        terminal_state = "healthy"
+        terminal_detail = "Enabled"
+        if not terminal.get("enabled"):
+            terminal_state, terminal_detail = "disabled", "Disabled in Settings"
+        elif terminal.get("error"):
+            terminal_state, terminal_detail = "error", "Launcher unavailable"
+        elif not terminal.get("installed"):
+            terminal_state, terminal_detail = "warning", "Launcher managed manually"
+        check("terminal", terminal_state, terminal_detail)
+        update_state = str(update.get("state") or "unknown")
+        check(
+            "updates",
+            "error" if update_state in {"error", "modified"} else "healthy",
+            "Managed" if update.get("managed") else "Managed manually",
+        )
+        overall = (
+            "needs_attention"
+            if any(item["state"] in {"error", "warning"} for item in checks)
+            else "healthy"
+        )
+        return broker._ok(
+            doctor={"state": overall, "redacted": True, "checks": checks}
+        )
+
+    def _describe(self, raw: dict[str, Any]) -> dict[str, Any]:
+        try:
+            description = self.broker._describe_safe_id(
+                sanitize_text(raw.get("safeId"), 100)
+            )
+        except ValueError as error:
+            return self.broker._error(str(error))
+        return self.broker._ok(description=description)
+
+    def _action_preview(self, raw: dict[str, Any]) -> dict[str, Any]:
+        action = sanitize_text(raw.get("action"), 40)
+        try:
+            description = self.broker._describe_safe_id(
+                sanitize_text(raw.get("safeId"), 100)
+            )
+        except ValueError as error:
+            return self.broker._error(str(error))
+        allowed = {
+            "open": {"open"},
+            "knowledgeOpen": {"openSource"},
+            "activate": {"open", "build"},
+            "download": {"download"},
+            "copyHash": {"copyHash"},
+            "copyContent": {"copy", "preview"},
+            "build": {"build"},
+        }
+        supported = allowed.get(action, set()).intersection(description["actions"])
+        if not supported:
+            return self.broker._error("action_not_available")
+        side_effects = {
+            "open": ["opens_desktop_browser", "adds_recent_link"],
+            "knowledgeOpen": ["opens_desktop_browser"],
+            "activate": ["opens_browser_or_starts_build"],
+            "download": ["creates_private_download"],
+            "copyHash": ["changes_clipboard"],
+            "copyContent": ["reads_file", "changes_clipboard"],
+            "build": ["starts_magnus_deployment", "adds_recent_link"],
+        }
+        return self.broker._ok(
+            dryRun={
+                "action": action,
+                "target": description,
+                "confirmationRequired": True,
+                "sideEffects": side_effects[action],
+                "executed": False,
+            }
+        )
+
+    def _ui_handoff_set(self, raw: dict[str, Any]) -> dict[str, Any]:
+        try:
+            handoff = self.broker._set_ui_handoff(
+                raw.get("view"), raw.get("query", "")
+            )
+        except ValueError as error:
+            return self.broker._error(str(error))
+        return self.broker._ok(uiHandoffReady=handoff)
+
+    def _ui_handoff_take(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        handoff = self.broker._take_ui_handoff()
+        return (
+            self.broker._ok(uiHandoff=handoff)
+            if handoff
+            else self.broker._error("ui_handoff_not_found")
         )
 
     def _set_context(self, raw: dict[str, Any]) -> dict[str, Any]:
@@ -127,7 +284,10 @@ class BrokerOperations:
 
     def _magnus_status(self, _raw: dict[str, Any]) -> dict[str, Any]:
         self.broker._probe_magnus()
-        return self.broker._ok(magnus=self.broker._magnus.status())
+        return self.broker._ok(
+            magnus=self.broker._magnus.status(),
+            magnusBuilds=self.broker._build_receipts.public_items(),
+        )
 
     def _search_capability_payload(
         self, *, force_refresh: bool = False
@@ -395,7 +555,11 @@ class BrokerOperations:
             browser = broker._magnus.browse(safe_id)
         except MagnusError as error:
             return broker._error(str(error))
-        return broker._ok(magnus=broker._magnus.status(), magnusBrowser=browser)
+        return broker._ok(
+            magnus=broker._magnus.status(),
+            magnusBrowser=browser,
+            magnusBuilds=broker._build_receipts.public_items(),
+        )
 
     def _magnus_preview(self, raw: dict[str, Any]) -> dict[str, Any]:
         return self._magnus_value(
@@ -473,6 +637,19 @@ class BrokerOperations:
         except MagnusError as error:
             return broker._error(str(error))
         return broker._complete_build(outcome)
+
+    def _magnus_builds(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        return self.broker._ok(
+            magnusBuilds=self.broker._build_receipts.public_items()
+        )
+
+    def _magnus_build_status(self, raw: dict[str, Any]) -> dict[str, Any]:
+        receipt = self.broker._build_receipts.get(raw.get("buildId"))
+        return (
+            self.broker._ok(magnusBuildStatus=receipt)
+            if receipt
+            else self.broker._error("build_not_found")
+        )
 
     def _search(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker

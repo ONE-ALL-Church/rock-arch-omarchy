@@ -204,6 +204,15 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('text: knowledgePanel.controller.knowledgeBusy ? "Opening…" : "Open source"', source)
         self.assertIn("Keys.onEscapePressed: knowledgePanel.controller.closeKnowledgeDetail()", source)
 
+    def test_cli_ui_handoff_is_one_time_and_build_copy_is_honest(self):
+        source = all_qml_source()
+
+        self.assertIn('function handoff(): void', source)
+        self.assertIn('root.request({op: "ui_handoff_take"})', source)
+        self.assertIn("function applyUiHandoff(handoff)", source)
+        self.assertIn('"Last started " + relativeTime(acceptedAt)', source)
+        self.assertNotIn('"Last deployed "', source)
+
     def test_search_categories_follow_the_active_accounts_detected_access(self):
         source = all_qml_source()
         settings = SETTINGS_PATH.read_text(encoding="utf-8")
@@ -435,7 +444,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('key === "b"', source)
         self.assertIn('text: "B · Deploy"', source)
         self.assertIn('". This starts a production mobile-app build."', source)
-        self.assertIn('"Last deployed " + searchPanel.controller.relativeTime', source)
+        self.assertIn('"Last started " + searchPanel.controller.relativeTime', source)
         self.assertIn('function deploymentSummary(title)', source)
         self.assertIn(
             "magnusPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source

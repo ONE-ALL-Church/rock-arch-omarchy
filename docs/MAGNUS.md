@@ -40,6 +40,8 @@ rock-arch magnus preview SAFE_FILE_ID
 rock-arch magnus hash SAFE_FILE_ID
 rock-arch magnus download SAFE_FILE_ID --confirm
 rock-arch magnus build SAFE_APP_ID --confirm
+rock-arch magnus builds
+rock-arch magnus build-status BUILD_ID
 ```
 
 The legacy path-oriented `python3 -m rock_lens_broker magnus ls|cat|hash`
@@ -84,17 +86,21 @@ than presenting the profile as safely signed out.
 
 Version 0.11 exposes the Magnus CLI-compatible `POST` build action only for a
 descriptor-provided mobile app URI. The first run and every Recent Link rerun
-require an inline production confirmation. A successful build is stored as a
-profile-scoped **Magnus Build** Recent Link without exposing the URI to QML.
+require an inline production confirmation. A build request accepted by Magnus
+is stored as a profile-scoped **Magnus Build** Recent Link without exposing the
+URI to QML.
 Rock Arch does not retry a timed-out build because the server may already have
 accepted it.
 
-The Magnus mobile-app descriptor does not include a deployment timestamp.
-Rock Arch therefore shows **Last deployed** from the most recent successful
-build it initiated for that profile. Recent times use compact relative labels
-such as `5 minutes ago`; older times show a local date and time. Clearing or
-disabling Recent Links also removes or hides this local observation, and builds
-started outside Rock Arch cannot be inferred from the Magnus descriptor.
+The Magnus mobile-app descriptor and action response do not provide a
+dependable completion-status endpoint or deployment timestamp. Rock Arch
+therefore records a separate owner-only receipt when Magnus accepts a request,
+shows **Last started**, and sends a local “accepted” notification. Each receipt
+has an opaque build ID, state `accepted`, `statusSource: local`, and
+`completionVerifiable: false`; it never claims that deployment finished.
+Recent times use compact labels such as `5 minutes ago`; older times show a
+local date and time. Build receipts remain available independently of Recent
+Links, while builds started outside Rock Arch cannot be inferred.
 
 For keyboard deployment, open Magnus, select a mobile app with Up/Down, press
 `B`, and press `Enter` to confirm. The confirmation's Deploy button receives

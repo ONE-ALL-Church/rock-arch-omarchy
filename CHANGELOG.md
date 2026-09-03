@@ -5,6 +5,36 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-03
+
+### Added
+
+- Add private query input for Rock and Knowledge search through `--stdin`, `-`,
+  or an interactive prompt when the positional query is omitted.
+- Add redacted `doctor` diagnostics and a versioned `schema` command. Every CLI
+  JSON result now carries `protocolVersion`.
+- Add side-effect-free opaque-ID descriptions and `--dry-run` previews for
+  every confirmed browser, clipboard, download, deletion, sign-out, profile
+  removal, update, and Magnus build action.
+- Add `ui open` and `ui close` handoff commands through Omarchy IPC. Search
+  terms move through a one-time owner-only broker handoff instead of an IPC
+  process argument.
+- Add owner-only Magnus build receipts, opaque build IDs, build list/status
+  commands, and a local notification when Magnus accepts a deployment request.
+
+### Changed
+
+- Describe Magnus build history as “started” or “accepted,” not “deployed.” The
+  currently available Magnus action endpoint acknowledges a request but does
+  not expose a dependable completion-status endpoint.
+
+### Security
+
+- Cap private stdin input at 8 KiB, expire unclaimed UI handoffs after 30
+  seconds, keep build records profile-scoped and mode `0600`, and exclude Rock
+  origins, profile identities, target URLs, queries, and credentials from
+  diagnostics and build receipts.
+
 ## [0.23.0] - 2026-09-03
 
 ### Added

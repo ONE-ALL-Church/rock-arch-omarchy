@@ -40,7 +40,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.23.0"
+  property string currentVersion: "0.24.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -100,6 +100,7 @@ Panel {
   property string magnusState: "unknown"
   property bool magnusProbeInFlight: false
   property var magnusItems: []
+  property var magnusBuilds: []
   property var magnusPreview: null
   property var magnusHistory: []
   property string magnusFolderId: ""
@@ -110,6 +111,7 @@ Panel {
   property string pendingMagnusBuildId: ""
   property string pendingMagnusBuildTitle: ""
   property bool pendingMagnusBuildRecent: false
+  property var pendingUiHandoff: null
   property bool personalLinksAvailable: false
   property bool setupBusy: false
   property bool setupSlow: false
@@ -206,12 +208,12 @@ Panel {
     return String(value || "").replace(/^Deploy /, "").trim().toLowerCase()
   }
 
-  function lastDeployedAt(title) {
+  function lastBuildAcceptedAt(title) {
     var expected = normalizedBuildTitle(title)
-    for (var index = 0; index < quickReturns.length; index++) {
-      var item = quickReturns[index]
-      if (item.kind === "Magnus Build" && normalizedBuildTitle(item.title) === expected)
-        return String(item.lastUsedAt || "")
+    for (var index = 0; index < magnusBuilds.length; index++) {
+      var item = magnusBuilds[index]
+      if (normalizedBuildTitle(item.title) === expected)
+        return String(item.acceptedAt || "")
     }
     return ""
   }
@@ -235,8 +237,30 @@ Panel {
   }
 
   function deploymentSummary(title) {
-    var deployedAt = lastDeployedAt(title)
-    return deployedAt ? "Last deployed " + relativeTime(deployedAt) : "No Rock Arch deployment recorded"
+    var acceptedAt = lastBuildAcceptedAt(title)
+    return acceptedAt ? "Last started " + relativeTime(acceptedAt) : "No Rock Arch build recorded"
+  }
+
+  function applyUiHandoff(handoff) {
+    if (!handoff) return
+    var view = String(handoff.view || "search")
+    var handoffQuery = String(handoff.query || "")
+    if (view === "settings") { openSettings(false); return }
+    if (view === "links") { selectPersonalLink(0); return }
+    if (view === "knowledge") { openKnowledge(handoffQuery); return }
+    if (view === "magnus") {
+      if (!statusLoaded || magnusState === "unknown" || magnusState === "checking") {
+        pendingUiHandoff = handoff
+        request({op: "status", probeMagnus: true})
+        return
+      }
+      pendingUiHandoff = null
+      if (showMagnus) openMagnus()
+      else { focusSearch(); feedbackText = "Magnus isn't available for this Rock account." }
+      return
+    }
+    focusSearch()
+    if (handoffQuery) { query = handoffQuery; scheduleSearch() }
   }
 
   function friendlyError(value) {
@@ -528,7 +552,9 @@ Panel {
       magnusState = String(response.magnus.state || "unknown")
       magnusProbeInFlight = false
       if (!showMagnus && viewMode === "magnus") focusSearch()
+      if (pendingUiHandoff && String(pendingUiHandoff.view || "") === "magnus") Qt.callLater(function() { root.applyUiHandoff(root.pendingUiHandoff) })
     }
+    if (Array.isArray(response.magnusBuilds)) magnusBuilds = response.magnusBuilds
     if (response.update) {
       updateManaged = response.update.managed === true
       updateState = String(response.update.state || "idle")
@@ -581,10 +607,11 @@ Panel {
       pendingMagnusBuildId = ""
       pendingMagnusBuildTitle = ""
       pendingMagnusBuildRecent = false
-      feedbackText = String(response.magnusBuild.message || "Build started successfully") +
+      feedbackText = String(response.magnusBuild.message || "Build request accepted") +
         (preferenceRecentLinks ? " · Added to Recent Links" : "")
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
+    if (response.uiHandoff) applyUiHandoff(response.uiHandoff)
     if (response.knowledgeDetail) {
       knowledgeBusy = false
       pendingKnowledgeNavigation = false
@@ -1469,11 +1496,13 @@ Panel {
     beginSetup("Switching profile…")
     editLoginMode = false
     magnusItems = []
+    magnusBuilds = []
     magnusPreview = null
     magnusHistory = []
     pendingMagnusBuildId = ""
     pendingMagnusBuildTitle = ""
     pendingMagnusBuildRecent = false
+    pendingUiHandoff = null
     pendingSuccessText = "Profile switched"
     request({op: "profile_switch", profileId: profileId})
   }
@@ -1680,6 +1709,10 @@ Panel {
     function settings(): void {
       root.open()
       root.openSettings(false)
+    }
+    function handoff(): void {
+      root.open()
+      root.request({op: "ui_handoff_take"})
     }
   }
 

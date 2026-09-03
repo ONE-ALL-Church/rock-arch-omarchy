@@ -3,7 +3,7 @@ import io
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,6 +12,7 @@ from rock_lens_broker.cli import (
     CliError,
     _parser,
     _request,
+    run,
 )
 from rock_lens_broker.terminal_access import CLI_CLIENT
 
@@ -166,6 +167,93 @@ class RockArchCliTests(unittest.TestCase):
                 "safeId": "opaque-app",
                 "confirmed": True,
             },
+        )
+
+    def test_private_query_input_and_interactive_fallback(self):
+        client = FakeClient()
+        with patch("sys.stdin", io.StringIO("Ada Rivera\n")):
+            _request(_parser().parse_args(["search", "--stdin"]), client)
+        with patch("sys.stdin", io.StringIO("mm: Group\n")):
+            _request(_parser().parse_args(["knowledge", "search"]), client)
+
+        self.assertEqual(
+            client.calls,
+            [
+                {"op": "search", "query": "Ada Rivera"},
+                {"op": "knowledge_search", "query": "mm: Group"},
+            ],
+        )
+        with self.assertRaisesRegex(CliError, "query_input_conflict"):
+            _request(
+                _parser().parse_args(["search", "visible", "--stdin"]), client
+            )
+
+    def test_schema_is_offline_and_every_emitted_object_is_versioned(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = run(["schema"])
+        payload = json.loads(output.getvalue())
+
+        self.assertEqual(result, 0)
+        self.assertEqual(payload["protocolVersion"], 1)
+        self.assertEqual(payload["schema"]["protocolVersion"], 1)
+        self.assertFalse(payload["schema"]["buildStatus"]["completionVerifiable"])
+
+    def test_dry_run_uses_description_without_confirmation(self):
+        client = FakeClient()
+        _request(
+            _parser().parse_args(
+                ["magnus", "build", "opaque-app", "--dry-run"]
+            ),
+            client,
+        )
+        clear = _request(
+            _parser().parse_args(["links", "clear", "--dry-run"]), client
+        )
+
+        self.assertEqual(
+            client.calls[-1],
+            {"op": "action_preview", "safeId": "opaque-app", "action": "build"},
+        )
+        self.assertFalse(clear["dryRun"]["executed"])
+
+    def test_ui_handoff_sends_query_only_through_the_broker(self):
+        client = FakeClient()
+        with (
+            patch("sys.stdin", io.StringIO("private person name\n")),
+            patch("rock_lens_broker.cli._omarchy_shell") as shell,
+        ):
+            response = _request(
+                _parser().parse_args(["ui", "open", "search", "--stdin"]),
+                client,
+            )
+
+        self.assertEqual(
+            client.calls,
+            [
+                {
+                    "op": "ui_handoff_set",
+                    "view": "search",
+                    "query": "private person name",
+                }
+            ],
+        )
+        shell.assert_called_once_with("handoff")
+        self.assertEqual(response["ui"], {"state": "opened", "view": "search"})
+
+    def test_build_receipt_commands_map_to_broker(self):
+        client = FakeClient()
+        _request(_parser().parse_args(["magnus", "builds"]), client)
+        _request(
+            _parser().parse_args(["magnus", "build-status", "build-abc"]),
+            client,
+        )
+        self.assertEqual(
+            client.calls,
+            [
+                {"op": "magnus_builds"},
+                {"op": "magnus_build_status", "buildId": "build-abc"},
+            ],
         )
 
     def test_client_adds_the_official_marker_and_reads_one_bounded_response(self):

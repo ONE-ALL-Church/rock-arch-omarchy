@@ -379,7 +379,7 @@ Column {
           Text {
             width: parent.width
             text: recentRow.modelData.kind === "Magnus Build"
-              ? "Last deployed " + searchPanel.controller.relativeTime(recentRow.modelData.lastUsedAt) +
+              ? "Last started " + searchPanel.controller.relativeTime(recentRow.modelData.lastUsedAt) +
                 " · Enter to deploy again"
               : recentRow.modelData.kind
             textFormat: Text.PlainText

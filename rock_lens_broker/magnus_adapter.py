@@ -538,6 +538,27 @@ class MagnusReadOnlyAdapter:
             raise MagnusError("magnus_view_unavailable")
         return NavigationTarget(target.title, "Magnus File", 80, target.view_url)
 
+    def describe(self, safe_id: str) -> dict[str, Any]:
+        """Describe a registered item without reading it or taking an action."""
+
+        target = self._resolve(safe_id)
+        actions: list[str]
+        if target.kind == "folder":
+            actions = ["browse"]
+            if target.build_path:
+                actions.append("build")
+        else:
+            actions = ["preview", "hash", "download", "copyHash"]
+            if target.view_url:
+                actions.append("open")
+        return {
+            "safeId": sanitize_text(safe_id, 100),
+            "title": target.title,
+            "kind": f"Magnus {target.kind.title()}",
+            "actions": actions,
+            "expires": "broker_restart",
+        }
+
     def build(self, safe_id: str) -> MagnusBuildOutcome:
         target = self._resolve(safe_id)
         if target.kind != "folder" or not target.build_path:
