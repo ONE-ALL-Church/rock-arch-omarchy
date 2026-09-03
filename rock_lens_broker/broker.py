@@ -7,7 +7,6 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Protocol
 
-from .auth import AuthState, ConfigStore, OAuthManager, default_config_path
 from .clipboard import copy_to_clipboard
 from .contracts import (
     ALLOWED_RESULT_KEYS,
@@ -106,8 +105,6 @@ class Broker:
     def __init__(
         self,
         state_file: Path | None = None,
-        auth: OAuthManager | None = None,
-        config_file: Path | None = None,
         session: RockSessionStatusProvider | None = None,
         magnus: MagnusStatusProvider | None = None,
         live: LiveReadAdapter | None = None,
@@ -124,11 +121,7 @@ class Broker:
         )
         self._context = self._load_context()
         self._mock = MockAdapter()
-        instance_path = instance_file or (
-            config_file.with_name("instance.json")
-            if config_file
-            else default_instance_path()
-        )
+        instance_path = instance_file or default_instance_path()
         self._instance_store = InstanceStore(instance_path)
         self._profile_store = ProfileStore(
             profile_file or instance_path.with_name("profiles.json"),
@@ -181,9 +174,6 @@ class Broker:
         self._url_opener = url_opener
         self._clipboard_writer = clipboard_writer or copy_to_clipboard
         self._live_health = HealthState.UNKNOWN
-        self._auth = auth or OAuthManager(
-            ConfigStore(config_file or default_config_path())
-        )
         self._store_context()
 
     def _load_context(self) -> Context:
@@ -206,21 +196,9 @@ class Broker:
 
     def capabilities(
         self,
-        auth: dict[str, Any] | None = None,
         rock: dict[str, Any] | None = None,
         magnus: dict[str, Any] | None = None,
     ) -> list[dict[str, str]]:
-        auth = auth or self._auth.public_status(self._context)
-        oauth_state = AuthState(auth["state"])
-        oauth_health = (
-            HealthState.HEALTHY
-            if oauth_state is AuthState.AUTHENTICATED
-            else HealthState.UNKNOWN
-        )
-        if oauth_state is AuthState.FAILED:
-            oauth_health = HealthState.FAILED
-        elif oauth_state is AuthState.EXPIRED:
-            oauth_health = HealthState.STALE
         rock = rock or self._session.status()
         magnus = magnus or self._magnus.status()
         rock_health = (
@@ -248,7 +226,6 @@ class Broker:
                     else "Developer mode disabled"
                 ),
             ).public_dict(),
-            Capability("rock_oauth", oauth_health, auth["label"]).public_dict(),
             Capability(
                 "rock_session",
                 rock_health,
@@ -268,18 +245,16 @@ class Broker:
         if op == "status":
             if raw.get("probeMagnus") is True:
                 self._probe_magnus()
-            auth = self._auth.public_status(self._context)
             rock = self._session.status()
             magnus = self._magnus.status()
             return self._ok(
                 context=self._context.value,
                 developerMode=self._developer_mode,
-                auth=auth,
                 rock=rock,
                 instance=self._instance_status(),
                 magnus=magnus,
                 profiles=self._profile_store.snapshot(),
-                capabilities=self.capabilities(auth, rock, magnus),
+                capabilities=self.capabilities(rock, magnus),
                 categories=list(self._mock.categories()),
             )
         if op == "set_context":
@@ -295,18 +270,11 @@ class Broker:
             return self._ok(
                 context=self._context.value,
                 developerMode=self._developer_mode,
-                auth=self._auth.public_status(self._context),
                 rock=self._session.status(),
                 instance=self._instance_status(),
                 magnus=self._magnus.status(),
                 profiles=self._profile_store.snapshot(),
             )
-        if op == "auth_status":
-            return self._ok(auth=self._auth.public_status(self._context))
-        if op == "auth_login":
-            return self._ok(auth=self._auth.begin_login(self._context))
-        if op == "auth_disconnect":
-            return self._ok(auth=self._auth.disconnect(self._context))
         if op == "magnus_status":
             self._probe_magnus()
             return self._ok(magnus=self._magnus.status())

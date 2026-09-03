@@ -2321,7 +2321,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                text: "Rock Lens 0.13.0 · Credentials stay in your desktop password manager"
+                text: "Rock Lens 0.14.0 · Credentials stay in your desktop password manager"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall

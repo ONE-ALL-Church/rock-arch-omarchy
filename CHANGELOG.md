@@ -3,6 +3,23 @@
 Rock Lens follows [Semantic Versioning](https://semver.org/). The GitHub
 repository's default branch is the source used by Omarchy plugin updates.
 
+## [0.14.0] - 2026-09-02
+
+### Changed
+
+- Replaced the README's early mock image with current, privacy-safe Search and
+  Magnus keyboard-flow screenshots.
+- Reorganized the user documentation around installation, first login, search,
+  keyboard navigation, profiles, and optional Magnus capabilities.
+
+### Removed
+
+- Removed the dormant experimental OpenID Connect client, callback server,
+  bearer-token storage, broker operations, CLI setup command, and tests. Rock
+  Lens uses only the native Rock session shared by Search, links, and Magnus.
+- Kept desktop Secret Service support as a small independent adapter for
+  per-profile Rock usernames and passwords.
+
 ## [0.13.0] - 2026-09-02
 
 ### Added
@@ -24,4 +41,5 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.14.0]: https://github.com/bscottdavis/rock-lens-omarchy/releases/tag/v0.14.0
 [0.13.0]: https://github.com/bscottdavis/rock-lens-omarchy/releases/tag/v0.13.0

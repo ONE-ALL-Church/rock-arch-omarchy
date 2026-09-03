@@ -10,10 +10,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any, Protocol
 
-from .auth import SecretStore, SecretToolStore
 from .contracts import Context
 from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, validate_profile_id
+from .secret_store import SecretStore, SecretToolStore
 from .version import HTTP_USER_AGENT
 
 AUTH_COOKIE_IDLE_SECONDS = 15 * 60

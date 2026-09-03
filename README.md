@@ -1,63 +1,40 @@
 # Rock Lens
 
-Rock Lens is an Omarchy 4.0.2+ launcher for Rock RMS discovery. Every
-user signs in directly to their Rock instance through the native Python broker;
-Magnus is not the login provider and neither the Magnus CLI nor Rock MCP is a
-runtime dependency. The resulting `.ROCK` cookie is retained only in broker
-memory with a 15-minute idle timeout and authenticates six fixed Rock REST v1
-search resources plus the current person's Personal Links.
+Rock Lens is a keyboard-first Omarchy launcher for Rock RMS. Search People,
+Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel Items; open
+Rock Personal Links; and return to recently opened records without navigating
+the full admin UI.
 
-After login, Rock Lens probes the optional server-side Magnus API. Users whose
-account and Rock instance expose it receive a separate **Magnus** tab for
-filesystem-style browsing, bounded text preview, download, clipboard copy,
-SHA-256 verification, same-origin viewing, and controlled mobile app builds.
-Everyone else keeps the complete search, Personal Links, and Recent Links
-experience without an error or empty core UI. Magnus item descriptors determine
-which server actions exist. Only exact descriptor-provided mobile-app build
-endpoints can be triggered, and every build requires an explicit production
-confirmation. Write, upload, create, and delete remain disabled.
+Every user signs directly into their own Rock instance. Rock Lens uses Rock's
+native `.ROCK` session for Search, Personal Links, and optional Magnus features.
+It does not require an OpenID client, Rock MCP, Magnus CLI, Node.js, or npm.
 
-A compact Settings view supports multiple Rock instances or accounts. Each
-profile card owns its login state, Magnus availability, connection testing,
-sign-out, removal, and per-profile Recent Links. Search category controls,
-person-context visibility, and close-after-open behavior (enabled by default)
-stay in a separate preferences section. Opening Settings focuses **Add profile**;
-`Tab` and `Shift+Tab` walk every available action, field, preference, and search
-category while keeping the focused control visible. `Enter` or `Space` activates
-the focused control, and `Esc` returns to Search.
-On first launch, or whenever the active profile has no saved login, Rock Lens
-shows a focused onboarding screen with only the Rock domain, username, password,
-and **Connect** action. Navigation and settings stay hidden until the login has
-been verified. An existing profile's domain is prefilled; entering a different
-domain creates a separate profile instead of changing the signed-out one.
-Search terms and opaque navigation or Magnus IDs travel over an owner-only local
-Unix socket. Credentials, cookies, raw Rock record IDs, and raw server URLs do
-not cross that boundary; only a user-requested bounded Magnus text preview is
-returned to the panel.
+![Current Rock Lens search with a selected result](outputs/keyboard-audit/02-search-results.png)
 
-Rock Lens also emulates Rock's Quick Return behavior as **Recent Links**. It
-remembers only same-origin records or Personal Links that were opened from the
-launcher, deduplicates them, orders them by last use with the newest item first,
-caps the list at 20, and stores private target data in an owner-only local file.
-It does not read or follow browser history.
+Accounts with Magnus access automatically receive the Magnus tab, including
+folder browsing, bounded previews, downloads, clipboard actions, hashes, and
+explicitly confirmed mobile-app builds.
 
-![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
+![Current Magnus deployment confirmation with keyboard focus](outputs/keyboard-audit/05-magnus-confirmation.png)
 
-## Install or run locally
+## Install
 
-```bash
-python3 -m unittest discover -s tests -v
-python3 -m rock_lens_broker --socket /tmp/rock-lens-demo.sock
-```
-
-The repository itself is a valid Omarchy plugin: its root `manifest.json`
-points to the QML entry point and includes the Python broker. A published copy
-can therefore be installed directly without Node.js, npm, Magnus CLI, or Rock
-MCP:
+Rock Lens supports Omarchy 4.0.2 or newer. Install the Git repository directly:
 
 ```bash
 omarchy plugin add https://github.com/bscottdavis/rock-lens-omarchy.git --enable
 ```
+
+Open it with `Super+R` or the Rock icon in the Omarchy bar. First launch asks
+for only three values:
+
+1. Your Rock domain, such as `rock.example.org`
+2. Your Rock username
+3. Your Rock password
+
+Select **Connect**. The broker verifies the login before saving it to the
+desktop password manager. No Rock administrator setup or client secret is
+required.
 
 ## Updates
 
@@ -74,12 +51,40 @@ Run the plugin update command when a new Rock Lens release is available. Release
 notes and publisher steps live in [CHANGELOG.md](CHANGELOG.md) and
 [docs/RELEASING.md](docs/RELEASING.md).
 
-For a standalone broker command outside Omarchy, install the same dependency-free
-Python package with `uv tool install .`.
-
 The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-lens/broker.sock`
 and starts the broker without passing queries or credentials as arguments.
-Summon it with `Super+R` or click the Rock bar indicator.
+
+## Authentication and profiles
+
+Rock Lens intentionally has one authentication system: Rock's native session
+login. It posts the username and password to the selected instance's fixed
+`/api/Auth/Login` endpoint over HTTPS, rejects redirects, validates the returned
+`.ROCK` cookie, and keeps that cookie only in broker memory. The cookie expires
+after 15 minutes without Rock Lens activity; the saved profile credentials let
+the broker establish a new session when the user next performs an action.
+
+Profile names, strict origins, the active profile ID, and preferences are
+non-secret metadata stored owner-only in
+`$XDG_CONFIG_HOME/rock-lens/profiles.json`. Usernames and passwords are stored
+only by desktop Secret Service under a stable random profile ID. Two accounts
+on the same Rock instance remain separate.
+
+Use **Settings** (`Ctrl+,` or `Ctrl+4`) to add, rename, switch, test, sign out,
+or remove profiles. **Sign out** clears that profile's username, password, and
+memory-only cookie while retaining its local metadata and Recent Links.
+**Remove** also deletes that profile's metadata and Recent Links. Both actions
+require confirmation and never modify the Rock server.
+
+The equivalent terminal commands are:
+
+```bash
+python3 -m rock_lens_broker rock login
+python3 -m rock_lens_broker rock status
+```
+
+Rock Lens does not read legacy `oidc.json` metadata or use stored OAuth client
+secrets/tokens. Version 0.14 removed that dormant experimental code; existing
+user-owned legacy records are left untouched rather than silently deleted.
 
 ## Developer mode
 
@@ -97,80 +102,7 @@ forces PROD, rewrites a previously saved DEV context to PROD, hides the switch,
 and rejects direct socket requests to enter DEV. Values such as `true` or `yes`
 do not enable it.
 
-## Optional OpenID Connect client
-
-In Rock, create a dedicated client under `Admin Tools > Settings > OpenID
-Connect Clients`. Register this exact loopback redirect URI:
-
-```text
-http://127.0.0.1:41397/oauth/callback
-```
-
-Allow the minimum scopes Rock Lens requests: `openid` and `offline_access`.
-Rock's current source supports a public client with no secret and requires S256
-PKCE for that client type. For an installed version or confidential client that
-requires a secret, generate one; Rock Lens stores it in Secret Service, never
-in the repository or command line.
-
-These settings follow Rock's official [OpenID Connect
-documentation](https://community.rockrms.com/documentation/BookContent/9#openid-connect)
-and the [current Rock authorization-provider
-source](https://github.com/SparkDevNetwork/Rock/blob/f0917ef9799aa433d8be7b648666ecd5239550b1/Rock.Oidc/Authorization/AuthorizationProvider.cs).
-
-Run the owner-local interactive setup for production:
-
-```bash
-python3 -m rock_lens_broker configure
-```
-
-Developer-mode OAuth metadata can still be configured with
-`ROCK_LENS_DEVELOPER_MODE=1` and `--context DEV`.
-
-Enter Rock's Public Application Root as the issuer, copy the client ID, accept
-the loopback URI, and leave the secret blank for a public client. This OIDC
-client remains available for future token-based capabilities. Current search,
-links, and Magnus reads use the native per-profile Rock session login below and
-do not require an administrator to register an OAuth client.
-
-The client metadata file is owner-only at
-`$XDG_CONFIG_HOME/rock-lens/oidc.json` (normally
-`~/.config/rock-lens/oidc.json`). Client secrets and tokens are stored by the
-desktop Secret Service. The launcher receives only `configured`, state, and a
-fixed display label.
-
-Rock profile names, strict origins, the active profile ID, and allowlisted
-preferences are non-secret metadata stored owner-only at
-`$XDG_CONFIG_HOME/rock-lens/profiles.json`. Usernames and passwords are never
-stored there; Secret Service keys use stable random profile IDs, so two accounts
-on the same Rock instance remain separate. Existing single-instance setup and
-Recent Links migrate automatically, with the old history retained as rollback.
-Successful mobile app builds are also added as **Magnus Build** Recent Links so
-they can be re-triggered quickly; re-triggering always displays the production
-confirmation again.
-
-## Configure a Rock profile
-
-The initial and signed-out launcher state asks only for the Rock domain,
-username, and password. Select **Connect** to continue. Once connected, open
-**Settings** (or press `Ctrl+,`) to add or manage other profiles. The broker
-first verifies the login directly at the selected origin, then stores the
-credentials in Secret Service. The equivalent terminal setup remains available:
-
-```bash
-python3 -m rock_lens_broker rock login
-python3 -m rock_lens_broker rock status
-```
-
-The native login performs the fixed, bounded search and Personal Links reads.
-It then probes Magnus independently. A successful probe enables the panel's
-Magnus tab and the bounded `ls`, `cat`, and `hash` terminal operations. A 403 or
-404 marks Magnus unavailable for only that profile; it never disables normal
-Rock functionality. See [docs/MAGNUS.md](docs/MAGNUS.md) for the exact boundary.
-
-**Sign out** clears the selected profile's password, username, and in-memory
-cookie while keeping its profile metadata and local Recent Links. **Remove**
-also deletes that profile's local metadata and Recent Links. Both actions
-require a second click in the launcher and never modify the Rock server.
+## Search, Personal Links, and Recent Links
 
 In the launcher, an empty **Search** view shows local **Recent Links**, with a
 confirmed **Clear** action in the section header and the first recent item
@@ -184,7 +116,9 @@ People, Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel
 Items. Each target uses a fixed Rock route and must resolve to the exact
 configured Rock origin; Personal Links have the same origin restriction.
 
-Start a query with an entity prefix to search only that Rock category. A bare
+All searches use fixed Rock REST v1 endpoints; Rock Lens does not use the v2
+API or accept arbitrary endpoint paths. Start a query with an entity prefix to
+search only that Rock category. A bare
 prefix such as `g:` lists the first three items in that category.
 
 | Category | Short prefix | Full aliases | Shortcut |
@@ -204,6 +138,8 @@ prefix when you know the entity type and want only that match. The active scope
 appears as a badge beside the search field. `Esc` clears the scope before closing
 the panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary
 search text; no slash-command mode is required.
+
+## Keyboard navigation
 
 The search field keeps native editing behavior. Up and Down move through Recent
 Links or results and across the Search/Personal Links boundary. Tab cycles the
@@ -228,16 +164,30 @@ in the family group. Email, phone, address, and full birth date are not fetched.
 Gated DEV never opens a target and does not display the PROD Recent Link
 history.
 
+## Optional Magnus features
+
+After native login, Rock Lens independently probes the server-side Magnus API.
+A successful probe enables the Magnus tab; a 403 or 404 hides it without
+affecting Search, Personal Links, or Recent Links. Magnus folders use Up/Down
+and Enter. File previews expose only descriptor-approved Download, Copy, Copy
+hash, Open, and Refresh actions.
+
+Only exact numeric mobile-app build paths advertised by Magnus become deploy
+actions. Every build and repeat build requires a focused production
+confirmation. Successful builds become profile-scoped **Magnus Build** Recent
+Links. Write, upload, create, general delete, arbitrary HTTP, and arbitrary
+build operations are not exposed. See [docs/MAGNUS.md](docs/MAGNUS.md) for the
+full capability boundary.
+
 ## Safety guarantees
 
 - Normal use is locked to PROD. DEV requires the exact process-level developer
   flag and remains visibly labeled while enabled.
 - Native Rock login sends credentials only in a same-origin HTTPS request body,
   rejects redirects, validates the `.ROCK` cookie, and saves credentials only
-  after a successful login. The optional OIDC implementation retains its S256
-  PKCE and exact-origin protections.
-- Passwords, client secrets, cookies, and access/refresh tokens never enter
-  argv, repository files, logs, notifications, or screenshots.
+  after a successful login.
+- Passwords and cookies never enter argv, repository files, logs,
+  notifications, or screenshots.
 - PROD never falls back to synthetic results. Without a configured Rock login
   the affected live category is empty; missing Magnus access affects only the
   Magnus tab.
@@ -259,9 +209,22 @@ history.
 - Magnus accepts only the configured HTTPS Rock origin, rejects cross-origin
   and traversal paths, uses the same authenticated Rock session, and does not
   expose write, upload, create, or delete operations.
-- Broker errors are reduced to stable public codes. Response bodies, tokens,
+- Broker errors are reduced to stable public codes. Response bodies,
   cookies, SQL, unselected PII, URLs, and exceptions are not logged or
   forwarded to QML.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+## Development
+
+Run the complete dependency-free test suite and a standalone broker with:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 -m rock_lens_broker --socket /tmp/rock-lens-demo.sock
+```
+
+For a standalone installed command outside Omarchy, use `uv tool install .`.
+Release notes and publisher checks are in [CHANGELOG.md](CHANGELOG.md) and
+[docs/RELEASING.md](docs/RELEASING.md).

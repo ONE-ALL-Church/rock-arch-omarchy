@@ -248,11 +248,10 @@ class BrokerContractTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.state = Path(self.tmp.name) / "context"
-        self.config = Path(self.tmp.name) / "oidc.json"
         self.instance = Path(self.tmp.name) / "instance.json"
         self.broker = Broker(
             self.state,
-            config_file=self.config,
+            instance_file=self.instance,
             developer_mode=True,
         )
 
@@ -270,7 +269,7 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(
             Broker(
                 self.state,
-                config_file=self.config,
+                instance_file=self.instance,
                 developer_mode=True,
             ).handle({"op": "status"})["context"],
             "PROD",
@@ -280,7 +279,7 @@ class BrokerContractTests(unittest.TestCase):
         self.state.write_text("DEV\n", encoding="utf-8")
         broker = Broker(
             self.state,
-            config_file=self.config,
+            instance_file=self.instance,
             developer_mode=False,
         )
         status = broker.handle({"op": "status"})
@@ -303,7 +302,7 @@ class BrokerContractTests(unittest.TestCase):
     def test_developer_mode_environment_flag_requires_exact_one(self):
         with patch.dict(os.environ, {DEVELOPER_MODE_ENV: "1"}):
             self.assertTrue(developer_mode_enabled())
-            status = Broker(self.state, config_file=self.config).handle(
+            status = Broker(self.state, instance_file=self.instance).handle(
                 {"op": "status"}
             )
             self.assertTrue(status["developerMode"])
@@ -363,29 +362,22 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(
             all(
                 states[name] != "healthy"
-                for name in ("rock_oauth", "rock_rest", "sql", "magnus")
+                for name in ("rock_session", "rock_rest", "sql", "magnus")
             )
         )
 
-    def test_auth_contract_is_unconfigured_without_private_details(self):
-        response = self.broker.handle({"op": "auth_status"})
-        self.assertEqual(
-            response["auth"],
-            {
-                "state": "unconfigured",
-                "configured": False,
-                "label": "OAuth setup needed",
-            },
+    def test_status_exposes_only_native_rock_session_authentication(self):
+        status = self.broker.handle({"op": "status"})
+        self.assertNotIn("auth", status)
+        self.assertNotIn(
+            "rock_oauth", {capability["name"] for capability in status["capabilities"]}
         )
-        serialized = json.dumps(response).lower()
-        for forbidden in (
-            "issuer",
-            "client_id",
-            "access_token",
-            "refresh_token",
-            "client_secret",
-        ):
-            self.assertNotIn(forbidden, serialized)
+        for operation in ("auth_status", "auth_login", "auth_disconnect"):
+            with self.subTest(operation=operation):
+                self.assertEqual(
+                    self.broker.handle({"op": operation}),
+                    {"ok": False, "error": "unsupported_operation"},
+                )
 
     def test_magnus_contract_is_controlled_and_private(self):
         response = self.broker.handle({"op": "magnus_status"})
@@ -413,7 +405,6 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=FakeMagnus(True),
             live=live,
@@ -435,7 +426,6 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=FakeMagnus(False),
             live=live,
@@ -461,7 +451,6 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=FakeMagnus(False),
             live=live,
@@ -487,7 +476,6 @@ class BrokerContractTests(unittest.TestCase):
         magnus.state = "unknown"
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=magnus,
             live=FakeLive(),
@@ -509,7 +497,6 @@ class BrokerContractTests(unittest.TestCase):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=FakeMagnus(True),
             live=FakeLive(),
@@ -533,7 +520,6 @@ class BrokerContractTests(unittest.TestCase):
         clipboard = []
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=FakeMagnus(True),
             live=FakeLive(),
@@ -569,7 +555,6 @@ class BrokerContractTests(unittest.TestCase):
         magnus = FakeMagnus(True)
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=magnus,
             live=FakeLive(),
@@ -626,7 +611,6 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(False),
             magnus=FakeMagnus(False),
             live=live,
@@ -644,10 +628,10 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=session,
             magnus=magnus,
             live=live,
+            instance_file=self.instance,
         )
         response = broker.handle(
             {
@@ -673,10 +657,10 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=session,
             magnus=magnus,
             live=live,
+            instance_file=self.instance,
         )
         added = broker.handle(
             {
@@ -723,10 +707,10 @@ class BrokerContractTests(unittest.TestCase):
         magnus = FakeMagnus(False)
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=session,
             magnus=magnus,
             live=FakeLive(),
+            instance_file=self.instance,
         )
         first = broker.handle(
             {
@@ -758,7 +742,6 @@ class BrokerContractTests(unittest.TestCase):
         live = FakeLive()
         broker = Broker(
             self.state,
-            config_file=self.config,
             session=FakeSession(True),
             magnus=FakeMagnus(True),
             live=live,

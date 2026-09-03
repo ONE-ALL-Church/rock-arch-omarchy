@@ -7,8 +7,8 @@
    socket (`0700` directory, `0600` socket).
 3. `RockSessionProvider`: native per-profile Rock login, Secret Service
    credential storage, and a validated memory-only `.ROCK` cookie.
-4. `OAuthManager`: optional Rock OpenID Connect authorization-code support for
-   future bearer-token capabilities; core login does not require it.
+4. `SecretToolStore`: the small Secret Service adapter used only for
+   per-profile Rock usernames and passwords.
 5. `MockAdapter`: deterministic, synthetic records for People, Groups,
    Workflow Types, Jobs, Pages, and Content Channel Items.
 6. `MagnusReadOnlyAdapter`: optional native capability probe plus descriptor-
@@ -51,26 +51,9 @@ Profiles created by earlier Rock Lens releases automatically migrate their
 Authentication failure, sign-out, profile change, or a failed authenticated
 request clears the cached cookie.
 
-## Optional Rock OAuth boundary
-
-Rock is the OpenID Provider. The broker loads owner-only issuer/client metadata,
-retrieves Rock's standard discovery document, and accepts only HTTPS
-authorization and token endpoints on the issuer's origin. The registered
-callback must be an exact unprivileged `127.0.0.1` HTTP URI. Authorization uses
-`response_type=code`, a random state and nonce, and S256 PKCE. Public Rock
-clients have no secret; confidential-client secrets are read from Secret
-Service only for the token exchange.
-
-Authorization codes live only in broker memory. Stored token records contain
-the bearer token, optional refresh token, type, scope string, and expiry and are
-written only to Secret Service. Identity-token claims are not persisted or
-sent to QML. The public socket contract exposes only a fixed state/label and a
-configured boolean. Detailed HTTP errors and response bodies are discarded.
-
-Authentication states are `unconfigured`, `signed_out`, `starting`, `waiting`,
-`refreshing`, `authenticated`, `expired`, and `failed`. Refresh failure deletes
-the unusable token set and fails closed. Disconnect deletes only the local token
-set. Gated DEV and PROD use separate configuration and keyring records.
+Version 0.14 removed the unused experimental OpenID manager and its public
+broker operations. Legacy `oidc.json`, client-secret, and token records are not
+read. They remain user-owned and are not silently deleted during an upgrade.
 
 ## Explicit context
 

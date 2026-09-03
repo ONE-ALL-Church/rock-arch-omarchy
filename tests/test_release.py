@@ -40,6 +40,12 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertNotIn("github.com/OWNER/", readme)
 
+    def test_obsolete_openid_surface_is_not_distributed(self):
+        self.assertFalse((ROOT / "rock_lens_broker/auth.py").exists())
+        self.assertFalse((ROOT / "tests/test_auth.py").exists())
+        main = (ROOT / "rock_lens_broker/__main__.py").read_text(encoding="utf-8")
+        self.assertNotIn('sys.argv[1] == "configure"', main)
+
 
 if __name__ == "__main__":
     unittest.main()

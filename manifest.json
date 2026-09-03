@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "oneall.rock-lens",
   "name": "Rock Lens",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "author": "ONE&ALL",
   "license": "MIT",
   "description": "Native multi-profile Rock search with optional Magnus browsing",

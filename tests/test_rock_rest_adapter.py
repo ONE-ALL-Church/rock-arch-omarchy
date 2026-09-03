@@ -85,7 +85,7 @@ class RockRestAdapterTests(unittest.TestCase):
         request, timeout = opener.calls[0]
         self.assertEqual(request.get_method(), "GET")
         self.assertEqual(request.get_header("Cookie"), ".ROCK=test-session")
-        self.assertEqual(request.get_header("User-agent"), "Rock-Lens/0.13")
+        self.assertEqual(request.get_header("User-agent"), "Rock-Lens/0.14")
         self.assertTrue(
             request.full_url.startswith("https://rock.example.org/api/People?")
         )
