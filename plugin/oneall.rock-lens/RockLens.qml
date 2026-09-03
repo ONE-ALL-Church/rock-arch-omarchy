@@ -86,9 +86,7 @@ Panel {
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
-    !onboardingDomainField.activeFocus && !onboardingUsernameField.activeFocus && !onboardingPasswordField.activeFocus &&
-    !domainField.activeFocus && !usernameField.activeFocus && !passwordField.activeFocus &&
-    !profileNameField.activeFocus && !activeUsernameField.activeFocus && !activePasswordField.activeFocus
+    !onboardingForm.inputActive && !settingsPanel.inputActive
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
     rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
     rockAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Secure password storage unavailable"
@@ -413,7 +411,7 @@ Panel {
         if (root.viewMode !== "magnus") return
         keyCatcher.forceActiveFocus()
         if (root.magnusCursor >= 0)
-          root.revealItem(magnusRepeater.itemAt(root.magnusCursor))
+          root.revealItem(magnusPanel.repeater.itemAt(root.magnusCursor))
       })
     }
     if (response.magnusPreview) {
@@ -422,8 +420,8 @@ Panel {
       panelFlick.contentY = 0
       Qt.callLater(function() {
         if (root.viewMode !== "magnus" || root.magnusPreview === null) return
-        magnusDownloadButton.forceActiveFocus(Qt.TabFocusReason)
-        root.revealFocusedControl(magnusDownloadButton)
+        magnusPanel.previewPrimaryButton.forceActiveFocus(Qt.TabFocusReason)
+        root.revealFocusedControl(magnusPanel.previewPrimaryButton)
       })
     }
     if (response.magnusDownload) {
@@ -463,7 +461,7 @@ Panel {
         editLoginMode = false
         if (instanceDomain && newProfileDomain.trim().length === 0)
           newProfileDomain = instanceDomain
-        Qt.callLater(function() { onboardingDomainField.forceActiveFocus() })
+        Qt.callLater(function() { onboardingForm.domainField.forceActiveFocus() })
       }
     }
     if (isStatusResponse) {
@@ -486,7 +484,7 @@ Panel {
       panelFlick.contentY = 0
       Qt.callLater(function() {
         if (root.viewMode === "search" && root.resultCursor >= 0)
-          root.revealItem(resultRepeater.itemAt(root.resultCursor))
+          root.revealItem(searchPanel.resultRepeater.itemAt(root.resultCursor))
       })
     }
     if (Array.isArray(response.personalLinks)) personalLinks = response.personalLinks
@@ -502,7 +500,7 @@ Panel {
     if (linkCursor >= navigationCount) linkCursor = navigationCount - 1
     if (viewMode === "personal" && linkCursor < 0 && navigationCount) linkCursor = 0
     if (viewMode === "personal" && linkCursor >= 0)
-      Qt.callLater(function() { root.revealItem(personalLinkRepeater.itemAt(root.linkCursor)) })
+      Qt.callLater(function() { root.revealItem(personalPanel.repeater.itemAt(root.linkCursor)) })
     if (response.personalLinksAvailable !== undefined)
       personalLinksAvailable = response.personalLinksAvailable === true
     if (response.person) quickLook = response.person
@@ -625,8 +623,8 @@ Panel {
     panelFlick.contentY = 0
     request({op: "profiles_status"})
     Qt.callLater(function() {
-      settingsAddProfileButton.forceActiveFocus(Qt.TabFocusReason)
-      root.revealItem(settingsAddProfileButton)
+      settingsPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)
+      root.revealItem(settingsPanel.primaryButton)
     })
   }
   function revealFocusedControl(control) {
@@ -682,7 +680,7 @@ Panel {
     quickLook = null
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
-      root.revealItem(resultRepeater.itemAt(root.resultCursor))
+      root.revealItem(searchPanel.resultRepeater.itemAt(root.resultCursor))
     })
   }
   function selectRecent(index) {
@@ -697,7 +695,7 @@ Panel {
     quickLook = null
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
-      root.revealItem(quickReturnRepeater.itemAt(root.recentCursor))
+      root.revealItem(searchPanel.quickReturnRepeater.itemAt(root.recentCursor))
     })
   }
   function selectPersonalLink(index) {
@@ -711,7 +709,7 @@ Panel {
     if (changedView) refreshPersonalLinks()
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
-      root.revealItem(personalLinkRepeater.itemAt(root.linkCursor))
+      root.revealItem(personalPanel.repeater.itemAt(root.linkCursor))
     })
   }
   function openMagnus() {
@@ -739,7 +737,7 @@ Panel {
     magnusCursor = Math.max(0, Math.min(magnusItems.length - 1, index))
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
-      root.revealItem(magnusRepeater.itemAt(root.magnusCursor))
+      root.revealItem(magnusPanel.repeater.itemAt(root.magnusCursor))
     })
   }
   function activateMagnus(index) {
@@ -779,9 +777,9 @@ Panel {
     feedbackText = "Press Enter to deploy, or Esc to cancel"
     Qt.callLater(function() {
       if (root.pendingMagnusBuildRecent)
-        recentBuildConfirmButton.forceActiveFocus(Qt.TabFocusReason)
+        searchPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)
       else
-        magnusBuildConfirmButton.forceActiveFocus(Qt.TabFocusReason)
+        magnusPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)
     })
   }
   function cancelMagnusBuild() {
@@ -1054,7 +1052,7 @@ Panel {
     if (!pendingClearRecent) {
       pendingClearRecent = true
       feedbackText = "Press Enter to clear Recent Links, or Esc to cancel"
-      Qt.callLater(function() { clearRecentButton.forceActiveFocus(Qt.TabFocusReason) })
+      Qt.callLater(function() { searchPanel.clearButton.forceActiveFocus(Qt.TabFocusReason) })
       return
     }
     pendingClearRecent = false
@@ -1217,7 +1215,7 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: root.onboardingRequired ? onboardingDomainField : searchField
+    focusTarget: root.onboardingRequired ? onboardingForm.domainField : searchField
     contentWidth: panel.fittedContentWidth(Style.space(520))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
 
@@ -1227,7 +1225,7 @@ Panel {
       formMode: root.onboardingRequired || root.viewMode === "settings" ||
         root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null
       commandMode: root.magnusPreviewCommandsEnabled
-      blocked: searchField.activeFocus || onboardingDomainField.activeFocus || onboardingUsernameField.activeFocus || onboardingPasswordField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus || magnusTextArea.activeFocus
+      blocked: searchField.activeFocus || onboardingForm.inputActive || settingsPanel.inputActive || magnusPanel.inputActive
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
@@ -1245,66 +1243,9 @@ Panel {
         width: parent.width
         spacing: Style.spacing.sm
 
-        RowLayout {
+        RockLensNavigationTabs {
           width: parent.width
-          spacing: Style.spacing.sm
-          Text { text: "Rock Lens"; color: Color.foreground; font.pixelSize: Style.font.title; font.bold: true }
-          Rectangle {
-            visible: root.developerMode
-            Layout.preferredWidth: contextLabel.implicitWidth + 16
-            Layout.preferredHeight: contextLabel.implicitHeight + 8
-            radius: 6
-            color: root.contextName === "PROD" ? "#7f1d1d" : "#14532d"
-            Text { id: contextLabel; anchors.centerIn: parent; text: root.contextName; color: "white"; font.bold: true }
-            MouseArea { anchors.fill: parent; enabled: root.developerMode; cursorShape: Qt.PointingHandCursor; onClicked: root.switchContext() }
-          }
-          Item { Layout.fillWidth: true }
-          Repeater {
-            model: root.onboardingRequired ? [] :
-              (root.showMagnus ? ["search", "personal", "magnus"] : ["search", "personal"])
-            delegate: Rectangle {
-              required property var modelData
-              Layout.preferredWidth: tabText.implicitWidth + 20
-              Layout.preferredHeight: Style.space(32)
-              radius: 7
-              color: root.viewMode === modelData ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-              Text {
-                id: tabText
-                anchors.centerIn: parent
-                text: modelData === "search" ? "Search" : (modelData === "personal" ? "Personal Links" : "Magnus")
-                color: Color.foreground
-                font.bold: root.viewMode === modelData
-              }
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                  if (modelData === "search") root.focusSearch()
-                  else if (modelData === "personal") root.selectPersonalLink(0)
-                  else root.openMagnus()
-                }
-              }
-            }
-          }
-          Rectangle {
-            visible: !root.onboardingRequired
-            Layout.preferredWidth: settingsLabel.implicitWidth + 20
-            Layout.preferredHeight: Style.space(32)
-            radius: 7
-            color: root.viewMode === "settings" ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-            Text {
-              id: settingsLabel
-              anchors.centerIn: parent
-              text: "Settings"
-              color: Color.foreground
-              font.bold: root.viewMode === "settings"
-            }
-            MouseArea {
-              anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.openSettings(false)
-            }
-          }
+          controller: root
         }
 
         RowLayout {
@@ -1417,936 +1358,40 @@ Panel {
             width: parent.width
             spacing: Style.spacing.sm
 
-            Column {
+            RockLensLoginPanel {
               id: onboardingForm
               visible: root.onboardingRequired
               width: body.width
-              height: visible ? implicitHeight : 0
-              spacing: Style.spacing.sm
-
-              Text {
-                text: "Connect to Rock"
-                color: Color.foreground
-                font.pixelSize: Style.font.heading
-                font.bold: true
-              }
-              TextField {
-                id: onboardingDomainField
-                width: parent.width
-                enabled: !root.setupBusy
-                maximumLength: 250
-                placeholderText: "Rock domain (rock.example.org)"
-                text: root.newProfileDomain
-                selectByMouse: true
-                inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-                KeyNavigation.tab: onboardingUsernameField
-                KeyNavigation.backtab: onboardingConnectButton
-                onTextChanged: root.newProfileDomain = text
-                onAccepted: onboardingUsernameField.forceActiveFocus(Qt.TabFocusReason)
-              }
-              TextField {
-                id: onboardingUsernameField
-                width: parent.width
-                enabled: !root.setupBusy
-                maximumLength: 200
-                placeholderText: "Rock username"
-                text: root.setupUsername
-                selectByMouse: true
-                KeyNavigation.tab: onboardingPasswordField
-                KeyNavigation.backtab: onboardingDomainField
-                onTextChanged: root.setupUsername = text
-                onAccepted: onboardingPasswordField.forceActiveFocus(Qt.TabFocusReason)
-              }
-              TextField {
-                id: onboardingPasswordField
-                width: parent.width
-                enabled: !root.setupBusy
-                placeholderText: "Rock password"
-                text: root.setupPassword
-                echoMode: TextInput.Password
-                selectByMouse: true
-                inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                KeyNavigation.tab: onboardingConnectButton
-                KeyNavigation.backtab: onboardingUsernameField
-                onTextChanged: root.setupPassword = text
-                onAccepted: root.completeOnboarding()
-              }
-              Button {
-                id: onboardingConnectButton
-                text: root.setupBusy ? (root.setupSlow ? "Still connecting…" : "Connecting…") : "Connect"
-                focusable: true
-                enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                KeyNavigation.tab: onboardingDomainField
-                KeyNavigation.backtab: onboardingPasswordField
-                onClicked: root.completeOnboarding()
-              }
+              controller: root
             }
 
-            Column {
-              visible: !root.onboardingRequired && root.viewMode === "search" && !root.showRecentLinks
+            RockLensSearchPanel {
+              id: searchPanel
+              visible: !root.onboardingRequired && root.viewMode === "search"
               width: body.width
-              height: visible ? implicitHeight : 0
-              spacing: Style.spacing.sm
-
-              Repeater {
-                id: resultRepeater
-                model: root.results
-                delegate: Rectangle {
-                  required property var modelData
-                  required property int index
-                  readonly property bool rowSelected: index === root.resultCursor ||
-                    (root.resultCursor < 0 && index === 0 && searchField.activeFocus && root.results.length > 0)
-                  width: body.width
-                  height: Style.space(52)
-                  radius: 7
-                  color: "transparent"
-                  clip: true
-                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
-                  Column {
-                    anchors.left: parent.left
-                    anchors.right: openButton.visible ? openButton.left : parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 10
-                    Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                    Text { width: parent.width; text: root.displayCategory(modelData.category) + " · " + modelData.subtitle + " · " + modelData.status; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
-                  }
-                  MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                      root.selectResult(index)
-                      if (modelData.category === "People")
-                        root.request({op: "person_quick_look", safeId: modelData.safeId})
-                    }
-                  }
-                  Rectangle {
-                    id: openButton
-                    visible: modelData.canOpen === true && root.contextName === "PROD" && index === root.resultCursor
-                    width: visible ? Style.space(54) : 0
-                    height: Style.space(32)
-                    anchors.right: parent.right
-                    anchors.rightMargin: 7
-                    anchors.verticalCenter: parent.verticalCenter
-                    radius: 6
-                    color: "#14532d"
-                    z: 2
-                    Text { anchors.centerIn: parent; text: "Open"; color: "white"; font.bold: true }
-                    MouseArea {
-                      anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: {
-                        root.resultCursor = index
-                        root.request({op: "open_navigation", safeId: modelData.safeId})
-                      }
-                    }
-                  }
-                }
-              }
-
-              Text {
-                visible: root.results.length === 0
-                width: body.width
-                text: root.contextName === "PROD" && !root.rockConfigured ? "Live results stay empty until a Rock login is saved." : "No matching results."
-                color: Color.foreground
-                opacity: 0.6
-                wrapMode: Text.WordWrap
-              }
-
-              Rectangle {
-                visible: root.quickLook !== null
-                width: body.width
-                height: visible ? Style.space(100) : 0
-                radius: 9
-                color: Style.selectedFillFor(Color.foreground, Color.accent)
-                Column {
-                  anchors.fill: parent
-                  anchors.margins: 12
-                  spacing: 4
-                  Text { text: root.quickLook ? root.quickLook.displayName : ""; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true; textFormat: Text.PlainText }
-                  Text { text: root.quickLook ? root.quickLook.subtitle : ""; color: Color.foreground; textFormat: Text.PlainText }
-                  Text { text: root.quickLook ? root.quickLook.campus : ""; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText }
-                }
-              }
+              controller: root
+              searchField: searchField
             }
 
-            Column {
-              visible: !root.onboardingRequired && root.viewMode === "search" && root.showRecentLinks
-              width: body.width
-              height: visible ? implicitHeight : 0
-              spacing: Style.spacing.sm
-
-              RowLayout {
-                width: parent.width
-                Text {
-                  text: "Recent Links"
-                  color: Color.foreground
-                  font.pixelSize: Style.font.heading
-                  font.bold: true
-                }
-                Item { Layout.fillWidth: true }
-                Button {
-                  id: clearRecentButton
-                  Layout.preferredHeight: Style.space(30)
-                  visible: root.contextName === "PROD"
-                  text: root.pendingClearRecent ? "Confirm clear" : "X · Clear"
-                  focusable: enabled
-                  enabled: root.quickReturns.length > 0 && !root.setupBusy
-                  background: root.pendingClearRecent ? "#7f1d1d" : Style.selectedFillFor(Color.foreground, Color.accent)
-                  KeyNavigation.tab: clearRecentButton
-                  KeyNavigation.backtab: clearRecentButton
-                  onActiveFocusChanged: root.revealFocusedControl(clearRecentButton)
-                  onClicked: root.clearRecentLinks()
-                }
-              }
-              Text {
-                visible: root.quickReturns.length === 0
-                width: body.width
-                text: root.contextName === "PROD" ?
-                  "Items opened from Rock Lens will appear here (up to 20)." :
-                  "Recent Links are available in PROD. Start typing to search preview data."
-                color: Color.foreground
-                opacity: 0.6
-                wrapMode: Text.WordWrap
-              }
-              Rectangle {
-                visible: root.pendingMagnusBuildId !== "" && root.pendingMagnusBuildRecent
-                width: body.width
-                height: visible ? buildRecentConfirm.implicitHeight + 24 : 0
-                radius: 9
-                color: Qt.rgba(0.45, 0.2, 0.05, 0.35)
-                border.width: 1
-                border.color: "#f59e0b"
-                ColumnLayout {
-                  id: buildRecentConfirm
-                  anchors.fill: parent
-                  anchors.margins: 12
-                  spacing: 8
-                  Text { Layout.fillWidth: true; text: "Deploy " + root.pendingMagnusBuildTitle + " again?"; color: Color.foreground; font.bold: true; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
-                  Text { Layout.fillWidth: true; text: "Press Enter to start the production build, or Esc to cancel. You can deploy it again later from Recent Links."; color: Color.foreground; opacity: 0.68; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
-                  RowLayout {
-                    Button {
-                      id: recentBuildCancelButton
-                      text: "Cancel"
-                      focusable: true
-                      enabled: !root.magnusActionBusy
-                      KeyNavigation.right: recentBuildConfirmButton
-                      KeyNavigation.tab: recentBuildConfirmButton
-                      KeyNavigation.backtab: recentBuildConfirmButton
-                      Keys.onEscapePressed: root.cancelMagnusBuild()
-                      onClicked: root.cancelMagnusBuild()
-                    }
-                    Button {
-                      id: recentBuildConfirmButton
-                      text: root.magnusActionBusy ? "Deploying…" : "Deploy again"
-                      focusable: true
-                      enabled: !root.magnusActionBusy
-                      KeyNavigation.left: recentBuildCancelButton
-                      KeyNavigation.tab: recentBuildCancelButton
-                      KeyNavigation.backtab: recentBuildCancelButton
-                      Keys.onEscapePressed: root.cancelMagnusBuild()
-                      onClicked: root.confirmMagnusBuild()
-                    }
-                    Item { Layout.fillWidth: true }
-                  }
-                }
-              }
-              Repeater {
-                id: quickReturnRepeater
-                model: root.quickReturns
-                delegate: Rectangle {
-                  required property var modelData
-                  required property int index
-                  readonly property bool rowSelected: index === root.recentCursor ||
-                    (root.recentCursor < 0 && index === 0 && searchField.activeFocus && root.quickReturns.length > 0)
-                  width: body.width
-                  height: Style.space(52)
-                  radius: 7
-                  color: "transparent"
-                  clip: true
-                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
-                  Column {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 10
-                    Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                    Text {
-                      width: parent.width
-                      text: modelData.kind === "Magnus Build" ?
-                        "Last deployed " + root.relativeTime(modelData.lastUsedAt) + " · Enter to deploy again" :
-                        modelData.kind
-                      color: Color.foreground
-                      opacity: 0.65
-                      textFormat: Text.PlainText
-                      elide: Text.ElideRight
-                    }
-                  }
-                  MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                      root.selectRecent(index)
-                      root.activateRecent(index)
-                    }
-                  }
-                }
-              }
-            }
-
-            Column {
+            RockLensPersonalPanel {
+              id: personalPanel
               visible: !root.onboardingRequired && root.viewMode === "personal"
               width: body.width
-              height: visible ? implicitHeight : 0
-              spacing: Style.spacing.sm
-
-              Text { text: "Personal Links"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
-              Text {
-                visible: root.personalLinks.length === 0
-                width: body.width
-                text: root.contextName !== "PROD" ? "Switch to PROD to load your Rock bookmarks." :
-                  root.rockConfigured ? "No same-site Personal Links were returned." : "A Rock login is needed to load Personal Links."
-                color: Color.foreground
-                opacity: 0.6
-                wrapMode: Text.WordWrap
-              }
-              Repeater {
-                id: personalLinkRepeater
-                model: root.personalLinks
-                delegate: Rectangle {
-                  required property var modelData
-                  required property int index
-                  readonly property bool rowSelected: index === root.linkCursor
-                  width: body.width
-                  height: Style.space(52)
-                  radius: 7
-                  color: "transparent"
-                  clip: true
-                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
-                  Column {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 10
-                    Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                    Text { width: parent.width; text: modelData.section + (modelData.isShared ? " · Shared" : ""); color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
-                  }
-                  MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                      root.selectPersonalLink(index)
-                      root.request({op: "open_navigation", safeId: modelData.safeId})
-                    }
-                  }
-                }
-              }
+              controller: root
             }
 
-            Column {
+            RockLensMagnusPanel {
+              id: magnusPanel
               visible: !root.onboardingRequired && root.viewMode === "magnus"
               width: body.width
-              height: visible ? implicitHeight : 0
-              spacing: Style.spacing.sm
-
-              RowLayout {
-                width: parent.width
-                Button {
-                  id: magnusBackButton
-                  visible: root.magnusPreview !== null || root.magnusHistory.length > 0
-                  text: "Back"
-                  focusable: true
-                  enabled: !root.magnusBusy
-                  onActiveFocusChanged: root.revealFocusedControl(magnusBackButton)
-                  onClicked: root.magnusBack()
-                }
-                Text {
-                  Layout.fillWidth: true
-                  text: root.magnusPreview ? root.magnusPreview.title : root.magnusFolderTitle
-                  color: Color.foreground
-                  font.pixelSize: Style.font.heading
-                  font.bold: true
-                  textFormat: Text.PlainText
-                  elide: Text.ElideMiddle
-                }
-                Text {
-                  text: "Files and mobile apps"
-                  color: "#86efac"
-                  font.pixelSize: Style.font.bodySmall
-                  font.bold: true
-                }
-                Button {
-                  id: magnusRefreshButton
-                  text: "R · Refresh"
-                  focusable: true
-                  enabled: !root.magnusBusy && !root.magnusActionBusy
-                  onActiveFocusChanged: root.revealFocusedControl(magnusRefreshButton)
-                  onClicked: root.refreshMagnus()
-                }
-              }
-
-              Rectangle {
-                visible: root.pendingMagnusBuildId !== "" && !root.pendingMagnusBuildRecent
-                width: body.width
-                height: visible ? buildMagnusConfirm.implicitHeight + 24 : 0
-                radius: 9
-                color: Qt.rgba(0.45, 0.2, 0.05, 0.35)
-                border.width: 1
-                border.color: "#f59e0b"
-                ColumnLayout {
-                  id: buildMagnusConfirm
-                  anchors.fill: parent
-                  anchors.margins: 12
-                  spacing: 8
-                  Text { Layout.fillWidth: true; text: "Deploy " + root.pendingMagnusBuildTitle + "?"; color: Color.foreground; font.bold: true; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
-                  Text { Layout.fillWidth: true; text: root.deploymentSummary(root.pendingMagnusBuildTitle) + ". Press Enter to start the production build, or Esc to cancel."; color: Color.foreground; opacity: 0.68; wrapMode: Text.WordWrap; textFormat: Text.PlainText }
-                  RowLayout {
-                    Button {
-                      id: magnusBuildCancelButton
-                      text: "Cancel"
-                      focusable: true
-                      enabled: !root.magnusActionBusy
-                      KeyNavigation.right: magnusBuildConfirmButton
-                      KeyNavigation.tab: magnusBuildConfirmButton
-                      KeyNavigation.backtab: magnusBuildConfirmButton
-                      Keys.onEscapePressed: root.cancelMagnusBuild()
-                      onClicked: root.cancelMagnusBuild()
-                    }
-                    Button {
-                      id: magnusBuildConfirmButton
-                      text: root.magnusActionBusy ? "Deploying…" : "Deploy now"
-                      focusable: true
-                      enabled: !root.magnusActionBusy
-                      KeyNavigation.left: magnusBuildCancelButton
-                      KeyNavigation.tab: magnusBuildCancelButton
-                      KeyNavigation.backtab: magnusBuildCancelButton
-                      Keys.onEscapePressed: root.cancelMagnusBuild()
-                      onClicked: root.confirmMagnusBuild()
-                    }
-                    Item { Layout.fillWidth: true }
-                  }
-                }
-              }
-
-              Text {
-                visible: root.magnusBusy
-                width: parent.width
-                text: "Opening Magnus…"
-                color: Color.foreground
-                opacity: 0.6
-              }
-
-              Column {
-                visible: root.magnusPreview !== null && !root.magnusBusy
-                width: parent.width
-                height: visible ? implicitHeight : 0
-                spacing: Style.spacing.sm
-                Text {
-                  width: parent.width
-                  text: root.magnusPreview ? "SHA-256 · " + root.magnusPreview.sha256 : ""
-                  color: Color.foreground
-                  opacity: 0.55
-                  font.pixelSize: Style.font.bodySmall
-                  textFormat: Text.PlainText
-                  elide: Text.ElideMiddle
-                }
-                RowLayout {
-                  width: parent.width
-                  spacing: 6
-                  Button {
-                    id: magnusDownloadButton
-                    text: root.magnusActionBusy ? "Working…" : "D · Download"
-                    focusable: true
-                    enabled: !root.magnusActionBusy
-                    onActiveFocusChanged: root.revealFocusedControl(magnusDownloadButton)
-                    onClicked: root.runMagnusAction("magnus_download", "")
-                  }
-                  Button {
-                    id: magnusCopyButton
-                    visible: root.hasMagnusAction("copy")
-                    text: "C · Copy"
-                    focusable: true
-                    enabled: !root.magnusActionBusy
-                    onActiveFocusChanged: root.revealFocusedControl(magnusCopyButton)
-                    onClicked: root.runMagnusAction("magnus_copy", "content")
-                  }
-                  Button {
-                    id: magnusHashButton
-                    text: "H · Copy hash"
-                    focusable: true
-                    enabled: !root.magnusActionBusy
-                    onActiveFocusChanged: root.revealFocusedControl(magnusHashButton)
-                    onClicked: root.runMagnusAction("magnus_copy", "hash")
-                  }
-                  Button {
-                    id: magnusOpenButton
-                    visible: root.hasMagnusAction("view")
-                    text: "O · Open in Rock"
-                    focusable: true
-                    enabled: !root.magnusActionBusy
-                    onActiveFocusChanged: root.revealFocusedControl(magnusOpenButton)
-                    onClicked: root.runMagnusAction("magnus_open", "")
-                  }
-                  Item { Layout.fillWidth: true }
-                }
-                Text {
-                  visible: root.magnusPreview && root.magnusPreview.previewAvailable !== true
-                  width: parent.width
-                  text: "Preview is unavailable for this binary or large file. You can still download it or copy its hash."
-                  color: Color.foreground
-                  opacity: 0.68
-                  wrapMode: Text.WordWrap
-                }
-                ScrollView {
-                  visible: root.magnusPreview && root.magnusPreview.previewAvailable === true
-                  width: parent.width
-                  height: visible ? Style.space(320) : 0
-                  clip: true
-                  TextArea {
-                    id: magnusTextArea
-                    text: root.magnusPreview ? root.magnusPreview.content : ""
-                    readOnly: true
-                    selectByMouse: true
-                    wrapMode: TextEdit.NoWrap
-                    font.family: "monospace"
-                    color: Color.foreground
-                    background: Rectangle {
-                      radius: 7
-                      color: Qt.rgba(1, 1, 1, 0.05)
-                      border.width: 1
-                      border.color: Qt.rgba(1, 1, 1, 0.10)
-                    }
-                    Keys.onEscapePressed: root.magnusBack()
-                  }
-                }
-              }
-
-              Text {
-                visible: root.magnusPreview === null && !root.magnusBusy && root.magnusItems.length === 0
-                width: parent.width
-                text: "This Magnus folder is empty."
-                color: Color.foreground
-                opacity: 0.6
-                wrapMode: Text.WordWrap
-              }
-
-              Repeater {
-                id: magnusRepeater
-                model: root.magnusPreview === null ? root.magnusItems : []
-                delegate: Rectangle {
-                  required property var modelData
-                  required property int index
-                  readonly property bool rowSelected: index === root.magnusCursor
-                  width: body.width
-                  height: Style.space(52)
-                  radius: 7
-                  color: "transparent"
-                  clip: true
-                  RockLensSelectionChrome { anchors.fill: parent; selected: parent.rowSelected }
-                  Column {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: modelData.actions && modelData.actions.indexOf("build") >= 0 ? 108 : 10
-                    Text {
-                      width: parent.width
-                      text: (modelData.kind === "folder" ? "▸ " : "") + modelData.title
-                      color: Color.foreground
-                      font.bold: true
-                      textFormat: Text.PlainText
-                      elide: Text.ElideRight
-                    }
-                    Text {
-                      width: parent.width
-                      text: modelData.kind === "folder" ?
-                        (modelData.actions && modelData.actions.indexOf("build") >= 0 ? "Mobile app · " + root.deploymentSummary(modelData.title) : "Folder · Enter to open") :
-                        "File · preview and download"
-                      color: Color.foreground
-                      opacity: 0.55
-                      font.pixelSize: Style.font.bodySmall
-                      textFormat: Text.PlainText
-                      elide: Text.ElideRight
-                    }
-                  }
-                  MouseArea {
-                    anchors.fill: parent
-                    anchors.rightMargin: modelData.actions && modelData.actions.indexOf("build") >= 0 ? 102 : 0
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                      root.selectMagnus(index)
-                      root.activateMagnus(index)
-                    }
-                  }
-                  Button {
-                    visible: modelData.actions && modelData.actions.indexOf("build") >= 0
-                    width: 92
-                    height: 32
-                    anchors.right: parent.right
-                    anchors.rightMargin: 7
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "B · Deploy"
-                    enabled: !root.magnusBusy && !root.magnusActionBusy
-                    z: 2
-                    onClicked: {
-                      root.selectMagnus(index)
-                      root.prepareMagnusBuild(modelData.safeId, modelData.title, false)
-                    }
-                  }
-                }
-              }
+              controller: root
             }
 
-            Column {
+            RockLensSettingsPanel {
+              id: settingsPanel
               visible: !root.onboardingRequired && root.viewMode === "settings"
               width: body.width
-              height: visible ? implicitHeight : 0
-              spacing: Style.spacing.md
-
-              RowLayout {
-                width: parent.width
-                Text {
-                  text: "Rock profiles"
-                  color: Color.foreground
-                  font.pixelSize: Style.font.heading
-                  font.bold: true
-                }
-                Item { Layout.fillWidth: true }
-                Button {
-                  id: settingsAddProfileButton
-                  text: root.addProfileMode ? "Cancel" : "Add profile"
-                  focusable: true
-                  enabled: !root.setupBusy
-                  onActiveFocusChanged: root.revealFocusedControl(settingsAddProfileButton)
-                  onClicked: {
-                    root.addProfileMode = !root.addProfileMode
-                    root.setupUsername = ""
-                    root.setupPassword = ""
-                    root.feedbackText = ""
-                    if (root.addProfileMode) Qt.callLater(function() { profileNameField.forceActiveFocus() })
-                  }
-                }
-              }
-              Text {
-                width: parent.width
-                text: "Each Rock site or account keeps its own login and Recent Links."
-                color: Color.foreground
-                opacity: 0.62
-                wrapMode: Text.WordWrap
-                textFormat: Text.PlainText
-              }
-
-              Repeater {
-                model: root.profiles
-                delegate: Rectangle {
-                  required property var modelData
-                  width: body.width
-                  height: Style.space(modelData.isActive ? 94 : 58)
-                  radius: 8
-                  color: modelData.isActive ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-                  border.width: 1
-                  border.color: modelData.isActive ? Color.accent : Qt.rgba(1, 1, 1, 0.12)
-                  ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 4
-                    RowLayout {
-                      Layout.fillWidth: true
-                      Column {
-                        Layout.fillWidth: true
-                        Text { width: parent.width; text: modelData.name; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                        Text { width: parent.width; text: String(modelData.origin).replace("https://", ""); color: Color.foreground; opacity: 0.58; textFormat: Text.PlainText; elide: Text.ElideRight }
-                      }
-                      Text {
-                        visible: modelData.isActive
-                        text: "Active"
-                        color: Color.accent
-                        font.bold: true
-                        font.pixelSize: Style.font.bodySmall
-                      }
-                      Button {
-                        id: useProfileButton
-                        visible: !modelData.isActive
-                        text: "Use"
-                        focusable: true
-                        enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealFocusedControl(useProfileButton)
-                        onClicked: root.switchProfile(modelData.id)
-                      }
-                      Button {
-                        id: removeProfileButton
-                        text: root.pendingRemoveProfileId === modelData.id ? "Confirm remove" : "Remove"
-                        focusable: true
-                        enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealFocusedControl(removeProfileButton)
-                        onClicked: root.removeProfile(modelData.id)
-                      }
-                    }
-                    RowLayout {
-                      visible: modelData.isActive
-                      Layout.fillWidth: true
-                      Layout.preferredHeight: visible ? Style.space(32) : 0
-                      spacing: Style.spacing.sm
-                      Rectangle {
-                        Layout.preferredWidth: 8
-                        Layout.preferredHeight: 8
-                        radius: 4
-                        color: root.rockConfigured ? "#86efac" : "#fbbf24"
-                      }
-                      Text {
-                        Layout.fillWidth: true
-                        text: !root.rockConfigured ? "Login required" :
-                          root.magnusState === "available" ? "Login saved · Magnus available" :
-                          root.magnusState === "unavailable" ? "Login saved · No Magnus access" :
-                          root.magnusState === "error" ? "Login saved · Magnus check failed" :
-                          "Login saved · Checking Magnus…"
-                        color: Color.foreground
-                        opacity: 0.72
-                        font.pixelSize: Style.font.bodySmall
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                      }
-                      Button {
-                        id: changeLoginButton
-                        visible: root.rockConfigured
-                        text: root.editLoginMode ? "Cancel" : "Change login"
-                        focusable: true
-                        enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealFocusedControl(changeLoginButton)
-                        onClicked: {
-                          root.editLoginMode = !root.editLoginMode
-                          root.setupUsername = ""
-                          root.setupPassword = ""
-                          if (root.editLoginMode) Qt.callLater(function() { activeUsernameField.forceActiveFocus() })
-                        }
-                      }
-                      Button {
-                        id: testProfileButton
-                        visible: root.rockConfigured
-                        text: "Test"
-                        focusable: true
-                        enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealFocusedControl(testProfileButton)
-                        onClicked: {
-                          root.beginSetup("Testing connection…")
-                          root.feedbackText = "Testing connection…"
-                          root.request({op: "profile_test"})
-                        }
-                      }
-                      Button {
-                        id: signOutButton
-                        visible: root.rockConfigured
-                        text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
-                        focusable: true
-                        enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealFocusedControl(signOutButton)
-                        onClicked: root.signOut()
-                      }
-                    }
-                  }
-                }
-              }
-
-              Rectangle {
-                visible: root.addProfileMode
-                width: parent.width
-                height: visible ? addProfileForm.implicitHeight + 24 : 0
-                radius: 8
-                color: Style.selectedFillFor(Color.foreground, Color.accent)
-                Column {
-                  id: addProfileForm
-                  anchors.fill: parent
-                  anchors.margins: 12
-                  spacing: Style.spacing.sm
-                  Text { text: "Add a Rock profile"; color: Color.foreground; font.bold: true }
-                  TextField {
-                    id: profileNameField
-                    width: parent.width
-                    activeFocusOnTab: true
-                    maximumLength: 80
-                    placeholderText: "Profile name (for example Main Campus)"
-                    text: root.newProfileName
-                    selectByMouse: true
-                    onActiveFocusChanged: root.revealFocusedControl(profileNameField)
-                    onTextChanged: root.newProfileName = text
-                  }
-                  TextField {
-                    id: domainField
-                    width: parent.width
-                    activeFocusOnTab: true
-                    maximumLength: 250
-                    placeholderText: "Rock domain (for example rock.example.org)"
-                    text: root.newProfileDomain
-                    selectByMouse: true
-                    inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-                    onActiveFocusChanged: root.revealFocusedControl(domainField)
-                    onTextChanged: root.newProfileDomain = text
-                  }
-                  TextField {
-                    id: usernameField
-                    width: parent.width
-                    activeFocusOnTab: true
-                    maximumLength: 200
-                    placeholderText: "Rock username"
-                    text: root.setupUsername
-                    selectByMouse: true
-                    onActiveFocusChanged: root.revealFocusedControl(usernameField)
-                    onTextChanged: root.setupUsername = text
-                  }
-                  TextField {
-                    id: passwordField
-                    width: parent.width
-                    activeFocusOnTab: true
-                    placeholderText: "Rock password"
-                    text: root.setupPassword
-                    echoMode: TextInput.Password
-                    selectByMouse: true
-                    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                    onActiveFocusChanged: root.revealFocusedControl(passwordField)
-                    onTextChanged: root.setupPassword = text
-                    onAccepted: root.addProfile()
-                  }
-                  Button {
-                    id: addProfileButton
-                    text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
-                    focusable: true
-                    enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                    onActiveFocusChanged: root.revealFocusedControl(addProfileButton)
-                    onClicked: root.addProfile()
-                  }
-                }
-              }
-
-              Rectangle {
-                visible: root.activeProfileId !== "" && !root.addProfileMode && (root.editLoginMode || !root.rockConfigured)
-                width: parent.width
-                height: visible ? activeLoginForm.implicitHeight + 24 : 0
-                radius: 8
-                color: Style.selectedFillFor(Color.foreground, Color.accent)
-                Column {
-                  id: activeLoginForm
-                  anchors.fill: parent
-                  anchors.margins: 12
-                  spacing: Style.spacing.sm
-                  Text {
-                    text: "Sign in to " + root.activeProfileName()
-                    color: Color.foreground
-                    font.bold: true
-                    textFormat: Text.PlainText
-                  }
-                  TextField {
-                    id: activeUsernameField
-                    width: parent.width
-                    activeFocusOnTab: true
-                    maximumLength: 200
-                    placeholderText: "Rock username"
-                    text: root.setupUsername
-                    selectByMouse: true
-                    onActiveFocusChanged: root.revealFocusedControl(activeUsernameField)
-                    onTextChanged: root.setupUsername = text
-                  }
-                  TextField {
-                    id: activePasswordField
-                    width: parent.width
-                    activeFocusOnTab: true
-                    placeholderText: "Rock password"
-                    text: root.setupPassword
-                    echoMode: TextInput.Password
-                    selectByMouse: true
-                    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                    onActiveFocusChanged: root.revealFocusedControl(activePasswordField)
-                    onTextChanged: root.setupPassword = text
-                    onAccepted: root.saveRockCredentials()
-                  }
-                  Button {
-                    id: saveLoginButton
-                    text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Save login"
-                    focusable: true
-                    enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                    onActiveFocusChanged: root.revealFocusedControl(saveLoginButton)
-                    onClicked: root.saveRockCredentials()
-                  }
-                }
-              }
-
-              Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.12) }
-              Text { text: "Search and behavior"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
-              CheckBox {
-                id: personContextCheckBox
-                text: "Person context · age, spouse, campus, and status"
-                activeFocusOnTab: true
-                checked: root.preferencePersonContext
-                onActiveFocusChanged: root.revealFocusedControl(personContextCheckBox)
-                Keys.onReturnPressed: root.togglePersonContextPreference()
-                Keys.onEnterPressed: root.togglePersonContextPreference()
-                onClicked: {
-                  root.preferencePersonContext = checked
-                  root.updatePreference("showPersonContext", checked)
-                }
-              }
-              CheckBox {
-                id: recentLinksCheckBox
-                text: "Remember Recent Links"
-                activeFocusOnTab: true
-                checked: root.preferenceRecentLinks
-                onActiveFocusChanged: root.revealFocusedControl(recentLinksCheckBox)
-                Keys.onReturnPressed: root.toggleRecentLinksPreference()
-                Keys.onEnterPressed: root.toggleRecentLinksPreference()
-                onClicked: {
-                  root.preferenceRecentLinks = checked
-                  root.updatePreference("recentLinks", checked)
-                  if (!checked) root.quickReturns = []
-                  else root.refreshQuickReturns()
-                }
-              }
-              CheckBox {
-                id: closeAfterOpenCheckBox
-                text: "Close Rock Lens after opening an item"
-                activeFocusOnTab: true
-                checked: root.preferenceCloseAfterOpen
-                onActiveFocusChanged: root.revealFocusedControl(closeAfterOpenCheckBox)
-                Keys.onReturnPressed: root.toggleCloseAfterOpenPreference()
-                Keys.onEnterPressed: root.toggleCloseAfterOpenPreference()
-                onClicked: {
-                  root.preferenceCloseAfterOpen = checked
-                  root.updatePreference("closeAfterOpen", checked)
-                }
-              }
-              Text { text: "Search categories"; color: Color.foreground; font.bold: true }
-              Flow {
-                width: parent.width
-                spacing: Style.spacing.sm
-                Repeater {
-                  model: [
-                    {key: "People", label: "People"},
-                    {key: "Groups", label: "Groups"},
-                    {key: "Workflows", label: "Workflow Types"},
-                    {key: "Jobs", label: "Jobs"},
-                    {key: "Pages", label: "Pages"},
-                    {key: "Content Channel Items", label: "Content Items"}
-                  ]
-                  delegate: CheckBox {
-                    id: categoryCheckBox
-                    required property var modelData
-                    text: modelData.label
-                    activeFocusOnTab: true
-                    checked: root.categoryEnabled(modelData.key)
-                    onActiveFocusChanged: root.revealFocusedControl(categoryCheckBox)
-                    Keys.onReturnPressed: root.toggleCategory(modelData.key)
-                    Keys.onEnterPressed: root.toggleCategory(modelData.key)
-                    onClicked: root.toggleCategory(modelData.key)
-                  }
-                }
-              }
-              Text {
-                width: parent.width
-                text: "Rock Lens 0.14.0 · Credentials stay in your desktop password manager"
-                color: Color.foreground
-                opacity: 0.48
-                font.pixelSize: Style.font.bodySmall
-                textFormat: Text.PlainText
-              }
+              controller: root
             }
           }
         }

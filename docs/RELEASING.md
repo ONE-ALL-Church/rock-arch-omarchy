@@ -8,7 +8,7 @@ required.
 ## Prepare
 
 1. Update the version in `rock_lens_broker/version.py`, `manifest.json`,
-   `pyproject.toml`, and the Rock Lens footer in `RockLens.qml`.
+   `pyproject.toml`, and the Rock Lens footer in `RockLensSettingsPanel.qml`.
 2. Add the user-visible changes to `CHANGELOG.md`.
 3. Run the release checks:
 

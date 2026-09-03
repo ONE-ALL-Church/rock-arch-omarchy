@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import re
 import secrets
 import time
@@ -21,6 +20,12 @@ from .contracts import (
     ALLOWED_RESULT_KEYS,
     allowlist,
     sanitize_text,
+)
+from .http_security import (
+    HttpSecurityError,
+    decode_bounded_json,
+    redirect_free_opener,
+    validate_rock_cookie_header,
 )
 from .navigation import NavigationError, NavigationTarget, clean_target
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
@@ -65,11 +70,6 @@ class JsonClient(Protocol):
     def get_json(self, path: str, params: dict[str, str], cookie: str) -> Any: ...
 
 
-class _RejectRedirects(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
-        return None
-
-
 class RockRestHttpClient:
     """Fixed-origin, GET-only Rock REST client."""
 
@@ -99,13 +99,10 @@ class RockRestHttpClient:
             raise RockRestError("rock_query_not_allowed")
         if path == "/api/PersonalLinks/GetPersonalLinksData" and params:
             raise RockRestError("rock_query_not_allowed")
-        if (
-            not isinstance(cookie, str)
-            or not cookie.startswith(".ROCK=")
-            or len(cookie) > 16 * 1024
-            or any(ord(char) < 33 or char in ';,\\"' for char in cookie)
-        ):
-            raise RockRestError("invalid_rock_cookie")
+        try:
+            safe_cookie = validate_rock_cookie_header(cookie)
+        except HttpSecurityError as error:
+            raise RockRestError("invalid_rock_cookie") from error
 
         query = urllib.parse.urlencode(params)
         url = self.origin + path + ("?" + query if query else "")
@@ -113,13 +110,13 @@ class RockRestHttpClient:
             url,
             headers={
                 "Accept": "application/json",
-                "Cookie": cookie,
+                "Cookie": safe_cookie,
                 "User-Agent": ROCK_LENS_USER_AGENT,
             },
             method="GET",
         )
         try:
-            opener = self._opener or urllib.request.build_opener(_RejectRedirects())
+            opener = redirect_free_opener(self._opener)
             with opener.open(request, timeout=20) as response:
                 raw = response.read(MAX_RESPONSE_BYTES + 1)
         except (OSError, urllib.error.URLError, urllib.error.HTTPError) as error:
@@ -127,8 +124,8 @@ class RockRestHttpClient:
         if len(raw) > MAX_RESPONSE_BYTES:
             raise RockRestError("rock_response_out_of_bounds")
         try:
-            return json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+            return decode_bounded_json(raw)
+        except HttpSecurityError as error:
             raise RockRestError("invalid_rock_response") from error
 
 

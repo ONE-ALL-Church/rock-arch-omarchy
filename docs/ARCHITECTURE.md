@@ -2,7 +2,10 @@
 
 ## Components
 
-1. `plugin/oneall.rock-lens`: a thin Quickshell bar indicator and launcher.
+1. `plugin/oneall.rock-lens`: a thin Quickshell controller composed from
+   focused Login, Search, Personal Links, Magnus, Settings, and navigation QML
+   components. Shared key handling and selection chrome remain independent
+   primitives.
 2. `rock_lens_broker`: an allowlist-based local broker using an owner-only Unix
    socket (`0700` directory, `0600` socket).
 3. `RockSessionProvider`: native per-profile Rock login, Secret Service
@@ -20,6 +23,11 @@
 8. `QuickReturnStore`: same-origin launcher and successful-build history,
    deduplicated and capped at 20 in an owner-only JSON file. Build entries are
    executed only through the Magnus validator and require confirmation again.
+9. `BrokerOperations`: the explicit operation-name router and request handlers;
+   broker construction, state ownership, and lifecycle transitions remain in
+   `Broker`.
+10. `http_security`: shared redirect refusal, authenticated cookie-header
+    validation, and bounded JSON decoding used by every Rock HTTP client.
 
 ## Trust boundary
 

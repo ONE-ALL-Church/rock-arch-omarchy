@@ -14,8 +14,10 @@ class ReleaseContractTests(unittest.TestCase):
         pyproject = tomllib.loads(
             (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
-        qml = (ROOT / "plugin/oneall.rock-lens/RockLens.qml").read_text(
-            encoding="utf-8"
+        plugin_root = ROOT / "plugin/oneall.rock-lens"
+        qml = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(plugin_root.glob("*.qml"))
         )
 
         self.assertEqual(manifest["version"], VERSION)

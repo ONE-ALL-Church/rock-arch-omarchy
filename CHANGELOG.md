@@ -5,6 +5,14 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+### Changed
+
+- Split the Quickshell UI into focused Login, Search, Personal Links, Magnus,
+  Settings, and navigation components without changing keyboard behavior.
+- Moved broker request routing into operation-specific handlers and centralized
+  redirect, cookie-header, and bounded JSON validation shared by every Rock
+  HTTP client.
+
 ### Security
 
 - Fail closed when Secret Service cannot delete profile credentials or legacy

@@ -7,6 +7,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Protocol
 
+from .broker_operations import BrokerOperations
 from .clipboard import copy_to_clipboard
 from .contracts import (
     ALLOWED_RESULT_KEYS,
@@ -15,15 +16,14 @@ from .contracts import (
     HealthState,
     allowlist,
     developer_mode_enabled,
-    parse_search_query,
     sanitize_text,
 )
 from .instance import InstanceStore, default_instance_path
 from .magnus_adapter import MagnusBuildOutcome, MagnusError, MagnusReadOnlyAdapter
 from .mock_adapter import MockAdapter
 from .navigation import NavigationTarget, open_rock_url
-from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
-from .profiles import ProfileError, ProfileStore, RockProfile, default_profile_name
+from .origin import DEFAULT_ROCK_ORIGIN
+from .profiles import ProfileError, ProfileStore, RockProfile
 from .quick_return import QuickReturnStore
 from .rock_rest_adapter import RockRestError, RockRestReadOnlyAdapter, SearchBatch
 from .rock_session import RockSessionError, RockSessionProvider
@@ -174,6 +174,7 @@ class Broker:
         self._url_opener = url_opener
         self._clipboard_writer = clipboard_writer or copy_to_clipboard
         self._live_health = HealthState.UNKNOWN
+        self._operations = BrokerOperations(self)
         self._store_context()
 
     def _load_context(self) -> Context:
@@ -241,318 +242,7 @@ class Broker:
         ]
 
     def handle(self, raw: dict[str, Any]) -> dict[str, Any]:
-        op = sanitize_text(raw.get("op"), 40)
-        if op == "status":
-            if raw.get("probeMagnus") is True:
-                self._probe_magnus()
-            rock = self._session.status()
-            magnus = self._magnus.status()
-            return self._ok(
-                context=self._context.value,
-                developerMode=self._developer_mode,
-                rock=rock,
-                instance=self._instance_status(),
-                magnus=magnus,
-                profiles=self._profile_store.snapshot(),
-                capabilities=self.capabilities(rock, magnus),
-                categories=list(self._mock.categories()),
-            )
-        if op == "set_context":
-            try:
-                requested_context = Context(sanitize_text(raw.get("context"), 8))
-            except ValueError:
-                return self._error("invalid_context")
-            if requested_context is Context.DEV and not self._developer_mode:
-                return self._error("developer_mode_disabled")
-            self._context = requested_context
-            self._store_context()
-            self._live.clear()
-            return self._ok(
-                context=self._context.value,
-                developerMode=self._developer_mode,
-                rock=self._session.status(),
-                instance=self._instance_status(),
-                magnus=self._magnus.status(),
-                profiles=self._profile_store.snapshot(),
-            )
-        if op == "magnus_status":
-            self._probe_magnus()
-            return self._ok(magnus=self._magnus.status())
-        if op in {"rock_configure", "magnus_configure"}:
-            domain = raw.get("domain")
-            username = raw.get("username")
-            password = raw.get("password")
-            if (
-                not isinstance(domain, str)
-                or not isinstance(username, str)
-                or not isinstance(password, str)
-            ):
-                return self._error("invalid_rock_credentials")
-            added_profile: RockProfile | None = None
-            try:
-                origin = validate_rock_origin(domain)
-                active = self._profile_store.active()
-                if active is None:
-                    added_profile = self._profile_store.add(
-                        default_profile_name(origin), origin
-                    )
-                    self._activate_profile(added_profile)
-                elif active.origin != origin:
-                    return self._error("profile_domain_mismatch")
-                self._session.configure(username, password)
-                self._reset_magnus_access()
-            except OriginError:
-                return self._error("invalid_rock_origin")
-            except (RockSessionError, ProfileError) as error:
-                if added_profile and not self._rollback_profile_add(added_profile):
-                    return self._error("secure_storage_failed")
-                return self._error(str(error))
-            self._live.clear()
-            return self._ok(
-                instance=self._instance_status(),
-                rock=self._session.status(),
-                magnus=self._magnus.status(),
-                refreshLive=True,
-                profiles=self._profile_store.snapshot(),
-            )
-        if op == "profiles_status":
-            return self._profile_response()
-        if op == "profile_add":
-            return self._profile_add(raw)
-        if op == "profile_switch":
-            try:
-                profile = self._profile_store.set_active(raw.get("profileId"))
-                self._activate_profile(profile)
-            except (ProfileError, RockSessionError, MagnusError) as error:
-                return self._error(str(error))
-            return self._profile_response(refreshLive=True)
-        if op == "profile_rename":
-            try:
-                self._profile_store.rename(raw.get("profileId"), raw.get("name"))
-            except ProfileError as error:
-                return self._error(str(error))
-            return self._profile_response()
-        if op == "profile_credentials_update":
-            username = raw.get("username")
-            password = raw.get("password")
-            if not isinstance(username, str) or not isinstance(password, str):
-                return self._error("invalid_rock_credentials")
-            if not self._profile_store.active():
-                return self._error("profile_not_found")
-            try:
-                self._session.configure(username, password)
-                self._reset_magnus_access()
-            except RockSessionError as error:
-                return self._error(str(error))
-            self._live.clear()
-            return self._profile_response(refreshLive=True)
-        if op == "profile_test":
-            if not self._profile_store.active():
-                return self._error("profile_not_found")
-            try:
-                self._session.test_connection()
-                self._reset_magnus_access()
-            except RockSessionError as error:
-                return self._error(str(error))
-            return self._profile_response(connection="connected")
-        if op == "profile_sign_out":
-            if not self._profile_store.active():
-                return self._error("profile_not_found")
-            try:
-                self._session.sign_out()
-                self._reset_magnus_access()
-            except RockSessionError as error:
-                return self._error(str(error))
-            self._live.clear()
-            return self._profile_response(connection="signed_out")
-        if op == "profile_remove":
-            return self._profile_remove(raw.get("profileId"))
-        if op == "preferences_update":
-            try:
-                self._profile_store.update_preferences(raw.get("preferences"))
-            except ProfileError as error:
-                return self._error(str(error))
-            return self._profile_response()
-        if op == "recent_links_clear":
-            if not self._quick_returns.clear():
-                return self._error("recent_links_clear_failed")
-            return self._ok(quickReturns=[])
-        if op == "magnus_browse":
-            if self._context is not Context.PROD:
-                return self._error("magnus_requires_prod")
-            safe_id = raw.get("safeId", "")
-            if not isinstance(safe_id, str):
-                return self._error("invalid_magnus_item")
-            try:
-                browser = self._magnus.browse(sanitize_text(safe_id, 100))
-            except MagnusError as error:
-                return self._error(str(error))
-            return self._ok(magnus=self._magnus.status(), magnusBrowser=browser)
-        if op == "magnus_preview":
-            if self._context is not Context.PROD:
-                return self._error("magnus_requires_prod")
-            safe_id = raw.get("safeId")
-            if not isinstance(safe_id, str):
-                return self._error("invalid_magnus_item")
-            try:
-                preview = self._magnus.preview(sanitize_text(safe_id, 100))
-            except MagnusError as error:
-                return self._error(str(error))
-            return self._ok(magnus=self._magnus.status(), magnusPreview=preview)
-        if op == "magnus_download":
-            if self._context is not Context.PROD:
-                return self._error("magnus_requires_prod")
-            safe_id = raw.get("safeId")
-            if not isinstance(safe_id, str):
-                return self._error("invalid_magnus_item")
-            try:
-                download = self._magnus.download(sanitize_text(safe_id, 100))
-            except MagnusError as error:
-                return self._error(str(error))
-            return self._ok(magnusDownload=download)
-        if op == "magnus_copy":
-            if self._context is not Context.PROD:
-                return self._error("magnus_requires_prod")
-            safe_id = raw.get("safeId")
-            value = raw.get("value")
-            if not isinstance(safe_id, str) or value not in {"content", "hash"}:
-                return self._error("invalid_magnus_item")
-            try:
-                copied_value = self._magnus.copy_value(
-                    sanitize_text(safe_id, 100), value
-                )
-            except MagnusError as error:
-                return self._error(str(error))
-            if not self._clipboard_writer(copied_value):
-                return self._error("clipboard_unavailable")
-            return self._ok(magnusCopied={"value": value})
-        if op == "magnus_open":
-            if self._context is not Context.PROD:
-                return self._error("magnus_requires_prod")
-            safe_id = raw.get("safeId")
-            if not isinstance(safe_id, str):
-                return self._error("invalid_magnus_item")
-            try:
-                target = self._magnus.view_target(sanitize_text(safe_id, 100))
-            except MagnusError as error:
-                return self._error(str(error))
-            return self._open_target(target)
-        if op == "magnus_build":
-            if self._context is not Context.PROD:
-                return self._error("magnus_requires_prod")
-            if raw.get("confirmed") is not True:
-                return self._error("build_confirmation_required")
-            safe_id = raw.get("safeId")
-            if not isinstance(safe_id, str):
-                return self._error("invalid_magnus_item")
-            try:
-                outcome = self._magnus.build(sanitize_text(safe_id, 100))
-            except MagnusError as error:
-                return self._error(str(error))
-            return self._complete_build(outcome)
-        if op == "search":
-            query, category = parse_search_query(raw.get("query"))
-            preferences = self._profile_store.preferences()
-            enabled_categories = preferences["enabledCategories"]
-            unavailable_categories = [category] if category else enabled_categories
-            if category and category not in enabled_categories:
-                return self._ok(
-                    context=self._context.value,
-                    results=[],
-                    source="disabled",
-                    unavailable=[],
-                )
-            if self._context is Context.DEV:
-                return self._ok(
-                    context=self._context.value,
-                    results=[
-                        row
-                        for row in self._mock.search(query, category=category)
-                        if row["category"] in enabled_categories
-                    ],
-                    source="synthetic",
-                    unavailable=[],
-                )
-            if not self._origin or not self._session.status()["configured"]:
-                return self._ok(
-                    context=self._context.value,
-                    results=[],
-                    source="unavailable",
-                    unavailable=unavailable_categories,
-                    rock=self._session.status(),
-                    magnus=self._magnus.status(),
-                )
-            if not query and category is None:
-                return self._ok(
-                    context=self._context.value,
-                    results=[],
-                    source="live",
-                    unavailable=[],
-                    rock=self._session.status(),
-                    magnus=self._magnus.status(),
-                )
-            try:
-                batch = self._live.search(
-                    query,
-                    category,
-                    categories=enabled_categories,
-                    include_person_context=preferences["showPersonContext"],
-                )
-            except RockRestError:
-                self._live_health = HealthState.FAILED
-                return self._ok(
-                    context=self._context.value,
-                    results=[],
-                    source="unavailable",
-                    unavailable=unavailable_categories,
-                    rock=self._session.status(),
-                    magnus=self._magnus.status(),
-                )
-            results = list(batch.results)
-            unavailable = list(batch.unavailable)
-            if category is None:
-                try:
-                    results = self._matching_personal_links(
-                        query, self._live.personal_links()
-                    ) + results
-                except RockRestError:
-                    unavailable.append("Personal Links")
-            self._live_health = (
-                HealthState.STALE if unavailable else HealthState.HEALTHY
-            )
-            return self._ok(
-                context=self._context.value,
-                results=results,
-                source="live",
-                unavailable=unavailable,
-                rock=self._session.status(),
-                magnus=self._magnus.status(),
-            )
-        if op == "person_quick_look":
-            safe_id = sanitize_text(raw.get("safeId"), 100)
-            person = (
-                self._mock.person_quick_look(safe_id)
-                if self._context is Context.DEV
-                else self._live.person_quick_look(safe_id)
-            )
-            return self._ok(person=person) if person else self._error("not_found")
-        if op == "navigation_status":
-            section = raw.get("section", "all")
-            if not isinstance(section, str) or section not in {
-                "all",
-                "personal",
-                "quick_returns",
-            }:
-                return self._error("invalid_navigation_section")
-            return self._navigation_status(section)
-        if op == "open_navigation":
-            return self._open_navigation(sanitize_text(raw.get("safeId"), 100))
-        if op == "activate_recent":
-            return self._activate_recent(
-                sanitize_text(raw.get("safeId"), 100),
-                raw.get("confirmed") is True,
-            )
-        return self._error("unsupported_operation")
+        return self._operations.handle(raw)
 
     def _navigation_status(self, section: str) -> dict[str, Any]:
         response: dict[str, Any] = {}

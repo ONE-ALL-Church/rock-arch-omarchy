@@ -9,18 +9,18 @@ Run from the repository root:
 
 ```bash
 python3 -m unittest discover -s tests -v
-uvx ruff check rock_lens_broker tests
-uvx ty check rock_lens_broker
+uvx --from ruff==0.16.5 ruff check rock_lens_broker tests
+uvx --from ty==0.0.78 ty check rock_lens_broker
 python3 -m compileall -q rock_lens_broker
 omarchy plugin validate .
 /usr/lib/qt6/bin/qmllint plugin/oneall.rock-lens/*.qml
 git diff --check
 ```
 
-The `0.14.0` suite contains 87 passing tests. Release-contract coverage keeps
+The suite contains 112 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
-verifies the QML entry point; and prevents the obsolete OpenID implementation
-or nested plugin manifest from returning.
+verifies the composed QML entry point and focused panel files; and prevents the
+obsolete OpenID implementation or nested plugin manifest from returning.
 
 GitHub Actions runs the unit tests, Ruff, ty, and bytecode compilation on every
 push to `main` and on pull requests.

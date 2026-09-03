@@ -524,6 +524,7 @@ class BrokerContractTests(unittest.TestCase):
             {"op": "magnus_preview", "safeId": "opaque-magnus-item"}
         )
         self.assertTrue(preview["ok"])
+        self.assertEqual(preview["magnus"]["state"], "available")
         self.assertEqual(preview["magnusPreview"]["sha256"], "a" * 64)
 
     def test_magnus_file_actions_keep_values_private(self):

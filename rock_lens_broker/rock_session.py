@@ -11,6 +11,11 @@ from contextlib import contextmanager
 from typing import Any, Protocol
 
 from .contracts import Context
+from .http_security import (
+    HttpSecurityError,
+    redirect_free_opener,
+    validate_rock_cookie_header,
+)
 from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, validate_profile_id
 from .secret_store import SecretStore, SecretStoreError, SecretToolStore
@@ -31,21 +36,11 @@ class LoginClient(Protocol):
     def login(self, origin: str, username: str, password: str) -> str: ...
 
 
-class _RejectRedirects(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
-        return None
-
-
 def validate_rock_cookie(value: object) -> str:
-    if (
-        not isinstance(value, str)
-        or not value.startswith(".ROCK=")
-        or len(value) < 7
-        or len(value) > MAX_COOKIE_BYTES
-        or any(ord(char) < 33 or char in ';,\\"' for char in value)
-    ):
-        raise RockSessionError("invalid_rock_cookie")
-    return value
+    try:
+        return validate_rock_cookie_header(value, MAX_COOKIE_BYTES)
+    except HttpSecurityError as error:
+        raise RockSessionError("invalid_rock_cookie") from error
 
 
 class RockSessionHttpClient:
@@ -73,7 +68,7 @@ class RockSessionHttpClient:
             method="POST",
         )
         try:
-            opener = self._opener or urllib.request.build_opener(_RejectRedirects())
+            opener = redirect_free_opener(self._opener)
             with opener.open(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
                 status = getattr(response, "status", None) or response.getcode()
                 if status not in (200, 204):

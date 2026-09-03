@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import os
 import secrets
 import stat
@@ -16,6 +15,12 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from .contracts import sanitize_text
+from .http_security import (
+    HttpSecurityError,
+    decode_bounded_json,
+    redirect_free_opener,
+    validate_rock_cookie_header,
+)
 from .navigation import NavigationError, NavigationTarget, validate_rock_url
 from .origin import DEFAULT_ROCK_ORIGIN, OriginError, validate_rock_origin
 from .rock_session import RockSessionError
@@ -78,11 +83,6 @@ class MagnusBuildOutcome:
 
     def public_dict(self) -> dict[str, str]:
         return {"title": self.title, "message": self.message}
-
-
-class _RejectRedirects(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
-        return None
 
 
 def validate_magnus_server(value: str) -> str:
@@ -187,8 +187,8 @@ class MagnusHttpClient:
     def get_json(self, origin: str, path: str, cookie: str) -> Any:
         raw = self._get(origin, path, cookie, MAX_TREE_OUTPUT_BYTES)
         try:
-            return json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+            return decode_bounded_json(raw)
+        except HttpSecurityError as error:
             raise MagnusError("invalid_magnus_response") from error
 
     def get_bytes(self, origin: str, path: str, cookie: str) -> bytes:
@@ -199,8 +199,8 @@ class MagnusHttpClient:
             origin, path, cookie, "POST", MAX_ACTION_OUTPUT_BYTES, data=b""
         )
         try:
-            return json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+            return decode_bounded_json(raw)
+        except HttpSecurityError as error:
             raise MagnusError("invalid_magnus_response") from error
 
     def _get(self, origin: str, path: str, cookie: str, maximum: int) -> bytes:
@@ -227,16 +227,13 @@ class MagnusHttpClient:
         ):
             raise MagnusError("invalid_magnus_path")
         _validate_http_path(path, method)
-        if (
-            not isinstance(cookie, str)
-            or not cookie.startswith(".ROCK=")
-            or len(cookie) > 16 * 1024
-            or any(ord(char) < 33 or char in ';,\\"' for char in cookie)
-        ):
-            raise MagnusError("invalid_rock_cookie")
+        try:
+            safe_cookie = validate_rock_cookie_header(cookie)
+        except HttpSecurityError as error:
+            raise MagnusError("invalid_rock_cookie") from error
         headers = {
             "Accept": "application/json, text/plain, */*",
-            "Cookie": cookie,
+            "Cookie": safe_cookie,
             "User-Agent": ROCK_LENS_USER_AGENT,
         }
         if method == "POST":
@@ -248,7 +245,7 @@ class MagnusHttpClient:
             method=method,
         )
         try:
-            opener = self._opener or urllib.request.build_opener(_RejectRedirects())
+            opener = redirect_free_opener(self._opener)
             with opener.open(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
                 raw = response.read(maximum + 1)
         except urllib.error.HTTPError as error:
