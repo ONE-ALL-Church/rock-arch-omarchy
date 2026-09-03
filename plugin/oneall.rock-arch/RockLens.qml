@@ -40,7 +40,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.24.1"
+  property string currentVersion: "0.24.2"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -120,6 +120,7 @@ Panel {
   property bool searchInFlight: false
   property bool searchPending: false
   property string searchInFlightQuery: ""
+  property string resultsQuery: ""
   property int resultCursor: -1
   property int recentCursor: -1
   property int linkCursor: -1
@@ -169,13 +170,11 @@ Panel {
     if (brokerSocket.connected) flushRequests()
     else brokerReconnectTimer.restart()
   }
-
   function isCredentialRequest(payload) {
     return payload && (payload.op === "rock_configure" ||
       payload.op === "profile_add" ||
       payload.op === "profile_credentials_update")
   }
-
   function dropQueuedCredentialRequests() {
     var retained = []
     for (var index = 0; index < requestQueue.length; index++)
@@ -183,7 +182,6 @@ Panel {
     requestQueue = retained
     setupPassword = ""
   }
-
   function flushRequests() {
     if (!brokerSocket.connected || !requestQueue.length) return
     while (brokerSocket.connected && requestQueue.length) {
@@ -193,7 +191,6 @@ Panel {
     }
     brokerSocket.flush()
   }
-
   function scopeKeyForQuery(value) {
     return SearchScopes.keyForQuery(value)
   }
@@ -203,11 +200,9 @@ Panel {
       if (profiles[index].id === activeProfileId) return String(profiles[index].name || "Rock")
     return "Rock"
   }
-
   function normalizedBuildTitle(value) {
     return String(value || "").replace(/^Deploy /, "").trim().toLowerCase()
   }
-
   function lastBuildAcceptedAt(title) {
     var expected = normalizedBuildTitle(title)
     for (var index = 0; index < magnusBuilds.length; index++) {
@@ -217,7 +212,6 @@ Panel {
     }
     return ""
   }
-
   function relativeTime(value) {
     var tick = relativeTimeTick
     var timestamp = Date.parse(String(value || ""))
@@ -235,12 +229,10 @@ Panel {
       Qt.formatDateTime(deployed, "MMM d, h:mm AP") :
       Qt.formatDateTime(deployed, "MMM d, yyyy, h:mm AP")
   }
-
   function deploymentSummary(title) {
     var acceptedAt = lastBuildAcceptedAt(title)
     return acceptedAt ? "Last started " + relativeTime(acceptedAt) : "No Rock Arch build recorded"
   }
-
   function applyUiHandoff(handoff) {
     if (!handoff) return
     var view = String(handoff.view || "search")
@@ -262,7 +254,6 @@ Panel {
     focusSearch()
     if (handoffQuery) { query = handoffQuery; scheduleSearch() }
   }
-
   function friendlyError(value) {
     var code = String(value || "")
     if (code === "rock_login_failed" || code === "rock_login_required")
@@ -308,7 +299,6 @@ Panel {
     var message = code.split("_").join(" ")
     return message.charAt(0).toUpperCase() + message.slice(1) + "."
   }
-
   function guidanceText() {
     if (setupBusy)
       return setupSlow ? setupBusyText + " Rock is taking longer than usual." : setupBusyText
@@ -320,7 +310,6 @@ Panel {
       return "Installing the update… Rock Arch will restart when it finishes."
     return ""
   }
-
   function categoryEnabled(category) {
     return enabledCategories.indexOf(category) >= 0
   }
@@ -522,6 +511,7 @@ Panel {
     var isStatusResponse = response.categories !== undefined && response.rock !== undefined
     var isSearchResponse = Array.isArray(response.results)
     var isKnowledgeSearchResponse = Array.isArray(response.knowledgeResults)
+    var completedSearchQuery = isSearchResponse ? searchInFlightQuery : ""
     var staleSearch = isSearchResponse && searchInFlight &&
       (searchPending || query !== searchInFlightQuery)
     var staleKnowledgeSearch = isKnowledgeSearchResponse && knowledgeSearchInFlight &&
@@ -674,7 +664,8 @@ Panel {
       onboardingSetupPrepared = false
       if (searchCapabilitiesState === "ready") {
         initializeOnboardingSetup()
-        if (query.trim().length > 0) Qt.callLater(function() { root.refreshSearch() })
+        if (query.trim().length > 0 && resultsQuery !== query)
+          Qt.callLater(function() { root.refreshSearch() })
       } else if (searchCapabilitiesState === "error") {
         results = []
         feedbackText = "Rock Arch couldn't check what this account can search."
@@ -692,7 +683,7 @@ Panel {
         searchInFlight = false
         searchPending = false
         searchInFlightQuery = ""
-      } else if (searchCapabilitiesReady && query.trim().length > 0) {
+      } else if (searchCapabilitiesReady && query.trim().length > 0 && resultsQuery !== query) {
         Qt.callLater(function() { root.refreshSearch() })
       }
       if (contextName === "PROD" && rockConfigured &&
@@ -700,7 +691,7 @@ Panel {
         Qt.callLater(function() { root.probeSearchCapabilities(false) })
       if (contextName === "PROD" && rockConfigured &&
           (magnusState === "unknown" || magnusState === "error"))
-        Qt.callLater(function() { root.probeMagnus() })
+        magnusProbeTimer.restart()
       if (finishSetupOnboardingRequired && opened) {
         initializeOnboardingSetup()
         Qt.callLater(function() {
@@ -710,10 +701,16 @@ Panel {
       }
     }
     if (isSearchResponse && !staleSearch) {
+      var selectedSafeId = completedSearchQuery === resultsQuery && resultCursor >= 0 &&
+        resultCursor < results.length ? String(results[resultCursor].safeId || "") : ""
       results = response.results
-      resultCursor = results.length ? 0 : -1
+      var preservedCursor = selectedSafeId ? results.findIndex(function(item) {
+        return String(item.safeId || "") === selectedSafeId
+      }) : -1
+      resultCursor = preservedCursor >= 0 ? preservedCursor : (results.length ? 0 : -1)
+      resultsQuery = completedSearchQuery
       recentCursor = -1
-      panelFlick.contentY = 0
+      if (preservedCursor < 0) panelFlick.contentY = 0
       Qt.callLater(function() {
         if (root.viewMode === "search" && root.resultCursor >= 0)
           root.revealItem(searchPanel.resultRepeater.itemAt(root.resultCursor))
@@ -775,7 +772,7 @@ Panel {
         root.refreshPersonalLinks()
         if (root.viewMode === "search" && !root.onboardingFlowActive)
           searchField.forceActiveFocus()
-        root.request({op: "status", probeMagnus: true})
+        root.request({op: "status"})
       })
     }
     if (response.onboardingSetup) {
@@ -787,7 +784,7 @@ Panel {
     if (response.connection === "connected") {
       finishSetup()
       feedbackText = "Connection successful"
-      Qt.callLater(function() { root.request({op: "status", probeMagnus: true}) })
+      Qt.callLater(function() { root.request({op: "status"}) })
     } else if (response.connection === "signed_out") {
       finishSetup()
       onboardingInProgress = false
@@ -842,7 +839,7 @@ Panel {
       return
     }
     if (searchInFlight) {
-      searchPending = true
+      if (query !== searchInFlightQuery) searchPending = true
       return
     }
     searchInFlight = true
@@ -883,7 +880,7 @@ Panel {
   function probeMagnus() {
     if (contextName !== "PROD" || !statusLoaded || !rockConfigured || magnusProbeInFlight)
       return
-    if (setupBusy || searchInFlight) {
+    if (setupBusy || searchInFlight || searchTimer.running) {
       magnusProbeTimer.restart()
       return
     }
@@ -1565,6 +1562,7 @@ Panel {
     if (!developerMode) return
     contextName = contextName === "DEV" ? "PROD" : "DEV"
     results = []
+    resultsQuery = ""
     personalLinks = []
     quickReturns = []
     resultCursor = -1
@@ -1590,7 +1588,7 @@ Panel {
     setupPassword = ""
     resetSearchCapabilities()
     request({op: "set_context", context: contextName})
-    request({op: "status", probeMagnus: true})
+    request({op: "status"})
     refreshSearch()
     refreshQuickReturns()
     if (viewMode === "personal") refreshPersonalLinks()
@@ -1617,12 +1615,11 @@ Panel {
     searchInFlightQuery = ""
     request({op: "status"})
     refreshQuickReturns()
-    refreshPersonalLinks()
   }
 
   onOpenedChanged: {
-    if (opened) resetPanel()
-    else dropQueuedCredentialRequests()
+    if (opened) { panelCleanupTimer.stop(); resetPanel() }
+    else { dropQueuedCredentialRequests(); panelCleanupTimer.restart() }
   }
 
   Process {
@@ -1646,7 +1643,7 @@ Panel {
       brokerSocket.connected = true
     }
   }
-  Timer { id: searchTimer; interval: 250; onTriggered: root.refreshSearch() }
+  Timer { id: searchTimer; interval: 160; onTriggered: root.refreshSearch() }
   Timer { id: knowledgeSearchTimer; interval: 400; onTriggered: root.refreshKnowledgeSearch() }
   Timer {
     interval: 60000
@@ -1659,9 +1656,10 @@ Panel {
     interval: 500
     repeat: true
     running: !root.statusLoaded
-    onTriggered: root.request({op: "status", probeMagnus: true})
+    onTriggered: root.request({op: "status"})
   }
-  Timer { id: magnusProbeTimer; interval: 800; onTriggered: root.probeMagnus() }
+  Timer { id: magnusProbeTimer; interval: 2500; onTriggered: root.probeMagnus() }
+  Timer { id: panelCleanupTimer; interval: 180; onTriggered: if (!root.opened) { root.viewMode = "search"; panelFlick.contentY = 0 } }
   Timer {
     id: updatePollTimer
     interval: 1000
@@ -1817,10 +1815,12 @@ Panel {
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {
+              magnusProbeTimer.restart()
               root.resultCursor = -1
               root.recentCursor = -1
               root.pendingClearRecent = false
               root.results = []
+              root.resultsQuery = ""
               root.quickLook = null
               root.feedbackText = ""
               if (root.scopeKeyForQuery(text) === "kb") {

@@ -5,6 +5,17 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-09-03
+
+### Fixed
+
+- Keep keyboard selection stable when a live search refresh completes, avoid
+  duplicate same-query refreshes, and shorten the search input delay.
+- Defer optional Magnus detection until typing and searches are idle so it
+  cannot delay the primary search workflow.
+- Clip panel content and normalize its closed state to prevent stale views or
+  underlying window text from flashing at the panel edge.
+
 ## [0.24.1] - 2026-09-03
 
 ### Fixed

@@ -5,6 +5,7 @@ import QtQuick
 // highlighted item to the search editor.
 Item {
   id: root
+  clip: true
 
   property bool blocked: false
   property bool formMode: false

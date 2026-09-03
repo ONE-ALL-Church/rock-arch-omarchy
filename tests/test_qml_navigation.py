@@ -47,7 +47,11 @@ class QmlNavigationTests(unittest.TestCase):
     def test_first_recent_and_search_results_are_selected_automatically(self):
         source = all_qml_source()
 
-        self.assertIn("resultCursor = results.length ? 0 : -1", source)
+        self.assertIn(
+            "resultCursor = preservedCursor >= 0 ? preservedCursor : "
+            "(results.length ? 0 : -1)",
+            source,
+        )
         self.assertIn("recentCursor = quickReturns.length ? 0 : -1", source)
         self.assertIn(
             "readonly property bool rowSelected: resultRow.index === searchPanel.controller.resultCursor ||",
@@ -89,10 +93,10 @@ class QmlNavigationTests(unittest.TestCase):
         )
         self.assertIn(
             'request({op: "status"})\n'
-            "    refreshQuickReturns()\n"
-            "    refreshPersonalLinks()",
+            "    refreshQuickReturns()",
             source,
         )
+        self.assertIn("if (changedView) refreshPersonalLinks()", source)
         self.assertIn(
             'viewMode === "search" && searchField.activeFocus && activeSearchCount',
             source,
@@ -251,7 +255,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("function dropQueuedCredentialRequests()", source)
         self.assertIn("if (!isCredentialRequest(requestQueue[index]))", source)
         self.assertIn(
-            "else dropQueuedCredentialRequests()",
+            "else { dropQueuedCredentialRequests(); panelCleanupTimer.restart() }",
             source,
         )
         timeout = source[source.index("id: setupTimeoutTimer") :]
@@ -263,7 +267,25 @@ class QmlNavigationTests(unittest.TestCase):
 
         self.assertIn("repeat: true", timer[:220])
         self.assertIn("running: !root.statusLoaded", timer[:220])
-        self.assertIn('request({op: "status", probeMagnus: true})', timer[:220])
+        self.assertIn('request({op: "status"})', timer[:220])
+        self.assertNotIn("probeMagnus: true", timer[:220])
+
+    def test_search_refreshes_keep_selection_and_do_not_yield_to_magnus(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("if (query !== searchInFlightQuery) searchPending = true", source)
+        self.assertIn("completedSearchQuery === resultsQuery", source)
+        self.assertIn("results.findIndex(function(item)", source)
+        self.assertIn("if (preservedCursor < 0) panelFlick.contentY = 0", source)
+        self.assertIn("setupBusy || searchInFlight || searchTimer.running", source)
+        self.assertIn("id: searchTimer; interval: 160", source)
+        self.assertIn("magnusProbeTimer.restart()", source)
+        self.assertIn("clip: true", key_catcher)
+        self.assertIn("id: panelCleanupTimer; interval: 180", source)
+        reset = source[source.index("function resetPanel()") :]
+        reset = reset[: reset.index("onOpenedChanged:")]
+        self.assertNotIn("refreshPersonalLinks()", reset)
 
     def test_tab_ring_includes_settings_in_both_directions(self):
         source = all_qml_source()
