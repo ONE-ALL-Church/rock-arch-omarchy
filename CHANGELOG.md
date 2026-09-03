@@ -5,6 +5,15 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-03
+
+### Added
+
+- Added a required Profile Name to first-run onboarding and a keyboard-complete
+  inline rename action for every existing Rock profile.
+- Added a theme-colored rock-arch menu-bar logo and a Settings option to hide
+  the bar item while keeping `Super+R` access available.
+
 ## [0.15.1] - 2026-09-03
 
 ### Fixed
@@ -99,6 +108,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.16.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.0
 [0.15.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.1
 [0.15.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.0
 [0.14.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.14.0

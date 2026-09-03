@@ -12,6 +12,7 @@ from rock_lens_broker.rock_rest_adapter import (
     RockRestHttpClient,
     RockRestReadOnlyAdapter,
 )
+from rock_lens_broker.version import HTTP_USER_AGENT
 
 
 class FakeCookieProvider:
@@ -85,7 +86,7 @@ class RockRestAdapterTests(unittest.TestCase):
         request, timeout = opener.calls[0]
         self.assertEqual(request.get_method(), "GET")
         self.assertEqual(request.get_header("Cookie"), ".ROCK=test-session")
-        self.assertEqual(request.get_header("User-agent"), "Rock-Arch/0.15")
+        self.assertEqual(request.get_header("User-agent"), HTTP_USER_AGENT)
         self.assertTrue(
             request.full_url.startswith("https://rock.example.org/api/People?")
         )

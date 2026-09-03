@@ -15,7 +15,7 @@ only in PROD and only when the active Rock profile reports access.
 
 ## Audit steps and health
 
-1. **Onboarding — healthy.** Domain, username, password, and Connect form a
+1. **Onboarding — healthy.** Profile name, domain, username, password, and Connect form a
    closed Tab/Shift+Tab loop. Enter advances fields or submits from the
    password field. Navigation remains hidden until login succeeds.
 2. **Header — healthy.** Tab/Shift+Tab continue to cycle the launcher views.
@@ -41,8 +41,8 @@ only in PROD and only when the active Rock profile reports access.
 7. **Build confirmation — healthy.** Deploy now receives focus on entry, Tab
    moves to Cancel, Enter activates the focused action, and Esc cancels. No
    production build was started during this audit.
-8. **Settings — healthy.** Tab/Shift+Tab walk profile controls, login fields,
-   preferences, categories, update actions, and the automatic-update toggle;
+8. **Settings — healthy.** Tab/Shift+Tab walk profile controls, inline profile
+   renaming, login fields, preferences, categories, update actions, and toggles;
    focused controls are scrolled into view.
 
 ## Privacy-safe visual evidence

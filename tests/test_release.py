@@ -34,6 +34,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(manifest["name"], "Rock Arch")
         self.assertEqual(manifest["description"], "Bridging Rock RMS and Omarchy")
         self.assertTrue((ROOT / entry_point).is_file())
+        self.assertTrue(
+            (ROOT / "plugin/oneall.rock-arch/assets/rock-arch.svg").is_file()
+        )
         self.assertFalse((ROOT / "plugin/oneall.rock-arch/manifest.json").exists())
 
     def test_public_install_url_is_not_a_placeholder(self):

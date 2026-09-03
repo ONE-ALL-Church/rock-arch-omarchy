@@ -118,15 +118,26 @@ class BrokerOperations:
         added_profile: RockProfile | None = None
         try:
             origin = validate_rock_origin(domain)
+            requested_name = (
+                broker._profile_store.validate_name(raw.get("name"), origin)
+                if "name" in raw
+                else None
+            )
             active = broker._profile_store.active()
             if active is None:
                 added_profile = broker._profile_store.add(
-                    default_profile_name(origin), origin
+                    requested_name or default_profile_name(origin), origin
                 )
                 broker._activate_profile(added_profile)
             elif active.origin != origin:
                 return broker._error("profile_domain_mismatch")
             broker._session.configure(username, password)
+            if (
+                active is not None
+                and requested_name is not None
+                and requested_name != active.name
+            ):
+                broker._profile_store.rename(active.profile_id, requested_name)
             broker._reset_magnus_access()
         except OriginError:
             return broker._error("invalid_rock_origin")

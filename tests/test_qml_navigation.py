@@ -8,6 +8,7 @@ QML_PATH = (
     / "RockLens.qml"
 )
 SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
+BAR_BUTTON_PATH = QML_PATH.with_name("RockArchBarButton.qml")
 KEY_CATCHER_PATH = QML_PATH.with_name("RockLensKeyCatcher.qml")
 LOGIN_PATH = QML_PATH.with_name("RockLensLoginPanel.qml")
 MAGNUS_PATH = QML_PATH.with_name("RockLensMagnusPanel.qml")
@@ -16,6 +17,7 @@ PERSONAL_PATH = QML_PATH.with_name("RockLensPersonalPanel.qml")
 SEARCH_PATH = QML_PATH.with_name("RockLensSearchPanel.qml")
 SETTINGS_PATH = QML_PATH.with_name("RockLensSettingsPanel.qml")
 PANEL_PATHS = (
+    BAR_BUTTON_PATH,
     LOGIN_PATH,
     MAGNUS_PATH,
     NAVIGATION_PATH,
@@ -89,7 +91,7 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
 
-    def test_signed_out_onboarding_is_a_three_field_login(self):
+    def test_signed_out_onboarding_collects_a_profile_name_first(self):
         source = all_qml_source()
         form = LOGIN_PATH.read_text(encoding="utf-8")
 
@@ -103,15 +105,34 @@ class QmlNavigationTests(unittest.TestCase):
             'visible: !root.onboardingRequired && root.viewMode === "settings"',
             source,
         )
-        self.assertEqual(form.count("TextField {"), 3)
+        self.assertEqual(form.count("TextField {"), 4)
+        self.assertIn(
+            'placeholderText: "Profile name (for example Rock Solid Church Production)"',
+            form,
+        )
         self.assertIn('placeholderText: "Rock domain (rock.example.org)"', form)
         self.assertIn('placeholderText: "Rock username"', form)
         self.assertIn('placeholderText: "Rock password"', form)
-        self.assertNotIn("profileNameField", form)
-        self.assertIn("KeyNavigation.backtab: onboardingConnectButton", form)
-        self.assertIn("KeyNavigation.tab: onboardingDomainField", form)
+        self.assertIn("property alias profileNameField", form)
+        self.assertIn("KeyNavigation.backtab: onboardingProfileNameField", form)
+        self.assertIn("KeyNavigation.tab: onboardingProfileNameField", form)
+        self.assertIn("focusTarget: root.onboardingRequired ? onboardingForm.profileNameField", source)
         self.assertIn("function completeOnboarding()", source)
         self.assertIn('"profile_add" : "rock_configure"', source)
+
+    def test_existing_profiles_have_a_keyboard_accessible_rename_form(self):
+        source = all_qml_source()
+
+        for control_id in (
+            "renameProfileButton",
+            "profileRenameField",
+            "saveProfileNameButton",
+            "cancelProfileRenameButton",
+        ):
+            start = source.index(f"id: {control_id}")
+            self.assertIn("activeFocusOnTab: true", source[start : start + 350])
+        self.assertIn('request({op: "profile_rename", profileId: profileId, name: name})', source)
+        self.assertIn("Keys.onEscapePressed:", source)
 
     def test_unsent_credentials_are_purged_from_the_retry_queue(self):
         source = all_qml_source()
@@ -180,6 +201,7 @@ class QmlNavigationTests(unittest.TestCase):
         for control_id in (
             "settingsAddProfileButton",
             "useProfileButton",
+            "renameProfileButton",
             "removeProfileButton",
             "changeLoginButton",
             "testProfileButton",
@@ -193,14 +215,24 @@ class QmlNavigationTests(unittest.TestCase):
             source.count("onActiveFocusChanged:"),
             16,
         )
-        self.assertEqual(
-            source.count("Keys.onReturnPressed:"),
-            5,
-        )
-        self.assertEqual(
-            source.count("Keys.onEnterPressed:"),
-            5,
-        )
+        self.assertGreaterEqual(source.count("Keys.onReturnPressed:"), 7)
+        self.assertGreaterEqual(source.count("Keys.onEnterPressed:"), 7)
+
+    def test_menu_bar_item_can_be_hidden_without_removing_shortcut_access(self):
+        source = all_qml_source()
+
+        self.assertIn('text: "Show Rock Arch in the menu bar"', source)
+        self.assertIn("implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0", source)
+        self.assertIn("visible: controller.preferenceShowMenuBar", source)
+        self.assertIn('updatePreference("showMenuBar", checked)', source)
+        self.assertIn("Super+R still opens Rock Arch", source)
+
+    def test_menu_bar_uses_the_theme_colored_rock_arch_mark(self):
+        source = all_qml_source()
+
+        self.assertIn('source: Qt.resolvedUrl("assets/rock-arch.svg")', source)
+        self.assertIn("colorizationColor: button.active ? button.activeColor : button.foreground", source)
+        self.assertIn('tooltipText: "Rock Arch"', source)
 
     def test_settings_exposes_bounded_opt_in_plugin_updates(self):
         source = all_qml_source()
@@ -338,6 +370,7 @@ class QmlNavigationTests(unittest.TestCase):
             "RockLensMagnusPanel",
             "RockLensSettingsPanel",
             "RockLensNavigationTabs",
+            "RockArchBarButton",
         ):
             self.assertIn(f"{component} {{", source)
         self.assertLess(len(source.splitlines()), 1_500)

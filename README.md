@@ -23,12 +23,13 @@ Rock Arch supports Omarchy 4.0.2 or newer. Install the Git repository directly:
 omarchy plugin add https://github.com/bscottdavis/rock-arch-omarchy.git --enable
 ```
 
-Open it with `Super+R` or the Rock icon in the Omarchy bar. First launch asks
-for only three values:
+Open it with `Super+R` or the rock-arch icon in the Omarchy bar. First launch
+asks for four values:
 
-1. Your Rock domain, such as `rock.example.org`
-2. Your Rock username
-3. Your Rock password
+1. A recognizable profile name, such as `Rock Solid Church Production`
+2. Your Rock domain, such as `rock.example.org`
+3. Your Rock username
+4. Your Rock password
 
 Select **Connect**. The broker verifies the login before saving it to the
 desktop password manager. No Rock administrator setup or client secret is
@@ -88,6 +89,9 @@ or remove profiles. **Sign out** clears that profile's username, password, and
 memory-only cookie while retaining its local metadata and Recent Links.
 **Remove** also deletes that profile's metadata and Recent Links. Both actions
 require confirmation and never modify the Rock server.
+
+Settings can also hide the rock-arch menu-bar item. `Super+R` continues to open
+Rock Arch while the item is hidden, so it can always be restored from Settings.
 
 The equivalent terminal commands are:
 

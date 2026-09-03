@@ -30,10 +30,11 @@ Panel {
   property bool preferencePersonContext: true
   property bool preferenceRecentLinks: true
   property bool preferenceCloseAfterOpen: true
+  property bool preferenceShowMenuBar: true
   property bool preferenceAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.15.1"
+  property string currentVersion: "0.16.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -54,6 +55,9 @@ Panel {
   property bool pendingSignOut: false
   property bool pendingClearRecent: false
   property bool editLoginMode: false
+  property string editingProfileId: ""
+  property string editingProfileName: ""
+  property bool profileRenameInputActive: false
   property string pendingSuccessText: ""
   property bool rockAvailable: false
   property bool rockConfigured: false
@@ -102,8 +106,8 @@ Panel {
     rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
     rockAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Secure password storage unavailable"
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0
+  implicitHeight: preferenceShowMenuBar ? button.implicitHeight : 0
 
   function request(payload) {
     var next = []
@@ -352,6 +356,10 @@ Panel {
       close()
       return
     }
+    if (editingProfileId !== "") {
+      settingsPanel.cancelRenameProfile()
+      return
+    }
     if (pendingMagnusBuildId !== "" && !magnusActionBusy) {
       cancelMagnusBuild()
       return
@@ -488,6 +496,7 @@ Panel {
       preferencePersonContext = preferences.showPersonContext !== false
       preferenceRecentLinks = preferences.recentLinks !== false
       preferenceCloseAfterOpen = preferences.closeAfterOpen === true
+      preferenceShowMenuBar = preferences.showMenuBar !== false
       preferenceAutomaticUpdates = preferences.automaticUpdates === true
       if (Array.isArray(preferences.enabledCategories))
         enabledCategories = preferences.enabledCategories
@@ -501,7 +510,9 @@ Panel {
         editLoginMode = false
         if (instanceDomain && newProfileDomain.trim().length === 0)
           newProfileDomain = instanceDomain
-        Qt.callLater(function() { onboardingForm.domainField.forceActiveFocus() })
+        if (activeProfileId && newProfileName.trim().length === 0)
+          newProfileName = activeProfileName()
+        Qt.callLater(function() { onboardingForm.profileNameField.forceActiveFocus() })
       }
     }
     if (isStatusResponse) {
@@ -659,6 +670,9 @@ Panel {
     pendingSignOut = false
     pendingClearRecent = false
     editLoginMode = false
+    editingProfileId = ""
+    editingProfileName = ""
+    profileRenameInputActive = false
     feedbackText = ""
     panelFlick.contentY = 0
     request({op: "profiles_status"})
@@ -1037,24 +1051,6 @@ Panel {
       activateResult(0)
     }
   }
-  function onboardingDomainKey(value) {
-    return String(value || "").trim().toLowerCase()
-      .replace(/^https:\/\//, "").replace(/\/+$/, "")
-  }
-  function completeOnboarding() {
-    var domain = newProfileDomain.trim()
-    var username = setupUsername.trim()
-    if (!domain || !username || !setupPassword || setupBusy) return
-    beginSetup("Connecting to Rock…")
-    onboardingInProgress = true
-    var password = setupPassword
-    var operation = activeProfileId &&
-      onboardingDomainKey(domain) !== onboardingDomainKey(instanceDomain) ?
-      "profile_add" : "rock_configure"
-    pendingSuccessText = "Rock Arch is ready"
-    request({op: operation, name: "", domain: domain, username: username, password: password})
-    setupPassword = ""
-  }
   function saveRockCredentials() {
     var username = setupUsername.trim()
     if (!username || !setupPassword || setupBusy || !activeProfileId) return
@@ -1284,15 +1280,11 @@ Panel {
   Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired && root.showMagnus; onActivated: root.openMagnus() }
   Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.openSettings(false) }
 
-  WidgetButton {
+  RockArchBarButton {
     id: button
     anchors.fill: parent
+    controller: root
     bar: root.bar
-    text: "ROCK" + (root.developerMode ? " " + root.contextName : "") +
-      (root.contextName === "PROD" && root.rockConfigured ? "  ●" : "")
-    fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-    horizontalMargin: 8
-    onPressed: root.toggle()
   }
 
   KeyboardPanel {
@@ -1301,7 +1293,7 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: root.onboardingRequired ? onboardingForm.domainField : searchField
+    focusTarget: root.onboardingRequired ? onboardingForm.profileNameField : searchField
     contentWidth: panel.fittedContentWidth(Style.space(520))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
 
@@ -1429,7 +1421,7 @@ Panel {
 
         Flickable {
           id: panelFlick
-          readonly property real maximumHeight: Style.space(root.onboardingRequired ? 280 : (root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 420)))
+          readonly property real maximumHeight: Style.space(root.onboardingRequired ? 340 : (root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 420)))
           width: content.width
           height: Math.min(maximumHeight, Math.max(Style.space(72), body.implicitHeight))
           contentWidth: width

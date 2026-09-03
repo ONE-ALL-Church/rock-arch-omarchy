@@ -22,6 +22,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "showPersonContext": True,
     "recentLinks": True,
     "closeAfterOpen": True,
+    "showMenuBar": True,
     "automaticUpdates": False,
     "enabledCategories": list(CATEGORIES),
 }
@@ -114,7 +115,7 @@ class ProfileStore:
             safe_origin = validate_rock_origin(origin)
         except OriginError as error:
             raise ProfileError("invalid_rock_origin") from error
-        safe_name = self._name(name, safe_origin)
+        safe_name = self.validate_name(name, safe_origin)
         profile = RockProfile(uuid.uuid4().hex, safe_name, safe_origin)
         state["profiles"].append(self._record(profile))
         state["activeProfileId"] = profile.profile_id
@@ -132,7 +133,7 @@ class ProfileStore:
 
     def rename(self, profile_id: object, name: object) -> RockProfile:
         profile = self.get(profile_id)
-        safe_name = self._name(name, profile.origin)
+        safe_name = self.validate_name(name, profile.origin)
         state = self._read()
         for row in state["profiles"]:
             if row["id"] == profile.profile_id:
@@ -170,6 +171,7 @@ class ProfileStore:
             "showPersonContext",
             "recentLinks",
             "closeAfterOpen",
+            "showMenuBar",
             "automaticUpdates",
         ):
             if name in updates:
@@ -297,6 +299,7 @@ class ProfileStore:
             "showPersonContext",
             "recentLinks",
             "closeAfterOpen",
+            "showMenuBar",
             "automaticUpdates",
         ):
             candidate = preferences.get(name, clean_preferences[name])
@@ -329,7 +332,7 @@ class ProfileStore:
         ]
 
     @staticmethod
-    def _name(value: object, origin: str) -> str:
+    def validate_name(value: object, origin: str) -> str:
         if value is not None and not isinstance(value, str):
             raise ProfileError("invalid_profile_name")
         name = sanitize_text(value, 80)

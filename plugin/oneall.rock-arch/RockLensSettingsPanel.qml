@@ -11,7 +11,38 @@ Column {
   property alias primaryButton: settingsAddProfileButton
   readonly property bool inputActive: profileNameField.activeFocus ||
     domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus ||
-    activeUsernameField.activeFocus || activePasswordField.activeFocus
+    activeUsernameField.activeFocus || activePasswordField.activeFocus ||
+    settingsPanel.controller.profileRenameInputActive
+
+  function beginRenameProfile(profileId, name) {
+    if (!profileId || controller.setupBusy) return
+    controller.editingProfileId = profileId
+    controller.editingProfileName = String(name || "")
+    controller.pendingRemoveProfileId = ""
+    controller.feedbackText = ""
+  }
+
+  function cancelRenameProfile() {
+    controller.editingProfileId = ""
+    controller.editingProfileName = ""
+    controller.profileRenameInputActive = false
+    controller.feedbackText = "Rename cancelled"
+  }
+
+  function saveProfileName(profileId) {
+    var name = controller.editingProfileName.trim()
+    if (!profileId || profileId !== controller.editingProfileId || !name || controller.setupBusy) return
+    controller.editingProfileId = ""
+    controller.editingProfileName = ""
+    controller.profileRenameInputActive = false
+    controller.feedbackText = "Profile name updated"
+    controller.request({op: "profile_rename", profileId: profileId, name: name})
+  }
+
+  function toggleMenuBarPreference() {
+    controller.preferenceShowMenuBar = !controller.preferenceShowMenuBar
+    controller.updatePreference("showMenuBar", controller.preferenceShowMenuBar)
+  }
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.md
@@ -55,8 +86,9 @@ Column {
     delegate: Rectangle {
       id: profileRow
       required property var modelData
+      readonly property bool editing: settingsPanel.controller.editingProfileId === profileRow.modelData.id
       width: settingsPanel.width
-      height: Style.space(profileRow.modelData.isActive ? 94 : 58)
+      height: Style.space(profileRow.modelData.isActive ? (profileRow.editing ? 136 : 94) : (profileRow.editing ? 100 : 58))
       radius: 8
       color: profileRow.modelData.isActive ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
       border.width: 1
@@ -89,12 +121,81 @@ Column {
             onClicked: settingsPanel.controller.switchProfile(profileRow.modelData.id)
           }
           Button {
+            id: renameProfileButton
+            visible: !profileRow.editing
+            text: "Rename"
+            activeFocusOnTab: true
+            enabled: !settingsPanel.controller.setupBusy
+            onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(renameProfileButton)
+            onClicked: {
+              settingsPanel.beginRenameProfile(profileRow.modelData.id, profileRow.modelData.name)
+              Qt.callLater(function() { profileRenameField.forceActiveFocus(Qt.TabFocusReason) })
+            }
+          }
+          Button {
             id: removeProfileButton
             text: settingsPanel.controller.pendingRemoveProfileId === profileRow.modelData.id ? "Confirm remove" : "Remove"
             activeFocusOnTab: true
             enabled: !settingsPanel.controller.setupBusy
             onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(removeProfileButton)
             onClicked: settingsPanel.controller.removeProfile(profileRow.modelData.id)
+          }
+        }
+        RowLayout {
+          visible: profileRow.editing
+          Layout.fillWidth: true
+          Layout.preferredHeight: visible ? Style.space(36) : 0
+          spacing: Style.spacing.sm
+          TextField {
+            id: profileRenameField
+            Layout.fillWidth: true
+            activeFocusOnTab: true
+            maximumLength: 80
+            placeholderText: "Profile name"
+            text: profileRow.editing ? settingsPanel.controller.editingProfileName : ""
+            selectByMouse: true
+            onActiveFocusChanged: {
+              settingsPanel.controller.profileRenameInputActive = activeFocus
+              settingsPanel.controller.revealFocusedControl(profileRenameField)
+            }
+            onTextEdited: settingsPanel.controller.editingProfileName = text
+            Keys.onReturnPressed: function(event) {
+              event.accepted = true
+              settingsPanel.saveProfileName(profileRow.modelData.id)
+              Qt.callLater(function() { renameProfileButton.forceActiveFocus(Qt.TabFocusReason) })
+            }
+            Keys.onEnterPressed: function(event) {
+              event.accepted = true
+              settingsPanel.saveProfileName(profileRow.modelData.id)
+              Qt.callLater(function() { renameProfileButton.forceActiveFocus(Qt.TabFocusReason) })
+            }
+            Keys.onEscapePressed: function(event) {
+              event.accepted = true
+              settingsPanel.cancelRenameProfile()
+              Qt.callLater(function() { renameProfileButton.forceActiveFocus(Qt.TabFocusReason) })
+            }
+          }
+          Button {
+            id: saveProfileNameButton
+            text: "Save"
+            activeFocusOnTab: true
+            enabled: settingsPanel.controller.editingProfileName.trim().length > 0 && !settingsPanel.controller.setupBusy
+            onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(saveProfileNameButton)
+            onClicked: {
+              settingsPanel.saveProfileName(profileRow.modelData.id)
+              Qt.callLater(function() { renameProfileButton.forceActiveFocus(Qt.TabFocusReason) })
+            }
+          }
+          Button {
+            id: cancelProfileRenameButton
+            text: "Cancel"
+            activeFocusOnTab: true
+            enabled: !settingsPanel.controller.setupBusy
+            onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(cancelProfileRenameButton)
+            onClicked: {
+              settingsPanel.cancelRenameProfile()
+              Qt.callLater(function() { renameProfileButton.forceActiveFocus(Qt.TabFocusReason) })
+            }
           }
         }
         RowLayout {
@@ -226,7 +327,7 @@ Column {
         id: addProfileButton
         text: settingsPanel.controller.setupBusy ? (settingsPanel.controller.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
         activeFocusOnTab: true
-        enabled: settingsPanel.controller.newProfileDomain.trim().length > 0 && settingsPanel.controller.setupUsername.trim().length > 0 && settingsPanel.controller.setupPassword.length > 0 && !settingsPanel.controller.setupBusy
+        enabled: settingsPanel.controller.newProfileName.trim().length > 0 && settingsPanel.controller.newProfileDomain.trim().length > 0 && settingsPanel.controller.setupUsername.trim().length > 0 && settingsPanel.controller.setupPassword.length > 0 && !settingsPanel.controller.setupBusy
         onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(addProfileButton)
         onClicked: settingsPanel.controller.addProfile()
       }
@@ -286,7 +387,29 @@ Column {
   }
 
   Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.12) }
-  Text { text: "Search and behavior"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
+  Text { text: "Search and appearance"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
+  CheckBox {
+    id: menuBarCheckBox
+    text: "Show Rock Arch in the menu bar"
+    activeFocusOnTab: true
+    checked: settingsPanel.controller.preferenceShowMenuBar
+    onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(menuBarCheckBox)
+    Keys.onReturnPressed: settingsPanel.toggleMenuBarPreference()
+    Keys.onEnterPressed: settingsPanel.toggleMenuBarPreference()
+    onClicked: {
+      settingsPanel.controller.preferenceShowMenuBar = checked
+      settingsPanel.controller.updatePreference("showMenuBar", checked)
+    }
+  }
+  Text {
+    width: parent.width
+    text: "Super+R still opens Rock Arch when the menu bar item is hidden."
+    color: Color.foreground
+    opacity: 0.56
+    font.pixelSize: Style.font.bodySmall
+    wrapMode: Text.WordWrap
+    textFormat: Text.PlainText
+  }
   CheckBox {
     id: personContextCheckBox
     text: "Person context · age, spouse, campus, and status"

@@ -53,11 +53,22 @@ class ProfileStoreTests(unittest.TestCase):
         self.assertFalse(updated["showPersonContext"])
         self.assertTrue(updated["closeAfterOpen"])
         self.assertFalse(updated["automaticUpdates"])
+        self.assertTrue(updated["showMenuBar"])
         self.assertEqual(updated["enabledCategories"], ["People", "Groups"])
         with self.assertRaisesRegex(ProfileError, "invalid_preferences"):
             store.update_preferences({"rawCookie": True})
         with self.assertRaisesRegex(ProfileError, "invalid_profile_name"):
             store.add({"unexpected": "record"}, DEFAULT_ROCK_ORIGIN)
+
+    def test_profile_name_can_be_changed_without_changing_its_identity(self):
+        store = ProfileStore(self.path, self.instance)
+        profile = store.add("Production", DEFAULT_ROCK_ORIGIN)
+
+        renamed = store.rename(profile.profile_id, "Rock Solid Church Production")
+
+        self.assertEqual(renamed.profile_id, profile.profile_id)
+        self.assertEqual(renamed.origin, profile.origin)
+        self.assertEqual(renamed.name, "Rock Solid Church Production")
 
     def test_remove_last_profile_clears_legacy_pointer(self):
         store = ProfileStore(self.path, self.instance)

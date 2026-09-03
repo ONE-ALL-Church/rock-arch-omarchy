@@ -711,6 +711,7 @@ class BrokerContractTests(unittest.TestCase):
         response = broker.handle(
             {
                 "op": "rock_configure",
+                "name": "Rock Solid Church Production",
                 "domain": "rock.example.org",
                 "username": "rock-user",
                 "password": "private-password",
@@ -719,12 +720,54 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(response["ok"])
         self.assertTrue(response["refreshLive"])
         self.assertEqual(session.saved, ("rock-user", "private-password"))
+        self.assertEqual(
+            response["profiles"]["profiles"][0]["name"],
+            "Rock Solid Church Production",
+        )
         self.assertEqual(magnus.server, DEFAULT_ROCK_ORIGIN)
         self.assertEqual(magnus.probe_calls, 0)
         self.assertEqual(InstanceStore(self.instance).get(), DEFAULT_ROCK_ORIGIN)
         serialized = json.dumps(response)
         self.assertNotIn("rock-user", serialized)
         self.assertNotIn("private-password", serialized)
+
+    def test_signed_out_onboarding_updates_the_existing_profile_name(self):
+        session = FakeSession(False)
+        broker = Broker(
+            self.state,
+            session=session,
+            magnus=FakeMagnus(False),
+            live=FakeLive(),
+            instance_file=self.instance,
+        )
+        added = broker.handle(
+            {
+                "op": "profile_add",
+                "name": "Production",
+                "domain": "rock.example.org",
+                "username": "rock-user",
+                "password": "private-password",
+            }
+        )
+        profile_id = added["profiles"]["activeProfileId"]
+        broker.handle({"op": "profile_sign_out"})
+
+        configured = broker.handle(
+            {
+                "op": "rock_configure",
+                "name": "Rock Solid Church Production",
+                "domain": "rock.example.org",
+                "username": "rock-user",
+                "password": "private-password",
+            }
+        )
+
+        self.assertTrue(configured["ok"])
+        self.assertEqual(configured["profiles"]["activeProfileId"], profile_id)
+        self.assertEqual(
+            configured["profiles"]["profiles"][0]["name"],
+            "Rock Solid Church Production",
+        )
 
     def test_failed_profile_rollback_returns_stable_error_and_keeps_profile(self):
         broker = Broker(
@@ -780,6 +823,7 @@ class BrokerContractTests(unittest.TestCase):
                 "op": "preferences_update",
                 "preferences": {
                     "showPersonContext": False,
+                    "showMenuBar": False,
                     "enabledCategories": ["Groups"],
                 },
             }
@@ -788,6 +832,7 @@ class BrokerContractTests(unittest.TestCase):
             preferences["profiles"]["preferences"]["enabledCategories"],
             ["Groups"],
         )
+        self.assertFalse(preferences["profiles"]["preferences"]["showMenuBar"])
         broker.handle({"op": "set_context", "context": "PROD"})
         search = broker.handle({"op": "search", "query": "Ada"})
         self.assertTrue(search["ok"])
