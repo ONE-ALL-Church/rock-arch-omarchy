@@ -64,6 +64,32 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
 
+    def test_signed_out_onboarding_is_a_three_field_login(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        start = source.index("id: onboardingForm")
+        end = source.index(
+            'visible: !root.onboardingRequired && root.viewMode === "search"',
+            start,
+        )
+        form = source[start:end]
+
+        self.assertIn(
+            'readonly property bool onboardingRequired: contextName === "PROD"',
+            source,
+        )
+        self.assertIn("model: root.onboardingRequired ? [] :", source)
+        self.assertIn(
+            'visible: !root.onboardingRequired && root.viewMode === "settings"',
+            source,
+        )
+        self.assertEqual(form.count("TextField {"), 3)
+        self.assertIn('placeholderText: "Rock domain (rock.example.org)"', form)
+        self.assertIn('placeholderText: "Rock username"', form)
+        self.assertIn('placeholderText: "Rock password"', form)
+        self.assertNotIn("profileNameField", form)
+        self.assertIn("function completeOnboarding()", source)
+        self.assertIn('"profile_add" : "rock_configure"', source)
+
     def test_tab_ring_includes_settings_in_both_directions(self):
         source = QML_PATH.read_text(encoding="utf-8")
 
@@ -124,7 +150,10 @@ class QmlNavigationTests(unittest.TestCase):
     def test_footer_copy_is_user_centered(self):
         source = QML_PATH.read_text(encoding="utf-8")
 
-        self.assertIn('text: root.feedbackText || root.guidanceText()', source)
+        self.assertIn(
+            'text: root.feedbackText || (root.onboardingRequired ? "" : root.guidanceText())',
+            source,
+        )
         self.assertIn('"Changes save automatically. Press Esc to return to Search."', source)
         self.assertIn('"Getting your Rock workspace ready…"', source)
         self.assertIn("Any ID or GUID checks every category.", source)

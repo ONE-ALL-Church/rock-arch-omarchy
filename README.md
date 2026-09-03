@@ -22,6 +22,11 @@ profile card owns its login state, Magnus availability, connection testing,
 sign-out, removal, and per-profile Recent Links. Search category controls,
 person-context visibility, and close-after-open behavior (enabled by default)
 stay in a separate preferences section.
+On first launch, or whenever the active profile has no saved login, Rock Lens
+shows a focused onboarding screen with only the Rock domain, username, password,
+and **Connect** action. Navigation and settings stay hidden until the login has
+been verified. An existing profile's domain is prefilled; entering a different
+domain creates a separate profile instead of changing the signed-out one.
 Search terms and opaque navigation or Magnus IDs travel over an owner-only local
 Unix socket. Credentials, cookies, raw Rock record IDs, and raw server URLs do
 not cross that boundary; only a user-requested bounded Magnus text preview is
@@ -127,10 +132,11 @@ confirmation again.
 
 ## Configure a Rock profile
 
-Open **Settings** (or press `Ctrl+,`) and enter the Rock domain, username, and
-password in the masked form. The broker first verifies the login directly at
-the selected origin, then stores the credentials in Secret Service. The
-equivalent terminal setup remains available:
+The initial and signed-out launcher state asks only for the Rock domain,
+username, and password. Select **Connect** to continue. Once connected, open
+**Settings** (or press `Ctrl+,`) to add or manage other profiles. The broker
+first verifies the login directly at the selected origin, then stores the
+credentials in Secret Service. The equivalent terminal setup remains available:
 
 ```bash
 python3 -m rock_lens_broker rock login

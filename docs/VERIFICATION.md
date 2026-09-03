@@ -283,6 +283,12 @@
   section. The active Rock profile card now owns its login state, Magnus access
   indicator, and login/test/sign-out actions; add-profile and sign-in forms use
   distinct inset cards, while search preferences remain a separate section.
+- First launch and any active profile without a saved login now enter a dedicated
+  onboarding state. Static QML regression coverage verifies that navigation,
+  regular Settings, search, Personal Links, and Magnus content are hidden while
+  the screen contains exactly three fields: Rock domain, username, and masked
+  password. The existing secure broker operations still verify and store the
+  login, and a successful connection transfers focus to Search.
 - Search results, Recent Links, Personal Links, and Magnus items share one
   accent-tint, outline, and side-marker component. Every two-line selectable row
   uses the same 52-pixel height, clips its contents, and reserves consistent

@@ -64,6 +64,7 @@ Panel {
   property bool personalLinksAvailable: false
   property bool setupBusy: false
   property bool setupSlow: false
+  property bool onboardingInProgress: false
   property string setupBusyText: "Working…"
   property bool searchInFlight: false
   property bool searchPending: false
@@ -74,12 +75,15 @@ Panel {
   property int relativeTimeTick: 0
   readonly property int navigationCount: personalLinks.length
   readonly property int magnusCount: magnusItems.length
+  readonly property bool onboardingRequired: contextName === "PROD" &&
+    statusLoaded && profilesLoaded && !rockConfigured
   readonly property bool queryIsEmpty: query.trim().length === 0
   readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
   readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
+    !onboardingDomainField.activeFocus && !onboardingUsernameField.activeFocus && !onboardingPasswordField.activeFocus &&
     !domainField.activeFocus && !usernameField.activeFocus && !passwordField.activeFocus &&
     !profileNameField.activeFocus && !activeUsernameField.activeFocus && !activePasswordField.activeFocus
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
@@ -290,6 +294,10 @@ Panel {
   }
 
   function escapePanel() {
+    if (onboardingRequired) {
+      close()
+      return
+    }
     if (pendingMagnusBuildId !== "" && !magnusActionBusy) {
       cancelMagnusBuild()
       return
@@ -309,6 +317,7 @@ Panel {
     var response
     try { response = JSON.parse(line) } catch (e) {
       finishSetup()
+      onboardingInProgress = false
       searchInFlight = false
       searchPending = false
       searchInFlightQuery = ""
@@ -318,6 +327,7 @@ Panel {
     }
     if (!response || response.ok !== true) {
       finishSetup()
+      onboardingInProgress = false
       searchInFlight = false
       searchPending = false
       searchInFlightQuery = ""
@@ -395,7 +405,15 @@ Panel {
         enabledCategories = preferences.enabledCategories
       if (profiles.length === 0 && opened) {
         viewMode = "settings"
-        addProfileMode = true
+        addProfileMode = false
+      }
+      if (contextName === "PROD" && !rockConfigured && opened) {
+        viewMode = "settings"
+        addProfileMode = false
+        editLoginMode = false
+        if (instanceDomain && newProfileDomain.trim().length === 0)
+          newProfileDomain = instanceDomain
+        Qt.callLater(function() { onboardingDomainField.forceActiveFocus() })
       }
     }
     if (isStatusResponse) {
@@ -433,6 +451,8 @@ Panel {
     if (response.person) quickLook = response.person
     if (response.source && !staleSearch) searchSource = String(response.source)
     if (response.refreshLive === true) {
+      var completedOnboarding = onboardingInProgress
+      onboardingInProgress = false
       finishSetup()
       setupPassword = ""
       newProfileName = ""
@@ -444,6 +464,7 @@ Panel {
       feedbackText = pendingSuccessText || "Rock connection updated"
       pendingSuccessText = ""
       Qt.callLater(function() {
+        if (completedOnboarding) root.focusSearch()
         root.refreshSearch()
         root.refreshQuickReturns()
         root.refreshPersonalLinks()
@@ -457,8 +478,9 @@ Panel {
       Qt.callLater(function() { root.request({op: "status", probeMagnus: true}) })
     } else if (response.connection === "signed_out") {
       finishSetup()
+      onboardingInProgress = false
       pendingSignOut = false
-      editLoginMode = true
+      editLoginMode = false
       setupPassword = ""
       feedbackText = "Signed out; this profile and its local history were kept"
     }
@@ -861,6 +883,24 @@ Panel {
       activateResult(0)
     }
   }
+  function onboardingDomainKey(value) {
+    return String(value || "").trim().toLowerCase()
+      .replace(/^https:\/\//, "").replace(/\/+$/, "")
+  }
+  function completeOnboarding() {
+    var domain = newProfileDomain.trim()
+    var username = setupUsername.trim()
+    if (!domain || !username || !setupPassword || setupBusy) return
+    beginSetup("Connecting to Rock…")
+    onboardingInProgress = true
+    var password = setupPassword
+    var operation = activeProfileId &&
+      onboardingDomainKey(domain) !== onboardingDomainKey(instanceDomain) ?
+      "profile_add" : "rock_configure"
+    pendingSuccessText = "Rock Lens is ready"
+    request({op: operation, name: "", domain: domain, username: username, password: password})
+    setupPassword = ""
+  }
   function saveRockCredentials() {
     var username = setupUsername.trim()
     if (!username || !setupPassword || setupBusy || !activeProfileId) return
@@ -1083,14 +1123,14 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: searchField
+    focusTarget: root.onboardingRequired ? onboardingDomainField : searchField
     contentWidth: panel.fittedContentWidth(Style.space(520))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(680))
 
     RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: searchField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus || magnusTextArea.activeFocus
+      blocked: searchField.activeFocus || onboardingDomainField.activeFocus || onboardingUsernameField.activeFocus || onboardingPasswordField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus || magnusTextArea.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
@@ -1122,7 +1162,8 @@ Panel {
           }
           Item { Layout.fillWidth: true }
           Repeater {
-            model: root.magnusAvailable ? ["search", "personal", "magnus"] : ["search", "personal"]
+            model: root.onboardingRequired ? [] :
+              (root.magnusAvailable ? ["search", "personal", "magnus"] : ["search", "personal"])
             delegate: Rectangle {
               required property var modelData
               Layout.preferredWidth: tabText.implicitWidth + 20
@@ -1148,6 +1189,7 @@ Panel {
             }
           }
           Rectangle {
+            visible: !root.onboardingRequired
             Layout.preferredWidth: settingsLabel.implicitWidth + 20
             Layout.preferredHeight: Style.space(32)
             radius: 7
@@ -1168,7 +1210,7 @@ Panel {
         }
 
         RowLayout {
-          visible: root.viewMode === "search"
+          visible: root.viewMode === "search" && !root.onboardingRequired
           width: parent.width
           spacing: Style.spacing.sm
 
@@ -1231,6 +1273,7 @@ Panel {
           }
         }
         Text {
+          visible: !root.onboardingRequired
           width: parent.width
           text: root.connectionText
           color: Color.foreground
@@ -1241,7 +1284,7 @@ Panel {
         }
 
         Column {
-          visible: root.viewMode !== "settings" && root.contextName === "PROD" && !root.rockConfigured
+          visible: !root.onboardingRequired && root.viewMode !== "settings" && root.contextName === "PROD" && !root.rockConfigured
           width: content.width
           height: visible ? implicitHeight : 0
           spacing: Style.spacing.sm
@@ -1261,7 +1304,7 @@ Panel {
 
         Flickable {
           id: panelFlick
-          readonly property real maximumHeight: Style.space(root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 420))
+          readonly property real maximumHeight: Style.space(root.onboardingRequired ? 280 : (root.viewMode === "settings" ? 520 : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 420)))
           width: content.width
           height: Math.min(maximumHeight, Math.max(Style.space(72), body.implicitHeight))
           contentWidth: width
@@ -1277,7 +1320,70 @@ Panel {
             spacing: Style.spacing.sm
 
             Column {
-              visible: root.viewMode === "search" && !root.showRecentLinks
+              id: onboardingForm
+              visible: root.onboardingRequired
+              width: body.width
+              height: visible ? implicitHeight : 0
+              spacing: Style.spacing.sm
+
+              Text {
+                text: "Connect to Rock"
+                color: Color.foreground
+                font.pixelSize: Style.font.heading
+                font.bold: true
+              }
+              TextField {
+                id: onboardingDomainField
+                width: parent.width
+                enabled: !root.setupBusy
+                maximumLength: 250
+                placeholderText: "Rock domain (rock.example.org)"
+                text: root.newProfileDomain
+                selectByMouse: true
+                inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
+                KeyNavigation.tab: onboardingUsernameField
+                onTextChanged: root.newProfileDomain = text
+                onAccepted: onboardingUsernameField.forceActiveFocus(Qt.TabFocusReason)
+              }
+              TextField {
+                id: onboardingUsernameField
+                width: parent.width
+                enabled: !root.setupBusy
+                maximumLength: 200
+                placeholderText: "Rock username"
+                text: root.setupUsername
+                selectByMouse: true
+                KeyNavigation.tab: onboardingPasswordField
+                KeyNavigation.backtab: onboardingDomainField
+                onTextChanged: root.setupUsername = text
+                onAccepted: onboardingPasswordField.forceActiveFocus(Qt.TabFocusReason)
+              }
+              TextField {
+                id: onboardingPasswordField
+                width: parent.width
+                enabled: !root.setupBusy
+                placeholderText: "Rock password"
+                text: root.setupPassword
+                echoMode: TextInput.Password
+                selectByMouse: true
+                inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                KeyNavigation.tab: onboardingConnectButton
+                KeyNavigation.backtab: onboardingUsernameField
+                onTextChanged: root.setupPassword = text
+                onAccepted: root.completeOnboarding()
+              }
+              Button {
+                id: onboardingConnectButton
+                text: root.setupBusy ? (root.setupSlow ? "Still connecting…" : "Connecting…") : "Connect"
+                focusable: true
+                enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                KeyNavigation.backtab: onboardingPasswordField
+                onClicked: root.completeOnboarding()
+              }
+            }
+
+            Column {
+              visible: !root.onboardingRequired && root.viewMode === "search" && !root.showRecentLinks
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
@@ -1364,7 +1470,7 @@ Panel {
             }
 
             Column {
-              visible: root.viewMode === "search" && root.showRecentLinks
+              visible: !root.onboardingRequired && root.viewMode === "search" && root.showRecentLinks
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
@@ -1495,7 +1601,7 @@ Panel {
             }
 
             Column {
-              visible: root.viewMode === "personal"
+              visible: !root.onboardingRequired && root.viewMode === "personal"
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
@@ -1545,7 +1651,7 @@ Panel {
             }
 
             Column {
-              visible: root.viewMode === "magnus"
+              visible: !root.onboardingRequired && root.viewMode === "magnus"
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.sm
@@ -1761,7 +1867,7 @@ Panel {
             }
 
             Column {
-              visible: root.viewMode === "settings"
+              visible: !root.onboardingRequired && root.viewMode === "settings"
               width: body.width
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.md
@@ -2058,8 +2164,9 @@ Panel {
         }
 
         Text {
+          visible: text.length > 0
           width: parent.width
-          text: root.feedbackText || root.guidanceText()
+          text: root.feedbackText || (root.onboardingRequired ? "" : root.guidanceText())
           color: Color.foreground
           opacity: 0.55
           wrapMode: Text.WordWrap
