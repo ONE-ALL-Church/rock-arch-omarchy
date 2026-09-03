@@ -39,7 +39,7 @@ MAX_REGISTERED_ITEMS = 2_000
 HTTP_TIMEOUT_SECONDS = 20
 MAX_ACTION_OUTPUT_BYTES = 64 * 1024
 MOBILE_APP_BUILD_PREFIX = MAGNUS_API_PREFIX + "/Build/mobileapps/"
-ROCK_LENS_USER_AGENT = HTTP_USER_AGENT
+ROCK_ARCH_USER_AGENT = HTTP_USER_AGENT
 
 
 class MagnusError(Exception):
@@ -234,7 +234,7 @@ class MagnusHttpClient:
         headers = {
             "Accept": "application/json, text/plain, */*",
             "Cookie": safe_cookie,
-            "User-Agent": ROCK_LENS_USER_AGENT,
+            "User-Agent": ROCK_ARCH_USER_AGENT,
         }
         if method == "POST":
             headers["Content-Type"] = "application/json"

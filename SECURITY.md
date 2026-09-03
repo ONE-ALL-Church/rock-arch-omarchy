@@ -9,7 +9,7 @@ reproduction using synthetic data is preferred.
 
 ## Supported boundary
 
-Rock Lens is an owner-local Omarchy plugin. Its Unix socket and state files are
+Rock Arch is an owner-local Omarchy plugin. Its Unix socket and state files are
 designed to protect against other local users, malformed server responses, and
 untrusted paths or URLs returned by Rock or Magnus. The broker exposes fixed,
 bounded operations and stable public errors; it does not provide a generic HTTP
@@ -21,6 +21,13 @@ compromised Quickshell process, a compromised Python runtime, or a malicious
 Rock server that returns semantically deceptive but structurally valid display
 text. Rock permissions remain the authorization boundary for tenant data and
 the mobile-app build action.
+
+Update checks are limited to the canonical Git-managed Rock Arch installation.
+They fetch the public `origin HEAD`, refuse local tracked changes or diverged
+history, validate the remote plugin ID and version, and expose only bounded
+status codes to QML. Installation always delegates to Omarchy's fixed plugin
+updater so its fast-forward, validation, rollback, and rescan safeguards remain
+authoritative. Automatic installation is disabled by default.
 
 ## Secret handling
 

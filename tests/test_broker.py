@@ -256,6 +256,38 @@ class FakeLive:
         )
 
 
+class FakeUpdates:
+    def __init__(self):
+        self.status_calls = []
+        self.start_calls = 0
+
+    def status(self, *, refresh=False, automatic_install=False):
+        self.status_calls.append((refresh, automatic_install))
+        return {
+            "managed": True,
+            "state": "available" if refresh else "current",
+            "currentVersion": "0.15.0",
+            "availableVersion": "0.16.0" if refresh else "0.15.0",
+            "lastCheckedAt": "2026-09-02T12:30:00Z",
+            "lastUpdatedAt": "",
+            "updateAvailable": refresh,
+            "error": "",
+        }
+
+    def start_update(self):
+        self.start_calls += 1
+        return {
+            "managed": True,
+            "state": "updating",
+            "currentVersion": "0.15.0",
+            "availableVersion": "0.16.0",
+            "lastCheckedAt": "2026-09-02T12:30:00Z",
+            "lastUpdatedAt": "",
+            "updateAvailable": True,
+            "error": "",
+        }
+
+
 class BrokerContractTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -286,6 +318,36 @@ class BrokerContractTests(unittest.TestCase):
             ).handle({"op": "status"})["context"],
             "PROD",
         )
+
+    def test_update_operations_are_bounded_and_follow_the_saved_preference(self):
+        updates = FakeUpdates()
+        broker = Broker(
+            self.state,
+            instance_file=self.instance,
+            developer_mode=True,
+            updates=updates,
+        )
+
+        status = broker.handle({"op": "update_status"})
+        self.assertEqual(status["update"]["state"], "current")
+        self.assertEqual(updates.status_calls[-1], (False, False))
+
+        checked = broker.handle({"op": "update_check"})
+        self.assertTrue(checked["update"]["updateAvailable"])
+        self.assertEqual(updates.status_calls[-1], (True, False))
+
+        preference = broker.handle(
+            {
+                "op": "preferences_update",
+                "preferences": {"automaticUpdates": True},
+            }
+        )
+        self.assertTrue(preference["profiles"]["preferences"]["automaticUpdates"])
+        self.assertEqual(updates.status_calls[-1], (False, True))
+
+        started = broker.handle({"op": "update_start"})
+        self.assertEqual(started["update"]["state"], "updating")
+        self.assertEqual(updates.start_calls, 1)
 
     def test_normal_mode_forces_prod_and_rejects_dev_context(self):
         self.state.write_text("DEV\n", encoding="utf-8")

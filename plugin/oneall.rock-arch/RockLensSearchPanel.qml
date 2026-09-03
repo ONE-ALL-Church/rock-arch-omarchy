@@ -138,7 +138,7 @@ Column {
       visible: searchPanel.controller.quickReturns.length === 0
       width: searchPanel.width
       text: searchPanel.controller.contextName === "PROD" ?
-        "Items opened from Rock Lens will appear here (up to 20)." :
+        "Items opened from Rock Arch will appear here (up to 20)." :
         "Recent Links are available in PROD. Start typing to search preview data."
       color: Color.foreground
       opacity: 0.6

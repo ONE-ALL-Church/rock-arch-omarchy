@@ -125,14 +125,14 @@ def main() -> None:
         return
     runtime = (
         Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
-        / "rock-lens"
+        / "rock-arch"
     )
     state = (
         Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
-        / "rock-lens"
+        / "rock-arch"
     )
     parser = argparse.ArgumentParser(
-        description="Owner-local Rock Lens broker"
+        description="Owner-local Rock Arch broker"
     )
     parser.add_argument("--socket", type=Path, default=runtime / "broker.sock")
     parser.add_argument("--state-file", type=Path, default=state / "context")

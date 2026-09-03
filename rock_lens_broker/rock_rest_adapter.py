@@ -37,7 +37,7 @@ MAX_TARGETS = 256
 MAX_PERSONAL_LINKS = 200
 PERSONAL_LINK_CACHE_SECONDS = 5 * 60
 ROWS_PER_CATEGORY = 3
-ROCK_LENS_USER_AGENT = HTTP_USER_AGENT
+ROCK_ARCH_USER_AGENT = HTTP_USER_AGENT
 GUID_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -111,7 +111,7 @@ class RockRestHttpClient:
             headers={
                 "Accept": "application/json",
                 "Cookie": safe_cookie,
-                "User-Agent": ROCK_LENS_USER_AGENT,
+                "User-Agent": ROCK_ARCH_USER_AGENT,
             },
             method="GET",
         )
@@ -322,7 +322,7 @@ class RockRestReadOnlyAdapter:
                 self._cookie_provider.authenticated_cookie() as cookie,
                 ThreadPoolExecutor(
                     max_workers=len(specs),
-                    thread_name_prefix="rock-lens-rest",
+                    thread_name_prefix="rock-arch-rest",
                 ) as executor,
             ):
                 requests = [

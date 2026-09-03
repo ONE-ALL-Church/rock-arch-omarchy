@@ -4,7 +4,7 @@ from pathlib import Path
 QML_PATH = (
     Path(__file__).resolve().parents[1]
     / "plugin"
-    / "oneall.rock-lens"
+    / "oneall.rock-arch"
     / "RockLens.qml"
 )
 SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
@@ -186,11 +186,25 @@ class QmlNavigationTests(unittest.TestCase):
         )
         self.assertEqual(
             source.count("Keys.onReturnPressed:"),
-            4,
+            5,
         )
         self.assertEqual(
             source.count("Keys.onEnterPressed:"),
-            4,
+            5,
+        )
+
+    def test_settings_exposes_bounded_opt_in_plugin_updates(self):
+        source = all_qml_source()
+
+        self.assertIn('text: "Settings" + (navigation.controller.updateAvailable ? "  ●" : "")', source)
+        self.assertIn('text: "Install updates automatically"', source)
+        self.assertIn('request({op: "update_check"})', source)
+        self.assertIn('request({op: "update_start"})', source)
+        self.assertIn('property bool preferenceAutomaticUpdates: false', source)
+        self.assertIn("interval: 86400000", source)
+        self.assertIn(
+            '"Rock Arch checks once a day. Automatic installation is optional',
+            source,
         )
 
     def test_every_panel_has_a_keyboard_route_and_contextual_guidance(self):

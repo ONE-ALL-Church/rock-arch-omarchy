@@ -1,6 +1,6 @@
 # Optional native Magnus boundary
 
-Rock Lens talks to the server-side TriumphTech Magnus API directly. The Node
+Rock Arch talks to the server-side TriumphTech Magnus API directly. The Node
 `rock-magnus-cli` package is not launched or otherwise required.
 Magnus is also not used for authentication: every configured profile first
 logs in through Rock's same-origin `/api/Auth/Login` endpoint.
@@ -66,14 +66,14 @@ tree path or content path according to the descriptor's `IsFolder` value.
 
 Profile credentials live in desktop Secret Service under the stable random
 profile ID. New credentials are verified before replacing a saved login. The
-validated `.ROCK` cookie is never written by Rock Lens and remains only in
+validated `.ROCK` cookie is never written by Rock Arch and remains only in
 broker memory with a sliding 15-minute idle timeout.
 
 Version 0.10 migrates profile-scoped `magnus_username` and `magnus_password`
 records written by earlier releases to neutral `rock_username` and
 `rock_password` keys, then removes the obsolete records. Sign-out clears both
 new and legacy keys as well as the in-memory cookie. If Secret Service does not
-confirm deletion, Rock Lens clears the memory cookie but reports failure rather
+confirm deletion, Rock Arch clears the memory cookie but reports failure rather
 than presenting the profile as safely signed out.
 
 ## Build and promotion policy
@@ -82,15 +82,15 @@ Version 0.11 exposes the Magnus CLI-compatible `POST` build action only for a
 descriptor-provided mobile app URI. The first run and every Recent Link rerun
 require an inline production confirmation. A successful build is stored as a
 profile-scoped **Magnus Build** Recent Link without exposing the URI to QML.
-Rock Lens does not retry a timed-out build because the server may already have
+Rock Arch does not retry a timed-out build because the server may already have
 accepted it.
 
 The Magnus mobile-app descriptor does not include a deployment timestamp.
-Rock Lens therefore shows **Last deployed** from the most recent successful
+Rock Arch therefore shows **Last deployed** from the most recent successful
 build it initiated for that profile. Recent times use compact relative labels
 such as `5 minutes ago`; older times show a local date and time. Clearing or
 disabling Recent Links also removes or hides this local observation, and builds
-started outside Rock Lens cannot be inferred from the Magnus descriptor.
+started outside Rock Arch cannot be inferred from the Magnus descriptor.
 
 For keyboard deployment, open Magnus, select a mobile app with Up/Down, press
 `B`, and press `Enter` to confirm. The confirmation's Deploy button receives

@@ -1,4 +1,4 @@
-# Releasing Rock Lens
+# Releasing Rock Arch
 
 Omarchy installs this repository directly. A release therefore needs a valid
 root manifest, a passing test suite, a fast-forwardable default branch, and a
@@ -8,7 +8,7 @@ required.
 ## Prepare
 
 1. Update the version in `rock_lens_broker/version.py`, `manifest.json`,
-   `pyproject.toml`, and the Rock Lens footer in `RockLensSettingsPanel.qml`.
+   `pyproject.toml`, and the Rock Arch footer in `RockLensSettingsPanel.qml`.
 2. Add the user-visible changes to `CHANGELOG.md`.
 3. Run the release checks:
 
@@ -35,7 +35,7 @@ Push `main`, wait for GitHub Actions to pass, then create and push the matching
 Users with a Git-managed installation update from the default branch:
 
 ```bash
-omarchy plugin update oneall.rock-lens
+omarchy plugin update oneall.rock-arch
 ```
 
 Omarchy uses a fast-forward-only merge, validates the result, and rolls back a

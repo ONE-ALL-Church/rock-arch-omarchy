@@ -1,4 +1,4 @@
-"""Rock Lens local broker with a deliberately narrow public API."""
+"""Rock Arch local broker with a deliberately narrow public API."""
 
 from .contracts import Context, HealthState
 from .version import VERSION

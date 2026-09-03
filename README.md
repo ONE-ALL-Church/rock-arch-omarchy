@@ -1,15 +1,15 @@
-# Rock Lens
+# Rock Arch — Bridging Rock RMS and Omarchy
 
-Rock Lens is a keyboard-first Omarchy launcher for Rock RMS. Search People,
+Rock Arch is a keyboard-first Omarchy launcher for Rock RMS. Search People,
 Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel Items; open
 Rock Personal Links; and return to recently opened records without navigating
 the full admin UI.
 
-Every user signs directly into their own Rock instance. Rock Lens uses Rock's
+Every user signs directly into their own Rock instance. Rock Arch uses Rock's
 native `.ROCK` session for Search, Personal Links, and optional Magnus features.
 It does not require an OpenID client, Rock MCP, Magnus CLI, Node.js, or npm.
 
-![Current Rock Lens search with a selected result](outputs/keyboard-audit/02-search-results.png)
+![Current Rock Arch search with a selected result](outputs/keyboard-audit/02-search-results.png)
 
 Accounts with Magnus access automatically receive the Magnus tab, including
 folder browsing, bounded previews, downloads, clipboard actions, hashes, and
@@ -19,10 +19,10 @@ explicitly confirmed mobile-app builds.
 
 ## Install
 
-Rock Lens supports Omarchy 4.0.2 or newer. Install the Git repository directly:
+Rock Arch supports Omarchy 4.0.2 or newer. Install the Git repository directly:
 
 ```bash
-omarchy plugin add https://github.com/bscottdavis/rock-lens-omarchy.git --enable
+omarchy plugin add https://github.com/bscottdavis/rock-arch-omarchy.git --enable
 ```
 
 Open it with `Super+R` or the Rock icon in the Omarchy bar. First launch asks
@@ -43,34 +43,43 @@ is purged when the panel closes or the connection attempt times out.
 
 ## Updates
 
-Git installs can be updated safely in place. Omarchy fetches the repository,
-fast-forwards only, validates the updated plugin, and rolls back a failed
-validation:
+Git-managed installs check for updates once a day. Open **Settings** to see the
+current version, check immediately, or install an available update. Automatic
+installation is optional and off by default. Enable **Install updates
+automatically** only if you want Rock Arch to apply a newly detected update
+without another click.
+
+Rock Arch delegates installation to Omarchy. Omarchy fetches the repository,
+fast-forwards only, validates the updated plugin, rolls back a failed
+validation, and reloads the shell. Local tracked changes or a diverged Git
+history prevent automatic installation and leave the checkout untouched. The
+equivalent terminal command is:
 
 ```bash
-omarchy plugin update oneall.rock-lens
+omarchy plugin update oneall.rock-arch
 ```
 
 Third-party plugins are not updated by the general `omarchy update` command.
-Run the plugin update command when a new Rock Lens release is available. Release
-notes and publisher steps live in [CHANGELOG.md](CHANGELOG.md) and
+Update checks use the public Git remote and do not need GitHub credentials or a
+token. Non-Git and development checkouts remain manually managed. Release notes
+and publisher steps live in [CHANGELOG.md](CHANGELOG.md) and
 [docs/RELEASING.md](docs/RELEASING.md).
 
-The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-lens/broker.sock`
+The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-arch/broker.sock`
 and starts the broker without passing queries or credentials as arguments.
 
 ## Authentication and profiles
 
-Rock Lens intentionally has one authentication system: Rock's native session
+Rock Arch intentionally has one authentication system: Rock's native session
 login. It posts the username and password to the selected instance's fixed
 `/api/Auth/Login` endpoint over HTTPS, rejects redirects, validates the returned
 `.ROCK` cookie, and keeps that cookie only in broker memory. The cookie expires
-after 15 minutes without Rock Lens activity; the saved profile credentials let
+after 15 minutes without Rock Arch activity; the saved profile credentials let
 the broker establish a new session when the user next performs an action.
 
 Profile names, strict origins, the active profile ID, and preferences are
 non-secret metadata stored owner-only in
-`$XDG_CONFIG_HOME/rock-lens/profiles.json`. Usernames and passwords are stored
+`$XDG_CONFIG_HOME/rock-arch/profiles.json`. Usernames and passwords are stored
 only by desktop Secret Service under a stable random profile ID. Two accounts
 on the same Rock instance remain separate.
 
@@ -87,7 +96,7 @@ python3 -m rock_lens_broker rock login
 python3 -m rock_lens_broker rock status
 ```
 
-Rock Lens does not read legacy `oidc.json` metadata or use stored OAuth client
+Rock Arch does not read legacy `oidc.json` metadata or use stored OAuth client
 secrets/tokens. Version 0.14 removed that dormant experimental code; existing
 user-owned legacy records are left untouched rather than silently deleted.
 
@@ -98,7 +107,7 @@ testing, but it is not exposed during normal use. The broker accepts DEV only
 when its process starts with this exact flag:
 
 ```bash
-ROCK_LENS_DEVELOPER_MODE=1 python3 -m rock_lens_broker
+ROCK_ARCH_DEVELOPER_MODE=1 python3 -m rock_lens_broker
 ```
 
 The installed shell must receive the same environment flag before it starts.
@@ -121,7 +130,7 @@ People, Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel
 Items. Each target uses a fixed Rock route and must resolve to the exact
 configured Rock origin; Personal Links have the same origin restriction.
 
-All searches use fixed Rock REST v1 endpoints; Rock Lens does not use the v2
+All searches use fixed Rock REST v1 endpoints; Rock Arch does not use the v2
 API or accept arbitrary endpoint paths. Start a query with an entity prefix to
 search only that Rock category. A bare
 prefix such as `g:` lists the first three items in that category.
@@ -171,7 +180,7 @@ history.
 
 ## Optional Magnus features
 
-After native login, Rock Lens independently probes the server-side Magnus API.
+After native login, Rock Arch independently probes the server-side Magnus API.
 A successful probe enables the Magnus tab; a 403 or 404 hides it without
 affecting Search, Personal Links, or Recent Links. Magnus folders use Up/Down
 and Enter. File previews expose only descriptor-approved Download, Copy, Copy
@@ -206,10 +215,10 @@ full capability boundary.
 - Recent Links (the local Quick Return store) contain only launcher-opened
   targets and successfully triggered mobile app builds, are capped at 20, are
   visible only in PROD, and are stored under
-  `$XDG_STATE_HOME/rock-lens` with owner-only permissions.
+  `$XDG_STATE_HOME/rock-arch` with owner-only permissions.
   Clearing them reports an error if the local history file cannot be removed.
 - Magnus mobile-app rows show the time of the last successful deployment that
-  Rock Lens initiated for the active profile. Magnus does not provide a global
+  Rock Arch initiated for the active profile. Magnus does not provide a global
   deployment timestamp, so builds started elsewhere are not represented.
 - There is no general mutation transport, SQL execution, job trigger, or Run
   Now UI. The sole server-side action is an explicitly confirmed mobile app
@@ -234,7 +243,7 @@ Run the complete dependency-free test suite and a standalone broker with:
 
 ```bash
 python3 -m unittest discover -s tests -v
-python3 -m rock_lens_broker --socket /tmp/rock-lens-demo.sock
+python3 -m rock_lens_broker --socket /tmp/rock-arch-demo.sock
 ```
 
 For a standalone installed command outside Omarchy, use `uv tool install .`.

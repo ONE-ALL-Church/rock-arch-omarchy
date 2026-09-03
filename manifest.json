@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
-  "id": "oneall.rock-lens",
-  "name": "Rock Lens",
-  "version": "0.14.0",
+  "id": "oneall.rock-arch",
+  "name": "Rock Arch",
+  "version": "0.15.0",
   "author": "ONE&ALL",
   "license": "MIT",
-  "description": "Native multi-profile Rock search with optional Magnus browsing",
+  "description": "Bridging Rock RMS and Omarchy",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
-  "entryPoints": {"barWidget": "plugin/oneall.rock-lens/RockLens.qml"},
+  "entryPoints": {"barWidget": "plugin/oneall.rock-arch/RockLens.qml"},
   "barWidget": {
-    "displayName": "Rock Lens",
-    "description": "Secure multi-instance Rock discovery, links, and Magnus files",
+    "displayName": "Rock Arch",
+    "description": "Bridging Rock RMS and Omarchy",
     "category": "Productivity",
-    "aliases": ["rock", "lens", "launcher", "magnus"],
+    "aliases": ["rock", "arch", "launcher", "magnus"],
     "allowMultiple": false
   }
 }

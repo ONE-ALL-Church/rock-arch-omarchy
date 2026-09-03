@@ -2,7 +2,7 @@
 
 ## Components
 
-1. `plugin/oneall.rock-lens`: a thin Quickshell controller composed from
+1. `plugin/oneall.rock-arch`: a thin Quickshell controller composed from
    focused Login, Search, Personal Links, Magnus, Settings, and navigation QML
    components. Shared key handling and selection chrome remain independent
    primitives.
@@ -28,6 +28,10 @@
    `Broker`.
 10. `http_security`: shared redirect refusal, authenticated cookie-header
     validation, and bounded JSON decoding used by every Rock HTTP client.
+11. `UpdateManager`: daily public-Git revision checks plus a fixed detached
+    worker that delegates installation, validation, rollback, and plugin reload
+    to Omarchy. Automatic installation is an explicit preference and defaults
+    to off.
 
 ## Trust boundary
 
@@ -51,6 +55,16 @@ permissions are rechecked; a live private socket is treated as an already
 running broker. QML launches the broker through `/usr/bin/python3`, avoiding a
 PATH-selected executable at this credential boundary.
 
+The updater is active only when the running repository is the canonical
+Git-managed `oneall.rock-arch` installation. It fetches only `origin HEAD`,
+compares revisions, and validates the remote root manifest's plugin ID and
+semantic version. It will not install over tracked changes or diverged history.
+Both the manual and optional automatic path launch a detached fixed module that
+accepts only the canonical install directory and calls Omarchy's plugin updater.
+Omarchy remains responsible for the fast-forward merge, plugin validation,
+rollback, and shell rescan. Updater state is bounded, owner-only JSON and
+contains no Git output, credentials, cookies, or Rock data.
+
 Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and an
 opaque `safeId`. Live search deliberately reports campus as `Not requested`.
 No contact details, notes, addresses, dates of birth, family relationships,
@@ -65,7 +79,7 @@ with a redirect-free `POST /api/Auth/Login` before replacing a saved login. It
 accepts only a bounded `.ROCK` cookie from `Set-Cookie` and retains that cookie
 only in process memory with a sliding 15-minute idle timeout.
 
-Profiles created by earlier Rock Lens releases automatically migrate their
+Profiles created by earlier Rock Arch releases automatically migrate their
 `magnus_username` and `magnus_password` Secret Service records into neutral
 `rock_username` and `rock_password` records, then remove the obsolete keys.
 Authentication failure, sign-out, profile change, or a failed authenticated
@@ -85,7 +99,7 @@ Context is a broker-owned enum: `DEV` or `PROD`. Normal startup is forced to
 PROD, including migration of a previously persisted DEV value. The QML omits
 the context control, and the broker rejects requests to enter DEV. Synthetic
 DEV data is available only when the broker process starts with the exact
-`ROCK_LENS_DEVELOPER_MODE=1` flag; values such as `true` or `yes` fail closed.
+`ROCK_ARCH_DEVELOPER_MODE=1` flag; values such as `true` or `yes` fail closed.
 When enabled, the UI restores the visibly labeled context control and explicit
 `set_context` requests may select either context. DEV remains synthetic, PROD
 never falls back to synthetic data, and only PROD can perform the narrowly

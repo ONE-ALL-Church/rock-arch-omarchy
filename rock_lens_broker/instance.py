@@ -11,7 +11,7 @@ from .origin import OriginError, validate_rock_origin
 def default_instance_path() -> Path:
     return (
         Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-        / "rock-lens"
+        / "rock-arch"
         / "instance.json"
     )
 

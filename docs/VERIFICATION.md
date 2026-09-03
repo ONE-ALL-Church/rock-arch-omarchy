@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.14.0` release boundary. Historical feature
+This record describes the current `0.15.0` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -13,21 +13,24 @@ uvx --from ruff==0.16.5 ruff check rock_lens_broker tests
 uvx --from ty==0.0.78 ty check rock_lens_broker
 python3 -m compileall -q rock_lens_broker
 omarchy plugin validate .
-/usr/lib/qt6/bin/qmllint plugin/oneall.rock-lens/*.qml
+/usr/lib/qt6/bin/qmllint plugin/oneall.rock-arch/*.qml
 git diff --check
 ```
 
-The suite contains 112 passing tests. Release-contract coverage keeps
+The suite contains 120 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
+Updater coverage verifies remote revision detection, manifest identity and
+version validation, local-change refusal, fixed worker launch arguments, private
+state permissions, broker routing, and the opt-in automatic-update preference.
 
 GitHub Actions runs the unit tests, Ruff, ty, and bytecode compilation on every
 push to `main` and on pull requests.
 
 ## Authentication boundary
 
-- Rock Lens has one authentication path: a redirect-free HTTPS
+- Rock Arch has one authentication path: a redirect-free HTTPS
   `POST /api/Auth/Login` to the selected, validated Rock origin.
 - Only a bounded `.ROCK` cookie is accepted from `Set-Cookie`. It remains in
   broker memory and expires after 15 idle minutes.
@@ -69,6 +72,21 @@ push to `main` and on pull requests.
   server, and every first or repeated build requires an explicit confirmation.
   No build is triggered by the automated suite.
 
+## Update boundary
+
+- Update checks run only for the exact Git-managed
+  `oneall.rock-arch` installation and fetch the public remote without prompting
+  for credentials.
+- Remote metadata must contain the same plugin ID and a bounded semantic
+  version. A non-fast-forward history or local tracked changes disables the
+  install action and leaves the checkout untouched.
+- Automatic installation is a persisted boolean preference that defaults to
+  off. Manual and automatic installs both invoke Omarchy's fixed plugin updater,
+  which performs its own fast-forward merge, validation, rollback, and rescan.
+- The detached worker accepts only the canonical installed plugin directory and
+  writes only owner-readable status. It never includes profile credentials,
+  cookies, tenant data, or command output in its state or notifications.
+
 ## UI evidence
 
 The README uses the current selection and deployment-confirmation UI:
@@ -78,7 +96,7 @@ The README uses the current selection and deployment-confirmation UI:
 - [`05-magnus-confirmation.png`](../outputs/keyboard-audit/05-magnus-confirmation.png)
   shows the bounded `Test` confirmation and does not trigger a deployment.
 
-Both images are cropped to the Rock Lens panel and contain no desktop, tenant,
+Both images are cropped to the Rock Arch panel and contain no desktop, tenant,
 credential, or live record data. See [KEYBOARD-AUDIT.md](KEYBOARD-AUDIT.md) for
 the interaction coverage represented by these captures.
 

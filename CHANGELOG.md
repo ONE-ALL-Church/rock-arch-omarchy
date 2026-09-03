@@ -1,17 +1,33 @@
 # Changelog
 
-Rock Lens follows [Semantic Versioning](https://semver.org/). The GitHub
+Rock Arch follows [Semantic Versioning](https://semver.org/). The GitHub
 repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-02
+
+### Added
+
+- Added daily update checks, a Settings availability indicator, a manual
+  **Update now** action, and optional automatic installation that is disabled
+  by default.
+- Added owner-only updater state and a detached update worker so Omarchy can
+  validate, roll back, and reload the plugin without being interrupted by QML
+  hot reloads.
+
 ### Changed
 
+- Renamed the project to **Rock Arch — Bridging Rock RMS and Omarchy**, including
+  its GitHub repository, Omarchy plugin ID, UI, install commands, and public
+  documentation.
 - Split the Quickshell UI into focused Login, Search, Personal Links, Magnus,
   Settings, and navigation components without changing keyboard behavior.
 - Moved broker request routing into operation-specific handlers and centralized
   redirect, cookie-header, and bounded JSON validation shared by every Rock
   HTTP client.
+- Delegated every update installation to Omarchy's fast-forward-only updater,
+  validation, rollback, and plugin rescan flow.
 
 ### Security
 
@@ -42,7 +58,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 - Removed the dormant experimental OpenID Connect client, callback server,
   bearer-token storage, broker operations, CLI setup command, and tests. Rock
-  Lens uses only the native Rock session shared by Search, links, and Magnus.
+  Arch uses only the native Rock session shared by Search, links, and Magnus.
 - Kept desktop Secret Service support as a small independent adapter for
   per-profile Rock usernames and passwords.
 
@@ -67,5 +83,6 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
-[0.14.0]: https://github.com/bscottdavis/rock-lens-omarchy/releases/tag/v0.14.0
-[0.13.0]: https://github.com/bscottdavis/rock-lens-omarchy/releases/tag/v0.13.0
+[0.15.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.0
+[0.14.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.14.0
+[0.13.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.13.0

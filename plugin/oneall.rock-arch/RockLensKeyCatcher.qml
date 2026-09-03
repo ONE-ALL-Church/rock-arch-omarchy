@@ -1,6 +1,6 @@
 import QtQuick
 
-// Rock Lens-local variant of Omarchy's PanelKeyCatcher. It keeps the shared
+// Rock Arch-local variant of Omarchy's PanelKeyCatcher. It keeps the shared
 // navigation semantics and adds one explicit Backspace action for returning a
 // highlighted item to the search editor.
 Item {

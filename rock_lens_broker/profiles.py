@@ -22,6 +22,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "showPersonContext": True,
     "recentLinks": True,
     "closeAfterOpen": True,
+    "automaticUpdates": False,
     "enabledCategories": list(CATEGORIES),
 }
 
@@ -165,7 +166,12 @@ class ProfileStore:
             raise ProfileError("invalid_preferences")
         state = self._read()
         preferences = dict(state["preferences"])
-        for name in ("showPersonContext", "recentLinks", "closeAfterOpen"):
+        for name in (
+            "showPersonContext",
+            "recentLinks",
+            "closeAfterOpen",
+            "automaticUpdates",
+        ):
             if name in updates:
                 if not isinstance(updates[name], bool):
                     raise ProfileError("invalid_preferences")
@@ -287,7 +293,12 @@ class ProfileStore:
         if profiles and not active:
             raise ProfileError("profile_store_unavailable")
         clean_preferences = dict(DEFAULT_PREFERENCES)
-        for name in ("showPersonContext", "recentLinks", "closeAfterOpen"):
+        for name in (
+            "showPersonContext",
+            "recentLinks",
+            "closeAfterOpen",
+            "automaticUpdates",
+        ):
             candidate = preferences.get(name, clean_preferences[name])
             if not isinstance(candidate, bool):
                 raise ProfileError("profile_store_unavailable")

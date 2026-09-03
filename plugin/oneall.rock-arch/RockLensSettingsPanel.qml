@@ -317,7 +317,7 @@ Column {
   }
   CheckBox {
     id: closeAfterOpenCheckBox
-    text: "Close Rock Lens after opening an item"
+    text: "Close Rock Arch after opening an item"
     activeFocusOnTab: true
     checked: settingsPanel.controller.preferenceCloseAfterOpen
     onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(closeAfterOpenCheckBox)
@@ -354,9 +354,83 @@ Column {
       }
     }
   }
+
+  Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.12) }
+  RowLayout {
+    width: parent.width
+    Text {
+      text: "Rock Arch updates"
+      color: Color.foreground
+      font.pixelSize: Style.font.heading
+      font.bold: true
+    }
+    Item { Layout.fillWidth: true }
+    Rectangle {
+      Layout.preferredWidth: 8
+      Layout.preferredHeight: 8
+      radius: 4
+      color: settingsPanel.controller.updateAvailable ? "#fbbf24" :
+        settingsPanel.controller.updateState === "error" ? "#f87171" : "#86efac"
+    }
+  }
   Text {
     width: parent.width
-    text: "Rock Lens 0.14.0 · Credentials stay in your desktop password manager"
+    text: "Version " + settingsPanel.controller.currentVersion + " · " + settingsPanel.controller.updateStatusText()
+    color: Color.foreground
+    opacity: 0.72
+    wrapMode: Text.WordWrap
+    textFormat: Text.PlainText
+  }
+  RowLayout {
+    width: parent.width
+    spacing: Style.spacing.sm
+    Button {
+      id: checkUpdateButton
+      text: settingsPanel.controller.updateState === "checking" ? "Checking…" : "Check now"
+      focusable: true
+      enabled: settingsPanel.controller.updateManaged && !settingsPanel.controller.updateBusy
+      onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(checkUpdateButton)
+      onClicked: settingsPanel.controller.checkForUpdates()
+    }
+    Button {
+      id: installUpdateButton
+      visible: settingsPanel.controller.updateAvailable || settingsPanel.controller.updateState === "updating"
+      text: settingsPanel.controller.updateState === "updating" ? "Updating…" : "Update now"
+      focusable: true
+      enabled: settingsPanel.controller.updateAvailable && !settingsPanel.controller.updateBusy
+      onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(installUpdateButton)
+      onClicked: settingsPanel.controller.startPluginUpdate()
+    }
+    Item { Layout.fillWidth: true }
+  }
+  CheckBox {
+    id: automaticUpdatesCheckBox
+    text: "Install updates automatically"
+    activeFocusOnTab: true
+    enabled: settingsPanel.controller.updateManaged && settingsPanel.controller.updateState !== "updating"
+    checked: settingsPanel.controller.preferenceAutomaticUpdates
+    onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(automaticUpdatesCheckBox)
+    Keys.onReturnPressed: settingsPanel.controller.toggleAutomaticUpdatesPreference()
+    Keys.onEnterPressed: settingsPanel.controller.toggleAutomaticUpdatesPreference()
+    onClicked: {
+      settingsPanel.controller.preferenceAutomaticUpdates = checked
+      settingsPanel.controller.updatePreference("automaticUpdates", checked)
+    }
+  }
+  Text {
+    width: parent.width
+    text: settingsPanel.controller.updateManaged ?
+      "Rock Arch checks once a day. Automatic installation is optional and uses Omarchy's validation and rollback safeguards." :
+      "Install Rock Arch as a Git-managed Omarchy plugin to enable update checks."
+    color: Color.foreground
+    opacity: 0.56
+    font.pixelSize: Style.font.bodySmall
+    wrapMode: Text.WordWrap
+    textFormat: Text.PlainText
+  }
+  Text {
+    width: parent.width
+    text: "Rock Arch " + settingsPanel.controller.currentVersion + " · Credentials stay in your desktop password manager"
     color: Color.foreground
     opacity: 0.48
     font.pixelSize: Style.font.bodySmall

@@ -25,7 +25,7 @@ AUTH_COOKIE_IDLE_SECONDS = 15 * 60
 HTTP_TIMEOUT_SECONDS = 15
 MAX_PASSWORD_BYTES = 1_024
 MAX_COOKIE_BYTES = 16 * 1024
-ROCK_LENS_USER_AGENT = HTTP_USER_AGENT
+ROCK_ARCH_USER_AGENT = HTTP_USER_AGENT
 
 
 class RockSessionError(Exception):
@@ -63,7 +63,7 @@ class RockSessionHttpClient:
             headers={
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": ROCK_LENS_USER_AGENT,
+                "User-Agent": ROCK_ARCH_USER_AGENT,
             },
             method="POST",
         )

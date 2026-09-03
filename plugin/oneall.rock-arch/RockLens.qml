@@ -8,13 +8,14 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "oneall.rock-lens"
-  ipcTarget: "oneall.rock-lens"
+  moduleName: "oneall.rock-arch"
+  ipcTarget: "oneall.rock-arch"
   manageIpc: false
 
-  readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))) + "/rock-lens"
+  readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))) + "/rock-arch"
   readonly property string socketPath: runtimeDir + "/broker.sock"
-  readonly property string packageRoot: Quickshell.env("ROCK_LENS_HOME") || (Quickshell.env("HOME") + "/.config/omarchy/plugins/oneall.rock-lens")
+  readonly property string packageRoot: Quickshell.env("ROCK_ARCH_HOME") ||
+    decodeURIComponent(Qt.resolvedUrl("../../").toString().replace(/^file:\/\//, "")).replace(/\/$/, "")
   property string contextName: "PROD"
   property bool developerMode: false
   property string viewMode: "search"
@@ -29,6 +30,15 @@ Panel {
   property bool preferencePersonContext: true
   property bool preferenceRecentLinks: true
   property bool preferenceCloseAfterOpen: true
+  property bool preferenceAutomaticUpdates: false
+  property bool updateManaged: false
+  property string updateState: "idle"
+  property string currentVersion: "0.15.0"
+  property string availableVersion: ""
+  property string updateLastCheckedAt: ""
+  property string updateLastUpdatedAt: ""
+  property string updateError: ""
+  property bool updateAvailable: false
   property var enabledCategories: ["People", "Groups", "Workflows", "Jobs", "Pages", "Content Channel Items"]
   property var quickLook: null
   property var requestQueue: []
@@ -76,6 +86,7 @@ Panel {
   readonly property int navigationCount: personalLinks.length
   readonly property int magnusCount: magnusItems.length
   readonly property bool showMagnus: contextName === "PROD" && magnusAvailable
+  readonly property bool updateBusy: updateState === "checking" || updateState === "updating"
   readonly property bool magnusPreviewCommandsEnabled: opened && viewMode === "magnus" &&
     magnusPreview !== null && !magnusBusy && !magnusActionBusy && pendingMagnusBuildId === ""
   readonly property bool onboardingRequired: contextName === "PROD" &&
@@ -188,7 +199,7 @@ Panel {
 
   function deploymentSummary(title) {
     var deployedAt = lastDeployedAt(title)
-    return deployedAt ? "Last deployed " + relativeTime(deployedAt) : "No Rock Lens deployment recorded"
+    return deployedAt ? "Last deployed " + relativeTime(deployedAt) : "No Rock Arch deployment recorded"
   }
 
   function friendlyError(value) {
@@ -207,6 +218,18 @@ Panel {
       return "The clipboard isn't available right now."
     if (code === "recent_links_clear_failed")
       return "Recent Links couldn't be cleared from this computer. Try again."
+    if (code === "no_update_available")
+      return "Rock Arch is already up to date."
+    if (code === "local_changes_prevent_update")
+      return "Local plugin changes must be committed or removed before updating."
+    if (code === "update_history_diverged")
+      return "This installation has a different Git history and must be updated manually."
+    if (code === "update_managed_manually")
+      return "Updates for this installation are managed manually."
+    if (code === "update_launch_failed" || code === "update_failed")
+      return "Rock Arch couldn't install the update. Try again from Settings."
+    if (code === "update_check_failed" || code === "update_interrupted")
+      return "Rock Arch couldn't check for updates. Try again when you're online."
     if (code === "not_found" || code === "magnus_item_not_found")
       return "That item is no longer available. Refresh and try again."
     if (!code) return "That action didn't finish. Try again."
@@ -225,7 +248,9 @@ Panel {
     if (contextName === "PROD" && !rockConfigured)
       return "Sign in from Settings to search Rock."
     if (viewMode === "settings")
-      return "Changes save automatically. Press Esc to return to Search."
+      return updateState === "updating" ?
+        "The update is running through Omarchy. Rock Arch will restart when it finishes." :
+        "Changes save automatically. Press Esc to return to Search."
     if (viewMode === "personal")
       return personalLinks.length ?
         "Use Up/Down to choose a Personal Link. Enter opens it in Rock." :
@@ -357,7 +382,7 @@ Panel {
       searchPending = false
       searchInFlightQuery = ""
       magnusActionBusy = false
-      feedbackText = "Rock Lens couldn't read Rock's response. Try again."
+      feedbackText = "Rock Arch couldn't read Rock's response. Try again."
       return
     }
     if (!response || response.ok !== true) {
@@ -398,6 +423,20 @@ Panel {
       magnusState = String(response.magnus.state || "unknown")
       magnusProbeInFlight = false
       if (!showMagnus && viewMode === "magnus") focusSearch()
+    }
+    if (response.update) {
+      updateManaged = response.update.managed === true
+      updateState = String(response.update.state || "idle")
+      currentVersion = String(response.update.currentVersion || currentVersion)
+      availableVersion = String(response.update.availableVersion || "")
+      updateLastCheckedAt = String(response.update.lastCheckedAt || "")
+      updateLastUpdatedAt = String(response.update.lastUpdatedAt || "")
+      updateError = String(response.update.error || "")
+      updateAvailable = response.update.updateAvailable === true
+      if (updateState === "updated")
+        feedbackText = "Rock Arch was updated successfully"
+      else if (updateState === "updating")
+        feedbackText = "Updating Rock Arch through Omarchy…"
     }
     if (response.magnusBrowser) {
       magnusBusy = false
@@ -449,6 +488,7 @@ Panel {
       preferencePersonContext = preferences.showPersonContext !== false
       preferenceRecentLinks = preferences.recentLinks !== false
       preferenceCloseAfterOpen = preferences.closeAfterOpen === true
+      preferenceAutomaticUpdates = preferences.automaticUpdates === true
       if (Array.isArray(preferences.enabledCategories))
         enabledCategories = preferences.enabledCategories
       if (profiles.length === 0 && opened) {
@@ -622,6 +662,7 @@ Panel {
     feedbackText = ""
     panelFlick.contentY = 0
     request({op: "profiles_status"})
+    request({op: "update_status"})
     Qt.callLater(function() {
       settingsPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)
       root.revealItem(settingsPanel.primaryButton)
@@ -644,6 +685,42 @@ Panel {
   function toggleCloseAfterOpenPreference() {
     preferenceCloseAfterOpen = !preferenceCloseAfterOpen
     updatePreference("closeAfterOpen", preferenceCloseAfterOpen)
+  }
+  function toggleAutomaticUpdatesPreference() {
+    preferenceAutomaticUpdates = !preferenceAutomaticUpdates
+    updatePreference("automaticUpdates", preferenceAutomaticUpdates)
+  }
+  function checkForUpdates() {
+    if (!updateManaged || updateBusy) return
+    updateState = "checking"
+    feedbackText = "Checking for a Rock Arch update…"
+    request({op: "update_check"})
+  }
+  function startPluginUpdate() {
+    if (!updateManaged || !updateAvailable || updateBusy) return
+    updateState = "updating"
+    feedbackText = "Updating Rock Arch through Omarchy…"
+    request({op: "update_start"})
+  }
+  function updateStatusText() {
+    if (!updateManaged || updateState === "manual")
+      return "Updates are managed manually for this installation"
+    if (updateState === "checking") return "Checking for updates…"
+    if (updateState === "updating") return "Installing the update through Omarchy…"
+    if (updateState === "available")
+      return availableVersion && availableVersion !== currentVersion ?
+        availableVersion + " available" : "A new revision is available"
+    if (updateState === "updated")
+      return "Updated " + (updateLastUpdatedAt ? relativeTime(updateLastUpdatedAt) : "successfully")
+    if (updateState === "modified")
+      return "Local changes prevent automatic updates"
+    if (updateState === "diverged")
+      return "This Git checkout must be updated manually"
+    if (updateState === "error")
+      return updateError === "update_failed" ? "The last update failed" : "Couldn't check for updates"
+    if (updateState === "current")
+      return "Up to date" + (updateLastCheckedAt ? " · checked " + relativeTime(updateLastCheckedAt) : "")
+    return "Ready to check for updates"
   }
   function backspaceToSearch() {
     var selectionStart = searchField.selectionStart
@@ -974,7 +1051,7 @@ Panel {
     var operation = activeProfileId &&
       onboardingDomainKey(domain) !== onboardingDomainKey(instanceDomain) ?
       "profile_add" : "rock_configure"
-    pendingSuccessText = "Rock Lens is ready"
+    pendingSuccessText = "Rock Arch is ready"
     request({op: operation, name: "", domain: domain, username: username, password: password})
     setupPassword = ""
   }
@@ -1143,6 +1220,14 @@ Panel {
     onTriggered: root.request({op: "status", probeMagnus: true})
   }
   Timer { id: magnusProbeTimer; interval: 800; onTriggered: root.probeMagnus() }
+  Timer {
+    id: updatePollTimer
+    interval: 1000
+    repeat: true
+    running: root.updateBusy
+    onTriggered: root.request({op: "update_status"})
+  }
+  Timer { interval: 86400000; repeat: true; running: true; onTriggered: root.request({op: "update_status"}) }
   Timer {
     id: setupSlowTimer
     interval: 3000

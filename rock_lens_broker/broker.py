@@ -27,6 +27,7 @@ from .profiles import ProfileError, ProfileStore, RockProfile
 from .quick_return import QuickReturnStore
 from .rock_rest_adapter import RockRestError, RockRestReadOnlyAdapter, SearchBatch
 from .rock_session import RockSessionError, RockSessionProvider
+from .updates import UpdateManager
 
 
 class RockSessionStatusProvider(Protocol):
@@ -101,6 +102,14 @@ class LiveReadAdapter(Protocol):
     def set_origin(self, origin: str) -> None: ...
 
 
+class UpdateStatusProvider(Protocol):
+    def status(
+        self, *, refresh: bool = False, automatic_install: bool = False
+    ) -> dict[str, Any]: ...
+
+    def start_update(self) -> dict[str, Any]: ...
+
+
 class Broker:
     def __init__(
         self,
@@ -114,6 +123,7 @@ class Broker:
         instance_file: Path | None = None,
         profile_file: Path | None = None,
         developer_mode: bool | None = None,
+        updates: UpdateStatusProvider | None = None,
     ) -> None:
         self._state_file = state_file
         self._developer_mode = (
@@ -157,12 +167,13 @@ class Broker:
             state_file.parent
             if state_file
             else Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
-            / "rock-lens"
+            / "rock-arch"
         )
         self._quick_returns_injected = quick_returns is not None
         self._quick_returns = quick_returns or QuickReturnStore(
             self._quick_return_path(), self._origin
         )
+        self._updates = updates or UpdateManager(self._quick_root / "updates.json")
         if (
             not quick_returns
             and self._profile_store.migrated_profile_id

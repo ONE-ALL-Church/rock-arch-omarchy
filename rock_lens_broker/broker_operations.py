@@ -9,6 +9,7 @@ from .origin import OriginError, validate_rock_origin
 from .profiles import ProfileError, RockProfile, default_profile_name
 from .rock_rest_adapter import RockRestError
 from .rock_session import RockSessionError
+from .updates import UpdateError
 
 if TYPE_CHECKING:
     from .broker import Broker
@@ -36,6 +37,9 @@ class BrokerOperations:
             "profile_sign_out": self._profile_sign_out,
             "profile_remove": self._profile_remove,
             "preferences_update": self._preferences_update,
+            "update_status": self._update_status,
+            "update_check": self._update_check,
+            "update_start": self._update_start,
             "recent_links_clear": self._recent_links_clear,
             "magnus_browse": self._magnus_browse,
             "magnus_preview": self._magnus_preview,
@@ -61,13 +65,17 @@ class BrokerOperations:
             broker._probe_magnus()
         rock = broker._session.status()
         magnus = broker._magnus.status()
+        profiles = broker._profile_store.snapshot()
         return broker._ok(
             context=broker._context.value,
             developerMode=broker._developer_mode,
             rock=rock,
             instance=broker._instance_status(),
             magnus=magnus,
-            profiles=broker._profile_store.snapshot(),
+            profiles=profiles,
+            update=broker._updates.status(
+                automatic_install=profiles["preferences"]["automaticUpdates"]
+            ),
             capabilities=broker.capabilities(rock, magnus),
             categories=list(broker._mock.categories()),
         )
@@ -203,10 +211,40 @@ class BrokerOperations:
     def _preferences_update(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
         try:
-            broker._profile_store.update_preferences(raw.get("preferences"))
+            preferences = broker._profile_store.update_preferences(
+                raw.get("preferences")
+            )
         except ProfileError as error:
             return broker._error(str(error))
-        return broker._profile_response()
+        response = broker._profile_response()
+        response["update"] = broker._updates.status(
+            automatic_install=preferences["automaticUpdates"]
+        )
+        return response
+
+    def _update_status(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        preferences = self.broker._profile_store.preferences()
+        return self.broker._ok(
+            update=self.broker._updates.status(
+                automatic_install=preferences["automaticUpdates"]
+            )
+        )
+
+    def _update_check(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        preferences = self.broker._profile_store.preferences()
+        return self.broker._ok(
+            update=self.broker._updates.status(
+                refresh=True,
+                automatic_install=preferences["automaticUpdates"],
+            )
+        )
+
+    def _update_start(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        try:
+            update = self.broker._updates.start_update()
+        except UpdateError as error:
+            return self.broker._error(str(error))
+        return self.broker._ok(update=update)
 
     def _recent_links_clear(self, _raw: dict[str, Any]) -> dict[str, Any]:
         if not self.broker._quick_returns.clear():

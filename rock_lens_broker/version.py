@@ -1,4 +1,4 @@
-"""Release metadata shared by Rock Lens network clients."""
+"""Release metadata shared by Rock Arch network clients."""
 
-VERSION = "0.14.0"
-HTTP_USER_AGENT = "Rock-Lens/0.14"
+VERSION = "0.15.0"
+HTTP_USER_AGENT = "Rock-Arch/0.15"

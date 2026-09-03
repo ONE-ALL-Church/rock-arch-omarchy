@@ -11,7 +11,7 @@ RowLayout {
   spacing: Style.spacing.sm
 
   Text {
-    text: "Rock Lens"
+    text: "Rock Arch"
     color: Color.foreground
     font.pixelSize: Style.font.title
     font.bold: true
@@ -74,7 +74,7 @@ RowLayout {
     Text {
       id: settingsLabel
       anchors.centerIn: parent
-      text: "Settings"
+      text: "Settings" + (navigation.controller.updateAvailable ? "  ●" : "")
       color: Color.foreground
       font.bold: navigation.controller.viewMode === "settings"
     }

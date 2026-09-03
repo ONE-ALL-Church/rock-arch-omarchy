@@ -11,7 +11,7 @@ class Context(StrEnum):
     PROD = "PROD"
 
 
-DEVELOPER_MODE_ENV = "ROCK_LENS_DEVELOPER_MODE"
+DEVELOPER_MODE_ENV = "ROCK_ARCH_DEVELOPER_MODE"
 
 
 def developer_mode_enabled() -> bool:

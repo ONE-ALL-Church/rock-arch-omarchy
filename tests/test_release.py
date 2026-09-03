@@ -14,7 +14,7 @@ class ReleaseContractTests(unittest.TestCase):
         pyproject = tomllib.loads(
             (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         )
-        plugin_root = ROOT / "plugin/oneall.rock-lens"
+        plugin_root = ROOT / "plugin/oneall.rock-arch"
         qml = "\n".join(
             path.read_text(encoding="utf-8")
             for path in sorted(plugin_root.glob("*.qml"))
@@ -22,25 +22,28 @@ class ReleaseContractTests(unittest.TestCase):
 
         self.assertEqual(manifest["version"], VERSION)
         self.assertEqual(pyproject["project"]["version"], VERSION)
-        self.assertIn(f"Rock Lens {VERSION} ", qml)
-        self.assertEqual(HTTP_USER_AGENT, f"Rock-Lens/{'.'.join(VERSION.split('.')[:2])}")
+        self.assertIn(f'property string currentVersion: "{VERSION}"', qml)
+        self.assertEqual(HTTP_USER_AGENT, f"Rock-Arch/{'.'.join(VERSION.split('.')[:2])}")
 
     def test_root_manifest_describes_a_distributable_plugin(self):
         manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
         entry_point = manifest["entryPoints"]["barWidget"]
 
         self.assertEqual(manifest["schemaVersion"], 1)
-        self.assertEqual(manifest["id"], "oneall.rock-lens")
+        self.assertEqual(manifest["id"], "oneall.rock-arch")
+        self.assertEqual(manifest["name"], "Rock Arch")
+        self.assertEqual(manifest["description"], "Bridging Rock RMS and Omarchy")
         self.assertTrue((ROOT / entry_point).is_file())
-        self.assertFalse((ROOT / "plugin/oneall.rock-lens/manifest.json").exists())
+        self.assertFalse((ROOT / "plugin/oneall.rock-arch/manifest.json").exists())
 
     def test_public_install_url_is_not_a_placeholder(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn(
-            "https://github.com/bscottdavis/rock-lens-omarchy.git",
+            "https://github.com/bscottdavis/rock-arch-omarchy.git",
             readme,
         )
         self.assertNotIn("github.com/OWNER/", readme)
+        self.assertIn("# Rock Arch — Bridging Rock RMS and Omarchy", readme)
 
     def test_obsolete_openid_surface_is_not_distributed(self):
         self.assertFalse((ROOT / "rock_lens_broker/auth.py").exists())
@@ -50,7 +53,7 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_ci_dependencies_and_broker_interpreter_are_pinned(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        qml = (ROOT / "plugin/oneall.rock-lens/RockLens.qml").read_text(
+        qml = (ROOT / "plugin/oneall.rock-arch/RockLens.qml").read_text(
             encoding="utf-8"
         )
 

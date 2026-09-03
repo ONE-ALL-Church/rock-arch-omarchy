@@ -33,6 +33,7 @@ class SecretToolStore:
         return bool(self.executable)
 
     def _attributes(self, context: Context, kind: str) -> list[str]:
+        # Stable keyring namespace: changing this would orphan saved logins.
         return ["application", "rock-lens", "context", context.value, "kind", kind]
 
     def lookup(self, context: Context, kind: str) -> str | None:
@@ -62,7 +63,7 @@ class SecretToolStore:
                 [
                     self.executable,
                     "store",
-                    f"--label=Rock Lens {context.value} {kind}",
+                    f"--label=Rock Arch {context.value} {kind}",
                     *self._attributes(context, kind),
                 ],
                 input=value.encode("utf-8"),
