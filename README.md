@@ -219,7 +219,7 @@ omarchy plugin update oneall.rock-arch
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
 | Workspaces | Tab / Shift+Tab | — | `Esc` closes | `Ctrl+1` Search, `Ctrl+2` Links, `Alt+K` Knowledge, `Ctrl+3` Magnus, `Ctrl+4` Settings |
-| Search / Recent | Up / Down | Enter or Space | Backspace resumes editing | `X` or Delete clears recents |
+| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Alt+K` opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
 | Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |
@@ -230,8 +230,9 @@ omarchy plugin update oneall.rock-arch
 
 The first Recent Link is selected when Search opens; the first matching result
 is selected when a query completes. Selection uses the same visible treatment
-in every list. Backspace from a selected item returns to the search field and
-deletes at the cursor, allowing immediate refinement.
+in every list. Down stops on the final Search or Recent row; use Tab or `Ctrl+2`
+when you want to move to Personal Links. Backspace from a selected item returns
+to the search field and deletes at the cursor, allowing immediate refinement.
 
 ## Terminal and agent CLI
 

@@ -62,6 +62,19 @@ class QmlNavigationTests(unittest.TestCase):
         )
         self.assertEqual(source.count("RockLensSelectionChrome {"), 5)
 
+    def test_down_arrow_stays_on_the_last_search_or_recent_item(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "else if (nextSearchItem >= activeSearchCount) "
+            "selectSearchItem(activeSearchCount - 1)",
+            source,
+        )
+        self.assertNotIn(
+            "else if (nextSearchItem >= activeSearchCount) selectPersonalLink(0)",
+            source,
+        )
+
     def test_all_navigable_rows_share_safe_selection_spacing(self):
         source = all_qml_source()
         selection = SELECTION_PATH.read_text(encoding="utf-8")

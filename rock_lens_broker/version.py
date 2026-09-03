@@ -1,4 +1,4 @@
 """Release metadata shared by Rock Arch network clients."""
 
-VERSION = "0.25.1"
+VERSION = "0.25.2"
 HTTP_USER_AGENT = "Rock-Arch/0.25"

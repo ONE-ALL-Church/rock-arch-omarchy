@@ -5,6 +5,13 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-09-03
+
+### Fixed
+
+- Keep Down-arrow navigation on the final Search or Recent Link instead of
+  unexpectedly advancing into the Personal Links panel.
+
 ## [0.25.1] - 2026-09-03
 
 ### Fixed

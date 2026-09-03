@@ -79,7 +79,7 @@ Magnus use deterministic preview fixtures.
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
 | Views | Tab / Shift+Tab | — | Esc | Ctrl+1 Search, Ctrl+2 Personal, Alt+K Knowledge, Ctrl+3 Magnus, Ctrl+4 Settings |
-| Search / Recent | Up / Down | Enter or Space | Backspace edits search | X or Delete clears Recent Links |
+| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace edits search | X or Delete clears Recent Links |
 | Knowledge results | Up / Down | Enter opens detail | Backspace edits search | `Alt+K` opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space follows actions and related items | Esc walks Back history | Open source |
 | Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |

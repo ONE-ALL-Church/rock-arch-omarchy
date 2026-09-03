@@ -38,7 +38,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.25.1"
+  property string currentVersion: "0.25.2"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -1403,7 +1403,7 @@ Panel {
       }
       var nextSearchItem = searchCursor + dy
       if (nextSearchItem < 0) focusSearch()
-      else if (nextSearchItem >= activeSearchCount) selectPersonalLink(0)
+      else if (nextSearchItem >= activeSearchCount) selectSearchItem(activeSearchCount - 1)
       else selectSearchItem(nextSearchItem)
       return
     }
