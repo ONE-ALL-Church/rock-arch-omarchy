@@ -70,17 +70,21 @@ push to `main` and on pull requests.
 
 ## Public Knowledge boundary
 
-- Knowledge is an explicit scope entered with `kb:`, `knowledge:`, the visible
-  selector, or `Alt+K`; unscoped and entity-prefixed searches remain local to
-  the selected Rock instance.
+- Knowledge is a dedicated workspace entered from its tab or `Alt+K`.
+  `kb:` and `knowledge:` transfer a main-Search query into that workspace;
+  unscoped and entity-prefixed searches remain local to the selected Rock
+  instance.
 - Requests use redirect-free GETs to the fixed public Rock Agent KB origin and
   include no Rock cookie, credentials, profile details, or instance origin.
-- Searches require at least three characters, return at most ten transformed
-  rows, and are capped at 512 KiB. Exact details are capped at 2 MiB, with at
-  most 20,000 characters of plain body text exposed to QML.
-- Result IDs and external source URLs remain broker-private. QML receives an
-  opaque ID; opening a source is a separate action guarded by strict public
-  HTTPS URL validation.
+- Searches return at most ten transformed rows and are capped at 512 KiB.
+  Generic and community searches require three characters; locally filtered
+  Model Map, Lava, and concept areas require two. Fixed collections are capped
+  at 3 MiB and exact details at 2 MiB, with at most 20,000 characters of plain
+  body text exposed to QML.
+- Result IDs, structured related targets, and external source URLs remain
+  broker-private. QML receives opaque IDs for results and related items;
+  opening a source is a separate action guarded by strict public HTTPS URL
+  validation.
 - Search and detail caches are memory-only and expire after five minutes.
   Knowledge results are not added to Recent Links.
 

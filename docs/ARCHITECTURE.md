@@ -164,25 +164,31 @@ authoritative server-side boundary.
 
 ## Public Rock Knowledge boundary
 
-Public Knowledge search is a separate trust path from live Rock search. The
-broker recognizes only the leading `kb:` and `knowledge:` scopes. Normal,
-unscoped, and entity-prefixed text can never reach the external service. QML
-also exposes the same explicit transition through the visible Knowledge button
-and `Alt+K` shortcut, and shows that the resulting query leaves the computer.
+Public Knowledge search is a separate trust path from live Rock search. A
+dedicated Knowledge workspace and `Alt+K` own the external query flow. The
+leading `kb:` and `knowledge:` prefixes remain quiet main-Search transitions:
+QML moves their remainder into Knowledge before dispatch, so normal unscoped
+and entity-prefixed Rock text can never reach the external service.
 
 `RockKbHttpClient` performs only redirect-free GET requests to the exact
 `https://rock-agent-kb.oneandall.church` origin. It attaches the Rock Arch user
 agent and JSON accept header only. The client has no reference to the Rock
 session or profile stores, so it cannot attach a cookie, credential, instance
 domain, profile identifier, Personal Link, Recent Link, or Rock entity result.
-Search requires at least three characters, asks for at most ten compact results
-at `source_backed` or stronger, and caps responses at 512 KiB. Exact details are
-capped at 2 MiB; only 20,000 characters of plain body text cross QML.
+Generic, issue, idea, and recipe search requires at least three characters;
+local Model Map, Lava-context, and concept filtering accepts two. Each area
+returns at most ten rows. The redirect-free client uses only fixed GET routes
+for generic search, exact results, Model Map, Lava contexts, issues, ideas, and
+concept guides. Search responses are capped at 512 KiB, bounded collections at
+3 MiB, and exact details at 2 MiB; only 20,000 characters of plain body text
+cross QML.
 
 Both service schemas are checked before use. Result IDs and source URLs remain
 inside an in-process HMAC registry; QML receives only `kb-` opaque IDs, bounded
 titles/snippets, trust labels, version status, public body text, attribution,
-and a source hostname. Opening a source requires a separately selected detail,
+a source hostname, and bounded related-item rows. Related result IDs, Model Map
+slugs, Lava roots, and concept IDs are registered behind the same opaque-ID
+boundary; QML cannot provide an endpoint or raw target. Opening a source requires a separately selected detail,
 an explicit action, and an HTTPS URL with no credentials, custom port, local
 hostname, IP literal, control character, or redirect. Knowledge results never
 enter profile-scoped Recent Links. Search and exact details are cached only in

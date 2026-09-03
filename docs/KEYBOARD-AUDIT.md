@@ -3,7 +3,7 @@
 Audited 2026-09-02 against the installed Omarchy shell. The review covered
 every Rock Arch surface: login and Finish setup onboarding, header navigation, Search and Recent
 Links, Personal Links, Magnus browsing and file actions, build confirmation,
-Settings, and the explicit public Knowledge scope.
+Settings, and the dedicated public Knowledge workspace.
 
 ## Outcome
 
@@ -30,10 +30,13 @@ only in PROD and only when the active Rock profile reports access.
    returns to the search field while deleting at the cursor. `X` or `Delete`
    opens a focused, escapable clear confirmation. Empty-state guidance now
    reflects the actual view.
-4. **Rock Knowledge — healthy.** The visible Knowledge selector and `Alt+K`
-   enter the same `kb:` scope. Up/Down selects results, Enter opens the selected
-   detail, Tab moves between Back and Open source, and Esc returns to the result
-   list. The scope visibly warns that its query goes to a public service.
+4. **Rock Knowledge — healthy.** The dedicated Knowledge tab and `Alt+K` open
+   the public workspace; typing `kb:` in Search transfers there without adding
+   controls to the Search UI. Up/Down selects results, Enter opens the selected
+   detail, Tab moves through Back, Open source, and related items, and Esc walks
+   the nested detail history. The workspace visibly warns that its query goes
+   to a public service and teaches `mm:`, `is:`, `idea:`, `lava:`, `recipe:`,
+   and `guide:` search areas.
 5. **Personal Links — healthy.** The first item is selected on entry, Up/Down
    moves, Enter opens, and the view resets and reveals its selection instead of
    inheriting a stale scroll offset from another panel.
@@ -68,10 +71,10 @@ only the update controls.
 
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
-| Views | Tab / Shift+Tab | — | Esc | Ctrl+1 Search, Ctrl+2 Personal, Ctrl+3 Magnus, Ctrl+4 Settings |
+| Views | Tab / Shift+Tab | — | Esc | Ctrl+1 Search, Ctrl+2 Personal, Alt+K Knowledge, Ctrl+3 Magnus, Ctrl+4 Settings |
 | Search / Recent | Up / Down | Enter or Space | Backspace edits search | X or Delete clears Recent Links |
-| Knowledge results | Up / Down | Enter opens detail | Backspace edits search | `Alt+K` enters scope |
-| Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc returns to results | Open source |
+| Knowledge results | Up / Down | Enter opens detail | Backspace edits search | `Alt+K` opens Knowledge |
+| Knowledge detail | Tab / Shift+Tab | Enter or Space follows actions and related items | Esc walks Back history | Open source |
 | Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | R refresh, B deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | D download, C copy, H hash, O open, R refresh |

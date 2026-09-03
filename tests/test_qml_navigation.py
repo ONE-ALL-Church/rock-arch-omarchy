@@ -18,6 +18,7 @@ MAGNUS_PATH = QML_PATH.with_name("RockLensMagnusPanel.qml")
 NAVIGATION_PATH = QML_PATH.with_name("RockLensNavigationTabs.qml")
 PERSONAL_PATH = QML_PATH.with_name("RockLensPersonalPanel.qml")
 SEARCH_PATH = QML_PATH.with_name("RockLensSearchPanel.qml")
+KNOWLEDGE_PATH = QML_PATH.with_name("RockLensKnowledgePanel.qml")
 SETTINGS_PATH = QML_PATH.with_name("RockLensSettingsPanel.qml")
 SCOPES_PATH = QML_PATH.with_name("RockLensSearchScopes.js")
 PANEL_PATHS = (
@@ -30,6 +31,7 @@ PANEL_PATHS = (
     NAVIGATION_PATH,
     PERSONAL_PATH,
     SEARCH_PATH,
+    KNOWLEDGE_PATH,
     SETTINGS_PATH,
     SCOPES_PATH,
 )
@@ -55,14 +57,14 @@ class QmlNavigationTests(unittest.TestCase):
             "readonly property bool rowSelected: recentRow.index === searchPanel.controller.recentCursor ||",
             source,
         )
-        self.assertEqual(source.count("RockLensSelectionChrome {"), 4)
+        self.assertEqual(source.count("RockLensSelectionChrome {"), 5)
 
     def test_all_navigable_rows_share_safe_selection_spacing(self):
         source = all_qml_source()
         selection = SELECTION_PATH.read_text(encoding="utf-8")
 
-        self.assertEqual(source.count("readonly property bool rowSelected:"), 4)
-        self.assertEqual(source.count("height: Style.space(54)"), 4)
+        self.assertEqual(source.count("readonly property bool rowSelected:"), 5)
+        self.assertEqual(source.count("height: Style.space(54)"), 5)
         self.assertGreaterEqual(
             source.count("anchors.leftMargin: Style.spacing.rowPaddingX"), 4
         )
@@ -175,24 +177,32 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('sequence: "Alt+Shift+C"', source)
         self.assertIn('onActivated: root.applyScope("ct")', source)
 
-    def test_public_knowledge_scope_is_discoverable_private_and_keyboard_complete(self):
+    def test_public_knowledge_panel_is_dedicated_private_and_keyboard_complete(self):
         source = all_qml_source()
+        search = SEARCH_PATH.read_text(encoding="utf-8")
+        knowledge = KNOWLEDGE_PATH.read_text(encoding="utf-8")
 
         self.assertIn('prefix === "kb" || prefix === "knowledge"', source)
         self.assertIn('sequence: "Alt+K"', source)
-        self.assertIn('onActivated: root.applyScope("kb")', source)
-        self.assertIn("Search Rock Knowledge · Alt+K", source)
+        self.assertIn('onActivated: root.openKnowledge()', source)
+        self.assertIn('{ key: "knowledge", label: "Knowledge", shortcut: "Alt+K" }', source)
+        self.assertIn('root.scopeKeyForQuery(text) === "kb"', source)
+        self.assertNotIn("Knowledge", search)
         self.assertIn(
             "Your query is sent to Rock Agent KB. Don't include names or private church data.",
-            source,
+            knowledge,
         )
-        self.assertIn('request({op: "knowledge_result", safeId: item.safeId})', source)
-        self.assertIn('op: "knowledge_open_source", safeId: detail.safeId', source)
+        for hint in ("mm:", "is:", "idea:", "lava:", "recipe:", "guide:"):
+            self.assertIn(hint, knowledge)
+        self.assertIn('request({op: "knowledge_search", query: knowledgeQuery})', source)
+        self.assertIn('request({op: "knowledge_result", safeId: knowledgeResults[index].safeId})', source)
+        self.assertIn('request({op: "knowledge_result", safeId: knowledgeDetail.links[index].safeId})', source)
+        self.assertIn('op: "knowledge_open_source", safeId: knowledgeDetail.safeId', source)
         self.assertIn("function closeKnowledgeDetail()", source)
-        self.assertIn("searchPanel.knowledgeBackButton.forceActiveFocus", source)
+        self.assertIn("knowledgePanel.backButton.forceActiveFocus", source)
         self.assertIn('text: "Back"', source)
-        self.assertIn('text: searchPanel.controller.knowledgeBusy ? "Opening…" : "Open source"', source)
-        self.assertIn("Keys.onEscapePressed: searchPanel.closeKnowledgeDetail()", source)
+        self.assertIn('text: knowledgePanel.controller.knowledgeBusy ? "Opening…" : "Open source"', source)
+        self.assertIn("Keys.onEscapePressed: knowledgePanel.controller.closeKnowledgeDetail()", source)
 
     def test_search_categories_follow_the_active_accounts_detected_access(self):
         source = all_qml_source()
@@ -250,16 +260,18 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
 
         self.assertIn(
-            'else if (viewMode === "personal" || viewMode === "magnus")\n'
+            'else if (viewMode === "knowledge" || viewMode === "magnus")\n'
             "        openSettings(false)",
             source,
         )
         self.assertIn(
             'if (viewMode === "settings") {\n'
             "      if (showMagnus) openMagnus()\n"
-            "      else selectPersonalLink(Math.max(0, navigationCount - 1))",
+            "      else openKnowledge()",
             source,
         )
+        self.assertIn('else if (viewMode === "personal")\n        openKnowledge()', source)
+        self.assertIn('} else if (viewMode === "magnus") {\n      openKnowledge()', source)
         self.assertIn(
             'if (viewMode === "settings")\n        focusSearch()',
             source,
@@ -472,6 +484,7 @@ class QmlNavigationTests(unittest.TestCase):
             "RockLensFinishSetupPanel",
             "RockLensSearchPanel",
             "RockLensPersonalPanel",
+            "RockLensKnowledgePanel",
             "RockLensMagnusPanel",
             "RockLensSettingsPanel",
             "RockLensNavigationTabs",
@@ -479,7 +492,7 @@ class QmlNavigationTests(unittest.TestCase):
             "RockArchBarButton",
         ):
             self.assertIn(f"{component} {{", source)
-        self.assertLess(len(source.splitlines()), 1_750)
+        self.assertLess(len(source.splitlines()), 2_000)
 
 
 if __name__ == "__main__":

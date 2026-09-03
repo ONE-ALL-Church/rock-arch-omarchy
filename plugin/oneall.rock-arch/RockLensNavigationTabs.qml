@@ -18,11 +18,13 @@ RowLayout {
         ? [
             { key: "search", label: "Search", shortcut: "Ctrl+1" },
             { key: "personal", label: "Links", shortcut: "Ctrl+2" },
+            { key: "knowledge", label: "Knowledge", shortcut: "Alt+K" },
             { key: "magnus", label: "Magnus", shortcut: "Ctrl+3" }
           ]
         : [
             { key: "search", label: "Search", shortcut: "Ctrl+1" },
-            { key: "personal", label: "Links", shortcut: "Ctrl+2" }
+            { key: "personal", label: "Links", shortcut: "Ctrl+2" },
+            { key: "knowledge", label: "Knowledge", shortcut: "Alt+K" }
           ])
 
     delegate: Button {
@@ -41,6 +43,7 @@ RowLayout {
       onClicked: {
         if (tab.modelData.key === "search") navigation.controller.focusSearch()
         else if (tab.modelData.key === "personal") navigation.controller.selectPersonalLink(0)
+        else if (tab.modelData.key === "knowledge") navigation.controller.openKnowledge()
         else navigation.controller.openMagnus()
       }
     }

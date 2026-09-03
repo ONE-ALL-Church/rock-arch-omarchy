@@ -3,9 +3,10 @@
 Rock Arch is a keyboard-first Omarchy launcher for Rock RMS. Search People,
 Groups, Group Types, Workflow Types, Scheduled Jobs, Pages, Content Channel
 Types, and Content Channel Items; open Rock Personal Links; and return to
-recently opened records without navigating the full admin UI. An explicit
-Knowledge scope searches the public Rock Agent Knowledge Base for guides,
-troubleshooting, recipes, Model Map records, Lava context, issues, and ideas.
+recently opened records without navigating the full admin UI. A dedicated
+**Knowledge** workspace searches the public Rock Agent Knowledge Base for
+guides, troubleshooting, recipes, Model Map records, Lava contexts, issues,
+and ideas.
 
 Every user signs directly into their own Rock instance. Rock Arch uses Rock's
 native `.ROCK` session for entity Search, Personal Links, and optional Magnus
@@ -147,10 +148,9 @@ route and must resolve to the exact configured Rock origin; Personal Links have
 the same origin restriction.
 
 Searches against the configured Rock instance use fixed Rock REST v1 endpoints;
-Rock Arch does not use the v2 API or accept arbitrary endpoint paths. The
-`kb:` scope uses a separate public, credentialless Knowledge service. Start a
-query with an entity prefix to search only that Rock category. A bare
-prefix such as `g:` lists the first three items in that category.
+Rock Arch does not use the v2 API or accept arbitrary endpoint paths. Start a
+query with an entity prefix to search only that Rock category. A bare prefix
+such as `g:` lists the first three items in that category.
 
 | Category | Short prefix | Full aliases | Shortcut |
 |---|---|---|---|
@@ -162,7 +162,6 @@ prefix such as `g:` lists the first three items in that category.
 | Pages | `pg:` | `page:`, `pages:` | `Alt+Shift+P` |
 | Content Channel Types | `ct:` | `contenttype:`, `channeltype:`, `channeltypes:` | `Alt+Shift+C` |
 | Content Channel Items | `c:` | `content:`, `item:`, `items:` | `Alt+C` |
-| Public Rock Knowledge | `kb:` | `knowledge:` | `Alt+K` |
 
 For example, `g: youth` calls only the Groups endpoint. Every scope also accepts
 an exact Rock ID or GUID, such as `g: 42` or `p: a81b7c6d-1234-4abc-9876-0123456789ab`.
@@ -177,30 +176,48 @@ text; no slash-command mode is required.
 
 ### Public Rock Knowledge
 
-Click **Knowledge**, press `Alt+K`, or begin a query with `kb:` to enter the
-explicit public-KB scope. For example:
+Open the dedicated **Knowledge** tab or press `Alt+K`. A plain question searches
+all public knowledge. Prefixes narrow the request to one structured area:
+
+| Area | Prefixes | Example |
+|---|---|---|
+| Model Map | `mm:`, `model:` | `mm: Group Member` |
+| Rock issues | `is:`, `issue:` | `is: check-in labels` |
+| Rock ideas | `idea:` | `idea: event duration` |
+| Lava contexts | `lava:`, `lc:` | `lava: workflow` |
+| Recipes | `recipe:` | `recipe: volunteer onboarding` |
+| Concept guides | `guide:`, `concept:` | `guide: groups` |
+
+The Knowledge panel displays these hints whenever its search is empty. The
+older `kb:` and `knowledge:` prefixes remain available as quiet main-Search
+shortcuts: typing either one transfers the text into Knowledge rather than
+mixing public results into the Rock entity list. For example:
 
 ```text
 kb: check-in labels not printing
-kb: Group model Members property
+kb: mm: Group Member
 kb: event duration feature request
 ```
 
-Rock Arch sends only the text after `kb:` to the fixed public
-`rock-agent-kb.oneandall.church` search service. It does not send the selected
+Rock Arch sends only the Knowledge query to the fixed public
+`rock-agent-kb.oneandall.church` service. It does not send the selected
 Rock domain, profile, credentials, cookie, Personal Links, Recent Links, or
 entity results. Because the public service necessarily receives the query, the
-scope displays a reminder not to include names or private church data. Normal
-unscoped and entity-prefixed searches are never forwarded to the KB.
+panel displays a reminder not to include names or private church data. Normal
+main-Search queries and entity-prefixed searches are never forwarded to the KB.
 
 Knowledge results can include guides, task cards, troubleshooting nodes,
 approved claims, structured references, recipes, Model Map records, Lava
 context, and public Rock issues or ideas. Results show their source authority;
 community issue and idea reports remain explicitly unreviewed. Enter opens a
-bounded plain-text detail inside Rock Arch. **Open source** is a separate action
-that validates the cited external HTTPS target before passing it to the browser.
-Esc returns to the result list. Search and detail responses are cached in broker
-memory for five minutes and are never added to Recent Links.
+bounded plain-text detail inside Rock Arch. Typed references become selectable
+**Related** links: an article or issue can open its cited Model Map record, a
+Lava context can open the model behind a root, and a model can continue into
+its related models. **Back** walks that in-panel history before returning to
+the result list. **Open source** remains a separate action that validates the
+cited external HTTPS target before passing it to the browser. Search and detail
+responses are cached in broker memory for five minutes and are never added to
+Recent Links.
 
 Displayed knowledge is attributed to the [Rock Agent Knowledge Base by ONE&ALL
 Church](https://github.com/ONE-ALL-Church/rock-agent-kb). Rock Arch uses the
@@ -212,20 +229,21 @@ server, or additional Python package is unnecessary.
 The search field keeps native editing behavior. Up and Down move through Recent
 Links or results and across the Search/Personal Links boundary. Tab cycles the
 search input, its displayed items, and Personal Links (Shift+Tab reverses), and
-Enter or Space opens the selected live target or Knowledge detail. Backspace on
+Enter or Space opens the selected live target. Backspace on
 a highlighted item returns to the search field and deletes at the search cursor,
 so narrowing can continue without an extra navigation step.
 
 Every main view also has a direct keyboard route: `Ctrl+1` opens Search,
 `Ctrl+2` opens Personal Links, `Ctrl+3` opens Magnus when the active profile has
-access, and `Ctrl+4` opens Settings. In an empty Search, press `X` or `Delete`
+access, `Alt+K` opens Knowledge, and `Ctrl+4` opens Settings. In an empty Search, press `X` or `Delete`
 to prepare clearing Recent Links, then `Enter` to confirm or `Esc` to cancel.
 Magnus folders use Up/Down and Enter; `B` prepares a selected mobile-app build.
 In a file preview, Tab walks the visible actions and the matching single-key
 commands are shown on each button (`D`, `C`, `H`, `O`, and `R`). Build and clear
 confirmations always move focus to an explicit action and remain escapable.
-Within Knowledge detail, Tab moves between **Back** and **Open source**; Esc
-returns to the selected result.
+Knowledge uses Up/Down and Enter for results. Within a detail, Tab moves through
+**Back**, **Open source**, and any related items; Enter follows a related item,
+and Esc walks back through the detail history.
 
 People results include compact duplicate-name context when Rock provides it:
 age, conservatively identified spouse, family campus, and connection status.
@@ -270,8 +288,9 @@ full capability boundary.
 - Live reads are fixed REST v1 GET operations with bounded responses and field-level
   output allowlists. QML cannot supply a URL, API path, OData field, or filter
   expression.
-- Public Knowledge search is activated only by `kb:`, `knowledge:`, the visible
-  selector, or `Alt+K`. Its fixed-origin client is redirect-free,
+- Public Knowledge search is isolated in the dedicated Knowledge workspace;
+  `kb:`, `knowledge:`, and `Alt+K` only transition into that workspace. Its
+  fixed-origin client is redirect-free,
   credentialless, response-bounded, and unable to access the Rock session.
   Result and source targets cross QML only as process-local opaque IDs.
 - Personal Links are read-only, restricted to same-origin HTTPS targets, and

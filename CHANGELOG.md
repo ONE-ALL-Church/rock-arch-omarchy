@@ -5,6 +5,33 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-03
+
+### Added
+
+- Add a dedicated **Knowledge** workspace with its own public-search field,
+  privacy boundary, keyboard navigation, and search-area hints for Model Map,
+  issues, ideas, Lava contexts, recipes, and concept guides.
+- Add local `mm:`, `is:`, `issue:`, `idea:`, `lava:`, `recipe:`, and `guide:`
+  routing over the Knowledge service's fixed read-only endpoints.
+- Turn typed relationships in knowledge results into safe in-panel links.
+  Articles and community reports can open referenced Model Map records, Lava
+  roots can open their models, and models can traverse to related models with
+  a nested Back history.
+
+### Changed
+
+- Remove Knowledge controls and explanatory copy from the main Rock Search
+  interface. The existing `kb:` and `knowledge:` prefixes remain as quiet
+  shortcuts that transfer the query into the Knowledge workspace.
+- Route generic Model Map search hits into the richer typed model detail view.
+
+### Security
+
+- Keep every new Knowledge area credentialless, fixed-origin, redirect-free,
+  GET-only, response-bounded, and represented in QML by process-local opaque
+  identifiers. Community issues and ideas retain their unreviewed labels.
+
 ## [0.21.0] - 2026-09-03
 
 ### Added

@@ -115,14 +115,15 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   categories and the optional automatic-update choice when the install supports
   it. The primary action continues to Search; no application navigation
   competes with the active onboarding step.
-- **Search:** search input first, then either Recent Links or results. A quiet
-  Knowledge selector shares the input row; activating it creates an explicit
-  scoped state rather than another top-level tab. Person context stays attached
+- **Search:** search input first, then either Recent Links or Rock results. It
+  contains no public-KB control or tutorial copy. Person context stays attached
   to the person result instead of becoming a competing card.
-- **Knowledge:** the scoped search visibly explains that the query goes to a
-  public service. Results reuse the standard selected-row treatment; Enter
-  opens a plain-text detail with trust/version context, Back, and Open source.
-  The source action remains secondary and Escape always returns to results.
+- **Knowledge:** a dedicated top-level workspace visibly explains that its query
+  goes to a public service. Its empty state teaches the supported area prefixes
+  without crowding Search. Results reuse the standard selected-row treatment;
+  Enter opens a plain-text detail with trust/version context, Back, and Open
+  source. Typed related items continue within the panel, and Back unwinds that
+  detail history before returning to results.
 - **Personal Links:** a single bookmark list with section metadata; no repeated
   keyboard tutorial below the list.
 - **Magnus:** breadcrumb/task title plus Refresh, a shared list treatment, and a

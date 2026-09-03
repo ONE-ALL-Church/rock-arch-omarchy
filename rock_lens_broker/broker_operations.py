@@ -58,6 +58,7 @@ class BrokerOperations:
             "magnus_open": self._magnus_open,
             "magnus_build": self._magnus_build,
             "search": self._search,
+            "knowledge_search": self._knowledge_search,
             "knowledge_result": self._knowledge_result,
             "knowledge_open_source": self._knowledge_open_source,
             "person_quick_look": self._person_quick_look,
@@ -591,6 +592,23 @@ class BrokerOperations:
     def _knowledge_result(self, raw: dict[str, Any]) -> dict[str, Any]:
         return self.broker._knowledge_detail(
             sanitize_text(raw.get("safeId"), 100)
+        )
+
+    def _knowledge_search(self, raw: dict[str, Any]) -> dict[str, Any]:
+        broker = self.broker
+        query = sanitize_text(raw.get("query"), 120)
+        try:
+            results = broker._knowledge.search(query)
+        except RockKbError:
+            return broker._ok(
+                context=broker._context.value,
+                knowledgeResults=[],
+                knowledgeSource="unavailable",
+            )
+        return broker._ok(
+            context=broker._context.value,
+            knowledgeResults=results,
+            knowledgeSource="public",
         )
 
     def _knowledge_open_source(self, raw: dict[str, Any]) -> dict[str, Any]:

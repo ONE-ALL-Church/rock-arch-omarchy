@@ -568,11 +568,18 @@ class BrokerContractTests(unittest.TestCase):
         response = broker.handle(
             {"op": "search", "query": "kb: labels not printing"}
         )
+        dedicated = broker.handle(
+            {"op": "knowledge_search", "query": "mm: group member"}
+        )
 
         self.assertEqual(too_short["results"], [])
         self.assertEqual(response["source"], "knowledge")
         self.assertEqual(response["results"][0]["safeId"], "kb-safe-result")
-        self.assertEqual(knowledge.search_calls, ["labels not printing"])
+        self.assertEqual(dedicated["knowledgeSource"], "public")
+        self.assertEqual(dedicated["knowledgeResults"][0]["safeId"], "kb-safe-result")
+        self.assertEqual(
+            knowledge.search_calls, ["labels not printing", "mm: group member"]
+        )
         self.assertEqual(live.search_calls, [])
 
         detail = broker.handle(

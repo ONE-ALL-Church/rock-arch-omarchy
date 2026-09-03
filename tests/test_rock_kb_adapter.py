@@ -11,6 +11,7 @@ from rock_lens_broker.rock_kb_adapter import (
     RockKbError,
     RockKbHttpClient,
     RockKbReadOnlyAdapter,
+    parse_knowledge_query,
     validate_public_source_url,
 )
 from rock_lens_broker.version import HTTP_USER_AGENT
@@ -101,7 +102,167 @@ class FakeHttp:
         }
 
 
+class ScopedFakeHttp(FakeHttp):
+    def __init__(self):
+        super().__init__()
+        self.model_calls = []
+        self.lava_calls = []
+        self.concept_calls = []
+        self.issue_calls = []
+        self.idea_calls = []
+
+    def models(self):
+        return {
+            "schema": "rock-kb-model-map-model-list-v1",
+            "models": [
+                {
+                    "model_name": "Group",
+                    "model_title": "Group",
+                    "model_slug": "group",
+                    "model_category": "Groups",
+                    "property_count": 115,
+                    "method_count": 55,
+                    "rock_version": "19.2.0",
+                },
+                {
+                    "model_name": "Group Member",
+                    "model_title": "GroupMember",
+                    "model_slug": "group-member",
+                    "model_category": "Groups",
+                    "property_count": 48,
+                    "method_count": 20,
+                    "rock_version": "19.2.0",
+                },
+            ],
+        }
+
+    def model(self, model_slug):
+        self.model_calls.append(model_slug)
+        return {
+            "matched_model": {"model_slug": model_slug},
+            "model": {
+                "identity": {
+                    "model_slug": model_slug,
+                    "model_name": "Group" if model_slug == "group" else "Group Member",
+                    "model_category": "Groups",
+                    "rock_version": "19.2.0",
+                },
+                "counts": {
+                    "properties": 115,
+                    "database_properties": 61,
+                    "lava_properties": 93,
+                    "relationships": 1,
+                    "methods": 55,
+                },
+                "required_fields": [{"name": "Name"}],
+                "relationships": [
+                    {
+                        "property_name": "GroupMembers",
+                        "related_model": "Group Member",
+                        "target_model_slug": "group-member",
+                    }
+                ] if model_slug == "group" else [],
+            },
+        }
+
+    def lava_contexts(self):
+        return {
+            "schema": "rock-kb-lava-context-surface-list-v1",
+            "surfaces": [
+                {
+                    "context_id": "workflow-activate",
+                    "surface_name": "Workflow activation",
+                    "context_family": "workflow",
+                    "surface_type": "workflow_action",
+                    "direct_root_count": 1,
+                    "root_keys": ["Workflow"],
+                    "source_version": "19.2.0",
+                }
+            ],
+        }
+
+    def lava_context(self, context_id):
+        self.lava_calls.append(context_id)
+        return {
+            "schema": "rock-kb-lava-context-surface-result-v2",
+            "status": "ok",
+            "surface": {
+                "context_id": context_id,
+                "surface_name": "Workflow activation",
+                "context_family": "workflow",
+                "surface_type": "workflow_action",
+                "source_version": "19.2.0",
+                "concept_ids": ["workflows"],
+            },
+            "roots": [
+                {
+                    "root_key": "Workflow",
+                    "model_slug": "workflow",
+                    "source_url": "https://github.com/SparkDevNetwork/Rock/blob/develop/Workflow.cs",
+                }
+            ],
+        }
+
+    def concepts(self):
+        return {"rows": [{"concept_id": "groups", "title": "Groups", "source_count": 42}]}
+
+    def concept(self, concept_id):
+        self.concept_calls.append(concept_id)
+        return "# Groups\n\nHow Rock groups are structured."
+
+    def issue_search(self, query, limit=10):
+        self.issue_calls.append((query, limit))
+        return {
+            "schema": "rock-kb-rock-issue-search-v1",
+            "results": [{
+                "id": "rock_issue:core:123",
+                "kind": "rock_issue",
+                "title": "Labels do not print",
+                "snippet": "A community-reported check-in issue.",
+                "authority_tier": "community-unreviewed",
+                "claim_tier": "routing_context_only",
+                "url": "https://github.com/SparkDevNetwork/Rock/issues/123",
+            }],
+        }
+
+    def idea_search(self, query, limit=10):
+        self.idea_calls.append((query, limit))
+        return {"schema": "rock-kb-rock-idea-search-v1", "results": []}
+
+    def result(self, result_id):
+        self.result_calls.append(result_id)
+        return {
+            "schema": "rock-kb-result-v1",
+            "status": "ok",
+            "requested_result_id": result_id,
+            "canonical_result_id": result_id,
+            "result": {
+                "id": result_id,
+                "kind": "task_card",
+                "title": "Diagnose labels",
+                "body": self.body,
+                "url": "",
+                "authority_tier": "community-reviewed",
+                "claim_tier": "source_backed",
+                "rock_versions": ["19.0"],
+                "version_scope_status": "matched",
+                "payload": {
+                    "source_urls": [
+                        "https://github.com/SparkDevNetwork/Rock/blob/develop/example.cs"
+                    ],
+                    "secret": "must-not-cross",
+                },
+            },
+        }
+
+
 class RockKbAdapterTests(unittest.TestCase):
+    def test_local_knowledge_area_prefixes_do_not_change_generic_queries(self):
+        self.assertEqual(parse_knowledge_query("mm: Group"), ("model", "Group"))
+        self.assertEqual(parse_knowledge_query("is: labels"), ("issue", "labels"))
+        self.assertEqual(parse_knowledge_query("lava: workflow"), ("lava", "workflow"))
+        self.assertEqual(parse_knowledge_query("how do groups work"), ("all", "how do groups work"))
+
     def test_http_client_is_fixed_origin_get_only_and_sends_no_rock_credentials(self):
         opener = FakeOpener()
         client = RockKbHttpClient(opener)
@@ -215,6 +376,38 @@ class RockKbAdapterTests(unittest.TestCase):
                 RockKbError, "invalid_knowledge_source"
             ):
                 validate_public_source_url(value)
+
+    def test_model_map_results_open_and_expose_only_opaque_related_models(self):
+        http = ScopedFakeHttp()
+        adapter = RockKbReadOnlyAdapter(http)
+
+        result = adapter.search("mm: group")[0]
+        detail = adapter.detail(result["safeId"])
+
+        self.assertEqual(result["status"], "Rock 19.2.0")
+        self.assertEqual(detail["kind"], "Model Map")
+        self.assertIn("Required fields\nName", detail["body"])
+        self.assertEqual(detail["links"][0]["title"], "Group Member")
+        self.assertNotIn("group-member", json.dumps(detail["links"]))
+
+        related = adapter.detail(detail["links"][0]["safeId"])
+        self.assertEqual(related["title"], "Group Member")
+        self.assertEqual(http.model_calls, ["group", "group-member"])
+
+    def test_lava_concept_and_issue_areas_use_their_bounded_routes(self):
+        http = ScopedFakeHttp()
+        adapter = RockKbReadOnlyAdapter(http)
+
+        lava = adapter.detail(adapter.search("lava: workflow")[0]["safeId"])
+        concept = adapter.detail(adapter.search("guide: groups")[0]["safeId"])
+        issue = adapter.search("is: labels")[0]
+
+        self.assertEqual(lava["links"][0]["kind"], "Model Map")
+        self.assertEqual(concept["body"], "How Rock groups are structured.")
+        self.assertEqual(issue["status"], "Community report · unreviewed")
+        self.assertEqual(http.lava_calls, ["workflow-activate"])
+        self.assertEqual(http.concept_calls, ["groups"])
+        self.assertEqual(http.issue_calls, [("labels", 10)])
 
 
 if __name__ == "__main__":
