@@ -90,7 +90,9 @@ Column {
         Layout.fillWidth: true
         text: magnusPanel.controller.deploymentSummary(
           magnusPanel.controller.pendingMagnusBuildTitle) +
-          ". This starts a production mobile-app build."
+          (magnusPanel.controller.contextName === "DEV"
+            ? ". Preview the confirmation flow without starting a build."
+            : ". This starts a production mobile-app build.")
         textFormat: Text.PlainText
         color: magnusPanel.dim
         font.family: Style.font.family

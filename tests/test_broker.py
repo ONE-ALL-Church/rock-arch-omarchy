@@ -107,7 +107,17 @@ class FakeMagnus:
             "configured": True,
             "state": self.state,
             "mode": "controlled",
-            "capabilities": ["browse", "preview", "hash", "download", "copy", "open", "mobile_app_build"] if self.available else [],
+            "capabilities": [
+                "browse",
+                "preview",
+                "hash",
+                "download",
+                "copy",
+                "open",
+                "mobile_app_build",
+            ]
+            if self.available
+            else [],
             "server": self.server.removeprefix("https://"),
         }
 
@@ -242,9 +252,7 @@ class FakeLive:
             for category in CATEGORIES
             if category not in self.available_categories
         ]
-        return SearchCapabilities(
-            tuple(self.available_categories), tuple(unavailable)
-        )
+        return SearchCapabilities(tuple(self.available_categories), tuple(unavailable))
 
     def search(
         self,
@@ -492,15 +500,9 @@ class BrokerContractTests(unittest.TestCase):
             declined["onboardingSetup"]["enabledCategories"],
             ["People", "Group Types"],
         )
-        self.assertFalse(
-            declined["profiles"]["preferences"]["automaticUpdates"]
-        )
-        self.assertTrue(
-            declined["profiles"]["preferences"]["automaticUpdatesPrompted"]
-        )
-        self.assertTrue(
-            declined["profiles"]["preferences"]["onboardingSetupCompleted"]
-        )
+        self.assertFalse(declined["profiles"]["preferences"]["automaticUpdates"])
+        self.assertTrue(declined["profiles"]["preferences"]["automaticUpdatesPrompted"])
+        self.assertTrue(declined["profiles"]["preferences"]["onboardingSetupCompleted"])
         self.assertEqual(updates.status_calls[-1], (False, False))
 
         enabled = broker.handle(
@@ -512,9 +514,7 @@ class BrokerContractTests(unittest.TestCase):
         )
         self.assertTrue(enabled["onboardingSetup"]["automaticUpdates"])
         self.assertTrue(enabled["profiles"]["preferences"]["automaticUpdates"])
-        self.assertTrue(
-            enabled["profiles"]["preferences"]["automaticUpdatesPrompted"]
-        )
+        self.assertTrue(enabled["profiles"]["preferences"]["automaticUpdatesPrompted"])
         self.assertEqual(updates.status_calls[-1], (False, True))
 
         self.assertEqual(
@@ -548,9 +548,7 @@ class BrokerContractTests(unittest.TestCase):
         status = broker.handle({"op": "status"})
         self.assertEqual(status["context"], "PROD")
         self.assertFalse(status["developerMode"])
-        mock = next(
-            item for item in status["capabilities"] if item["name"] == "mock"
-        )
+        mock = next(item for item in status["capabilities"] if item["name"] == "mock")
         self.assertEqual(mock["state"], "unknown")
         self.assertEqual(mock["detail"], "Developer mode disabled")
         self.assertEqual(self.state.read_text(encoding="utf-8"), "PROD\n")
@@ -571,8 +569,9 @@ class BrokerContractTests(unittest.TestCase):
             self.assertTrue(status["developerMode"])
             self.assertEqual(status["context"], "DEV")
         for value in ("true", "yes", "0", ""):
-            with self.subTest(value=value), patch.dict(
-                os.environ, {DEVELOPER_MODE_ENV: value}
+            with (
+                self.subTest(value=value),
+                patch.dict(os.environ, {DEVELOPER_MODE_ENV: value}),
             ):
                 self.assertFalse(developer_mode_enabled())
 
@@ -609,7 +608,9 @@ class BrokerContractTests(unittest.TestCase):
         )
         self.assertEqual(parse_search_query("unknown: youth"), ("unknown: youth", None))
 
-    def test_knowledge_scope_is_explicit_credentialless_and_opens_only_opaque_sources(self):
+    def test_knowledge_scope_is_explicit_credentialless_and_opens_only_opaque_sources(
+        self,
+    ):
         live = FakeLive()
         knowledge = FakeKnowledge()
         opened = []
@@ -624,9 +625,7 @@ class BrokerContractTests(unittest.TestCase):
         )
 
         too_short = broker.handle({"op": "search", "query": "kb: ab"})
-        response = broker.handle(
-            {"op": "search", "query": "kb: labels not printing"}
-        )
+        response = broker.handle({"op": "search", "query": "kb: labels not printing"})
         dedicated = broker.handle(
             {"op": "knowledge_search", "query": "mm: group member"}
         )
@@ -641,17 +640,13 @@ class BrokerContractTests(unittest.TestCase):
         )
         self.assertEqual(live.search_calls, [])
 
-        detail = broker.handle(
-            {"op": "knowledge_result", "safeId": "kb-safe-result"}
-        )
+        detail = broker.handle({"op": "knowledge_result", "safeId": "kb-safe-result"})
         self.assertEqual(detail["knowledgeDetail"]["kind"], "Task card")
         opened_response = broker.handle(
             {"op": "knowledge_open_source", "safeId": "kb-safe-result"}
         )
         self.assertTrue(opened_response["knowledgeOpened"])
-        self.assertEqual(
-            opened, ["https://community.rockrms.com/documentation"]
-        )
+        self.assertEqual(opened, ["https://community.rockrms.com/documentation"])
         self.assertEqual(
             broker.handle(
                 {
@@ -686,9 +681,10 @@ class BrokerContractTests(unittest.TestCase):
         self.assertTrue(
             all(
                 states[name] != "healthy"
-                for name in ("rock_session", "rock_rest", "sql", "magnus")
+                for name in ("rock_session", "rock_rest", "sql")
             )
         )
+        self.assertEqual(states["magnus"], "healthy")
 
     def test_status_exposes_only_native_rock_session_authentication(self):
         status = self.broker.handle({"op": "status"})
@@ -764,9 +760,7 @@ class BrokerContractTests(unittest.TestCase):
             detected["searchCapabilities"]["availableCategories"],
             ["People", "Groups", "Pages"],
         )
-        self.assertIn(
-            "Jobs", detected["searchCapabilities"]["unavailableCategories"]
-        )
+        self.assertIn("Jobs", detected["searchCapabilities"]["unavailableCategories"])
 
         denied = broker.handle({"op": "search", "query": "j: nightly"})
         self.assertEqual(denied["source"], "not_authorized")
@@ -953,21 +947,15 @@ class BrokerContractTests(unittest.TestCase):
             "accepted",
         )
         self.assertEqual(
-            broker.handle({"op": "magnus_builds"})["magnusBuilds"][0][
-                "buildId"
-            ],
+            broker.handle({"op": "magnus_builds"})["magnusBuilds"][0]["buildId"],
             build_id,
         )
         self.assertEqual(built["quickReturns"][0]["kind"], "Magnus Build")
-        self.assertRegex(
-            built["quickReturns"][0]["lastUsedAt"], r"^\d{4}-\d{2}-\d{2}T"
-        )
+        self.assertRegex(built["quickReturns"][0]["lastUsedAt"], r"^\d{4}-\d{2}-\d{2}T")
         self.assertNotIn("Build/mobileapps/14", json.dumps(built))
         recent_id = built["quickReturns"][0]["safeId"]
         self.assertEqual(
-            broker.handle({"op": "open_navigation", "safeId": recent_id})[
-                "error"
-            ],
+            broker.handle({"op": "open_navigation", "safeId": recent_id})["error"],
             "build_confirmation_required",
         )
         self.assertEqual(len(magnus.build_calls), 1)
@@ -975,9 +963,7 @@ class BrokerContractTests(unittest.TestCase):
         repeat_confirmation = broker.handle(
             {"op": "activate_recent", "safeId": recent_id}
         )
-        self.assertEqual(
-            repeat_confirmation["error"], "build_confirmation_required"
-        )
+        self.assertEqual(repeat_confirmation["error"], "build_confirmation_required")
         self.assertEqual(len(magnus.build_calls), 1)
         repeated = broker.handle(
             {"op": "activate_recent", "safeId": recent_id, "confirmed": True}
@@ -1003,9 +989,9 @@ class BrokerContractTests(unittest.TestCase):
         )
         broker.handle({"op": "set_context", "context": "PROD"})
 
-        description = broker.handle(
-            {"op": "describe", "safeId": "magnus-opaque-app"}
-        )["description"]
+        description = broker.handle({"op": "describe", "safeId": "magnus-opaque-app"})[
+            "description"
+        ]
         self.assertEqual(description["actions"], ["browse", "build"])
         preview = broker.handle(
             {
@@ -1248,9 +1234,7 @@ class BrokerContractTests(unittest.TestCase):
             developer_mode=True,
         )
         broker.handle({"op": "set_context", "context": "PROD"})
-        recent = broker.handle(
-            {"op": "navigation_status", "section": "quick_returns"}
-        )
+        recent = broker.handle({"op": "navigation_status", "section": "quick_returns"})
         self.assertEqual(recent, {"ok": True, "quickReturns": []})
         self.assertEqual(live.personal_link_calls, 0)
 
@@ -1291,19 +1275,64 @@ class BrokerContractTests(unittest.TestCase):
         cleared = broker.handle({"op": "recent_links_clear"})
         self.assertEqual(cleared, {"ok": True, "quickReturns": []})
         self.assertEqual(
-            broker.handle(
-                {"op": "navigation_status", "section": "quick_returns"}
-            ),
+            broker.handle({"op": "navigation_status", "section": "quick_returns"}),
             {"ok": True, "quickReturns": []},
         )
         broker.handle({"op": "set_context", "context": "DEV"})
         dev_navigation = broker.handle({"op": "navigation_status"})
-        self.assertEqual(dev_navigation["personalLinks"], [])
-        self.assertEqual(dev_navigation["quickReturns"], [])
         self.assertEqual(
-            broker.handle({"op": "open_navigation", "safeId": quick_id})["error"],
-            "navigation_requires_prod",
+            dev_navigation["personalLinks"][0]["title"], "Weekend Dashboard"
         )
+        self.assertEqual(dev_navigation["quickReturns"][0]["kind"], "Page")
+        preview = broker.handle(
+            {"op": "open_navigation", "safeId": "mock-link-weekend"}
+        )
+        self.assertIn("no Rock page", preview["previewAction"])
+        self.assertEqual(
+            opened,
+            [
+                "https://rock.example.org/Person/17",
+                "https://rock.example.org/Person/17",
+            ],
+        )
+
+    def test_dev_preview_has_search_links_knowledge_and_safe_magnus_fixtures(self):
+        status = self.broker.handle({"op": "status"})
+        self.assertEqual(status["magnus"]["state"], "available")
+        self.assertEqual(status["magnusBuilds"][0]["title"], "Weekend Mobile")
+
+        search = self.broker.handle({"op": "search", "query": "north"})
+        self.assertGreaterEqual(len({row["category"] for row in search["results"]}), 5)
+        self.assertTrue(all(row["canOpen"] for row in search["results"]))
+
+        knowledge = self.broker.handle(
+            {"op": "knowledge_search", "query": "mm: group member"}
+        )
+        self.assertEqual(knowledge["knowledgeSource"], "preview")
+        knowledge_id = knowledge["knowledgeResults"][0]["safeId"]
+        detail = self.broker.handle({"op": "knowledge_result", "safeId": knowledge_id})[
+            "knowledgeDetail"
+        ]
+        self.assertEqual(detail["kind"], "Model Map")
+        self.assertGreaterEqual(len(detail["links"]), 1)
+
+        root = self.broker.handle({"op": "magnus_browse"})
+        self.assertEqual(root["magnusBrowser"]["items"][0]["title"], "Weekend Mobile")
+        file_id = root["magnusBrowser"]["items"][2]["safeId"]
+        preview = self.broker.handle({"op": "magnus_preview", "safeId": file_id})
+        self.assertTrue(preview["magnusPreview"]["previewAvailable"])
+        download = self.broker.handle({"op": "magnus_download", "safeId": file_id})
+        self.assertTrue(download["magnusDownload"]["previewOnly"])
+
+        build = self.broker.handle(
+            {
+                "op": "magnus_build",
+                "safeId": "mock-magnus-app-weekend",
+                "confirmed": True,
+            }
+        )
+        self.assertTrue(build["magnusBuild"]["previewOnly"])
+        self.assertIn("no deployment", build["magnusBuild"]["message"])
 
     def test_recent_links_clear_does_not_claim_success_after_unlink_failure(self):
         broker = Broker(
@@ -1316,9 +1345,7 @@ class BrokerContractTests(unittest.TestCase):
         with patch.object(broker._quick_returns, "clear", return_value=False):
             response = broker.handle({"op": "recent_links_clear"})
 
-        self.assertEqual(
-            response, {"ok": False, "error": "recent_links_clear_failed"}
-        )
+        self.assertEqual(response, {"ok": False, "error": "recent_links_clear_failed"})
 
 
 if __name__ == "__main__":

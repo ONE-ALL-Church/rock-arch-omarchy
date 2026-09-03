@@ -117,9 +117,7 @@ class LiveReadAdapter(Protocol):
 
     def person_quick_look(self, safe_id: str) -> dict[str, Any] | None: ...
 
-    def personal_links(
-        self, force_refresh: bool = False
-    ) -> list[dict[str, Any]]: ...
+    def personal_links(self, force_refresh: bool = False) -> list[dict[str, Any]]: ...
 
     def resolve(self, safe_id: str) -> NavigationTarget | None: ...
 
@@ -231,7 +229,9 @@ class Broker:
             and self._profile_store.migrated_profile_id
             and self._origin
         ):
-            self._quick_returns.migrate_from(self._legacy_quick_return_path(self._origin))
+            self._quick_returns.migrate_from(
+                self._legacy_quick_return_path(self._origin)
+            )
         if quick_returns and self._origin:
             self._quick_returns.set_origin(self._origin)
         self._url_opener = url_opener
@@ -269,14 +269,14 @@ class Broker:
     ) -> list[dict[str, str]]:
         rock = rock or self._session.status()
         magnus = magnus or self._magnus.status()
-        rock_health = (
-            HealthState.HEALTHY if rock["configured"] else HealthState.UNKNOWN
-        )
+        rock_health = HealthState.HEALTHY if rock["configured"] else HealthState.UNKNOWN
         magnus_state = magnus.get("state", "unknown")
         magnus_health = (
             HealthState.HEALTHY
             if magnus_state == "available"
-            else HealthState.FAILED if magnus_state == "error" else HealthState.UNKNOWN
+            else HealthState.FAILED
+            if magnus_state == "error"
+            else HealthState.UNKNOWN
         )
         magnus_detail = {
             "available": "Browse, preview, and hash available",
@@ -284,6 +284,8 @@ class Broker:
             "error": "Capability check could not complete",
             "signed_out": "Rock login required",
         }.get(magnus_state, "Capability not checked")
+        if self._context is Context.DEV:
+            magnus_detail = "Preview files and build confirmation"
         return [
             Capability(
                 "mock",
@@ -313,6 +315,15 @@ class Broker:
 
     def _navigation_status(self, section: str) -> dict[str, Any]:
         response: dict[str, Any] = {}
+        if self._context is Context.DEV:
+            if section in {"all", "personal"}:
+                response.update(
+                    personalLinks=self._mock.personal_links(),
+                    personalLinksAvailable=True,
+                )
+            if section in {"all", "quick_returns"}:
+                response["quickReturns"] = self._mock.quick_returns()
+            return self._ok(**response)
         if section in {"all", "personal"}:
             personal_links: list[dict[str, Any]] = []
             available = False
@@ -387,7 +398,11 @@ class Broker:
 
     def _open_navigation(self, safe_id: str) -> dict[str, Any]:
         if self._context is not Context.PROD:
-            return self._error("navigation_requires_prod")
+            return (
+                self._ok(previewAction="Preview only · no Rock page was opened")
+                if self._mock.has_navigation_item(safe_id)
+                else self._error("not_found")
+            )
         target = self._live.resolve(safe_id) or self._quick_returns.resolve(safe_id)
         if not isinstance(target, NavigationTarget):
             return self._error("not_found")
@@ -439,7 +454,21 @@ class Broker:
 
     def _activate_recent(self, safe_id: str, confirmed: bool = False) -> dict[str, Any]:
         if self._context is not Context.PROD:
-            return self._error("navigation_requires_prod")
+            if not self._mock.has_navigation_item(safe_id):
+                return self._error("not_found")
+            if self._mock.is_recent_build(safe_id):
+                if not confirmed:
+                    return self._error("build_confirmation_required")
+                return self._ok(
+                    magnusBuild={
+                        "title": "Weekend Mobile",
+                        "message": "Preview complete · no deployment was started",
+                        "previewOnly": True,
+                    },
+                    magnusBuilds=self._mock.magnus_builds(),
+                    quickReturns=self._mock.quick_returns(),
+                )
+            return self._ok(previewAction="Preview only · no Rock page was opened")
         target = self._quick_returns.resolve(safe_id)
         if not isinstance(target, NavigationTarget):
             return self._error("not_found")
@@ -482,9 +511,7 @@ class Broker:
                 self._quick_root / "quick-returns-unconfigured.json"
             )
             if not self._build_receipts_injected:
-                self._build_receipts = BuildReceiptStore(
-                    self._build_receipt_path()
-                )
+                self._build_receipts = BuildReceiptStore(self._build_receipt_path())
             self._live_health = HealthState.UNKNOWN
             return
         self._active_profile_id = profile.profile_id
@@ -583,7 +610,10 @@ class Broker:
             resetter()
 
     def _probe_magnus(self, force: bool = False) -> None:
-        if self._context is not Context.PROD or not self._session.status()["configured"]:
+        if (
+            self._context is not Context.PROD
+            or not self._session.status()["configured"]
+        ):
             return
         state = self._magnus.status().get("state", "unknown")
         if not force and state not in {"unknown", "error"}:

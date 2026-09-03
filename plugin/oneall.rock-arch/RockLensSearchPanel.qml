@@ -297,7 +297,9 @@ Column {
 
         Text {
           Layout.fillWidth: true
-          text: "This starts a production mobile-app build."
+          text: searchPanel.controller.contextName === "DEV"
+            ? "Preview the confirmation flow without starting a build."
+            : "This starts a production mobile-app build."
           textFormat: Text.PlainText
           color: searchPanel.dim
           font.family: Style.font.family

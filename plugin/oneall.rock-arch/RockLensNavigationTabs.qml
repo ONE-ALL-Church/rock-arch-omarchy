@@ -63,16 +63,4 @@ RowLayout {
     onClicked: navigation.controller.openSettings(false)
   }
 
-  Button {
-    visible: navigation.controller.developerMode
-    text: navigation.controller.contextName
-    tooltipText: "Switch preview context"
-    foreground: navigation.controller.contextName === "PROD" ? Color.urgent : Color.accent
-    bordered: true
-    fontSize: Style.font.caption
-    horizontalPadding: Style.spacing.md
-    verticalPadding: Style.spacing.xs
-    focusable: false
-    onClicked: navigation.controller.switchContext()
-  }
 }

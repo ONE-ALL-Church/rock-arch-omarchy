@@ -93,7 +93,11 @@ class BrokerOperations:
         if raw.get("probeMagnus") is True:
             broker._probe_magnus()
         rock = broker._session.status()
-        magnus = broker._magnus.status()
+        magnus = (
+            broker._mock.magnus_status()
+            if broker._context is Context.DEV
+            else broker._magnus.status()
+        )
         profiles = broker._profile_store.snapshot()
         return broker._ok(
             context=broker._context.value,
@@ -110,7 +114,11 @@ class BrokerOperations:
             ),
             capabilities=broker.capabilities(rock, magnus),
             categories=list(broker._mock.categories()),
-            magnusBuilds=broker._build_receipts.public_items(),
+            magnusBuilds=(
+                broker._mock.magnus_builds()
+                if broker._context is Context.DEV
+                else broker._build_receipts.public_items()
+            ),
         )
 
     def _doctor(self, raw: dict[str, Any]) -> dict[str, Any]:
@@ -163,9 +171,9 @@ class BrokerOperations:
         magnus_state = str(magnus.get("state") or "unknown")
         check(
             "magnus",
-            "healthy" if magnus_state == "available" else (
-                "error" if magnus_state == "error" else "optional"
-            ),
+            "healthy"
+            if magnus_state == "available"
+            else ("error" if magnus_state == "error" else "optional"),
             {
                 "available": "Available",
                 "error": "Access check failed",
@@ -193,9 +201,7 @@ class BrokerOperations:
             if any(item["state"] in {"error", "warning"} for item in checks)
             else "healthy"
         )
-        return broker._ok(
-            doctor={"state": overall, "redacted": True, "checks": checks}
-        )
+        return broker._ok(doctor={"state": overall, "redacted": True, "checks": checks})
 
     def _describe(self, raw: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -247,9 +253,7 @@ class BrokerOperations:
 
     def _ui_handoff_set(self, raw: dict[str, Any]) -> dict[str, Any]:
         try:
-            handoff = self.broker._set_ui_handoff(
-                raw.get("view"), raw.get("query", "")
-            )
+            handoff = self.broker._set_ui_handoff(raw.get("view"), raw.get("query", ""))
         except ValueError as error:
             return self.broker._error(str(error))
         return self.broker._ok(uiHandoffReady=handoff)
@@ -283,6 +287,11 @@ class BrokerOperations:
         )
 
     def _magnus_status(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        if self.broker._context is Context.DEV:
+            return self.broker._ok(
+                magnus=self.broker._mock.magnus_status(),
+                magnusBuilds=self.broker._mock.magnus_builds(),
+            )
         self.broker._probe_magnus()
         return self.broker._ok(
             magnus=self.broker._magnus.status(),
@@ -462,10 +471,7 @@ class BrokerOperations:
         broker = self.broker
         automatic_updates = raw.get("automaticUpdates")
         categories = raw.get("enabledCategories")
-        if (
-            not isinstance(automatic_updates, bool)
-            or not isinstance(categories, list)
-        ):
+        if not isinstance(automatic_updates, bool) or not isinstance(categories, list):
             return broker._error("invalid_onboarding_preferences")
         capabilities = self._search_capability_payload()
         if capabilities["state"] != "ready":
@@ -529,6 +535,11 @@ class BrokerOperations:
         return self.broker._ok(update=update)
 
     def _recent_links_clear(self, _raw: dict[str, Any]) -> dict[str, Any]:
+        if self.broker._context is Context.DEV:
+            return self.broker._ok(
+                quickReturns=self.broker._mock.quick_returns(),
+                previewAction="Preview only · Recent Links were not changed",
+            )
         if not self.broker._quick_returns.clear():
             return self.broker._error("recent_links_clear_failed")
         return self.broker._ok(quickReturns=[])
@@ -540,12 +551,24 @@ class BrokerOperations:
             else self.broker._error("magnus_requires_prod")
         )
 
-    def _safe_magnus_id(self, raw: dict[str, Any], default: object = None) -> str | None:
+    def _safe_magnus_id(
+        self, raw: dict[str, Any], default: object = None
+    ) -> str | None:
         value = raw.get("safeId", default)
         return sanitize_text(value, 100) if isinstance(value, str) else None
 
     def _magnus_browse(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
+        if broker._context is Context.DEV:
+            safe_id = self._safe_magnus_id(raw, "")
+            browser = broker._mock.magnus_browse(safe_id or "")
+            if safe_id is None or browser is None:
+                return broker._error("invalid_magnus_item")
+            return broker._ok(
+                magnus=broker._mock.magnus_status(),
+                magnusBrowser=browser,
+                magnusBuilds=broker._mock.magnus_builds(),
+            )
         if error := self._require_prod():
             return error
         safe_id = self._safe_magnus_id(raw, "")
@@ -562,14 +585,46 @@ class BrokerOperations:
         )
 
     def _magnus_preview(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return self._magnus_value(
-            raw, "preview", "magnusPreview", include_status=True
-        )
+        if self.broker._context is Context.DEV:
+            safe_id = self._safe_magnus_id(raw)
+            preview = self.broker._mock.magnus_preview(safe_id or "")
+            if safe_id is None or preview is None:
+                return self.broker._error("invalid_magnus_item")
+            return self.broker._ok(
+                magnus=self.broker._mock.magnus_status(),
+                magnusPreview=preview,
+            )
+        return self._magnus_value(raw, "preview", "magnusPreview", include_status=True)
 
     def _magnus_download(self, raw: dict[str, Any]) -> dict[str, Any]:
+        if self.broker._context is Context.DEV:
+            preview = self.broker._mock.magnus_preview(self._safe_magnus_id(raw) or "")
+            if preview is None:
+                return self.broker._error("invalid_magnus_item")
+            return self.broker._ok(
+                magnusDownload={
+                    "title": preview["title"],
+                    "savedAs": preview["title"],
+                    "folder": "Preview",
+                    "sizeBytes": preview["sizeBytes"],
+                    "sha256": preview["sha256"],
+                    "previewOnly": True,
+                }
+            )
         return self._magnus_value(raw, "download", "magnusDownload")
 
     def _magnus_hash(self, raw: dict[str, Any]) -> dict[str, Any]:
+        if self.broker._context is Context.DEV:
+            preview = self.broker._mock.magnus_preview(self._safe_magnus_id(raw) or "")
+            if preview is None:
+                return self.broker._error("invalid_magnus_item")
+            return self.broker._ok(
+                magnusHash={
+                    "title": preview["title"],
+                    "sizeBytes": preview["sizeBytes"],
+                    "sha256": preview["sha256"],
+                }
+            )
         return self._magnus_value(raw, "file_hash", "magnusHash")
 
     def _magnus_value(
@@ -596,6 +651,13 @@ class BrokerOperations:
 
     def _magnus_copy(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
+        if broker._context is Context.DEV:
+            safe_id = self._safe_magnus_id(raw)
+            value = raw.get("value")
+            preview = broker._mock.magnus_preview(safe_id or "")
+            if safe_id is None or value not in {"content", "hash"} or preview is None:
+                return broker._error("invalid_magnus_item")
+            return broker._ok(magnusCopied={"value": value, "previewOnly": True})
         if error := self._require_prod():
             return error
         safe_id = self._safe_magnus_id(raw)
@@ -612,6 +674,12 @@ class BrokerOperations:
 
     def _magnus_open(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
+        if broker._context is Context.DEV:
+            safe_id = self._safe_magnus_id(raw)
+            preview = broker._mock.magnus_preview(safe_id or "")
+            if safe_id is None or preview is None or "view" not in preview["actions"]:
+                return broker._error("invalid_magnus_item")
+            return broker._ok(previewAction="Preview only · no Rock page was opened")
         if error := self._require_prod():
             return error
         safe_id = self._safe_magnus_id(raw)
@@ -625,6 +693,21 @@ class BrokerOperations:
 
     def _magnus_build(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
+        if broker._context is Context.DEV:
+            if raw.get("confirmed") is not True:
+                return broker._error("build_confirmation_required")
+            safe_id = self._safe_magnus_id(raw)
+            if safe_id is None or not broker._mock.is_magnus_build(safe_id):
+                return broker._error("invalid_magnus_item")
+            return broker._ok(
+                magnusBuild={
+                    "title": "Weekend Mobile",
+                    "message": "Preview complete · no deployment was started",
+                    "previewOnly": True,
+                },
+                magnusBuilds=broker._mock.magnus_builds(),
+                quickReturns=broker._mock.quick_returns(),
+            )
         if error := self._require_prod():
             return error
         if raw.get("confirmed") is not True:
@@ -639,11 +722,26 @@ class BrokerOperations:
         return broker._complete_build(outcome)
 
     def _magnus_builds(self, _raw: dict[str, Any]) -> dict[str, Any]:
-        return self.broker._ok(
-            magnusBuilds=self.broker._build_receipts.public_items()
-        )
+        if self.broker._context is Context.DEV:
+            return self.broker._ok(magnusBuilds=self.broker._mock.magnus_builds())
+        return self.broker._ok(magnusBuilds=self.broker._build_receipts.public_items())
 
     def _magnus_build_status(self, raw: dict[str, Any]) -> dict[str, Any]:
+        if self.broker._context is Context.DEV:
+            build_id = sanitize_text(raw.get("buildId"), 100)
+            receipt = next(
+                (
+                    row
+                    for row in self.broker._mock.magnus_builds()
+                    if row["buildId"] == build_id
+                ),
+                None,
+            )
+            return (
+                self.broker._ok(magnusBuildStatus=receipt)
+                if receipt
+                else self.broker._error("build_not_found")
+            )
         receipt = self.broker._build_receipts.get(raw.get("buildId"))
         return (
             self.broker._ok(magnusBuildStatus=receipt)
@@ -663,7 +761,11 @@ class BrokerOperations:
                     unavailable=[],
                 )
             try:
-                results = broker._knowledge.search(query)
+                results = (
+                    broker._mock.knowledge_search(query)
+                    if broker._context is Context.DEV
+                    else broker._knowledge.search(query)
+                )
             except RockKbError:
                 return broker._ok(
                     context=broker._context.value,
@@ -688,13 +790,14 @@ class BrokerOperations:
                 unavailable=[],
             )
         if broker._context is Context.DEV:
+            results = broker._mock.search(query, category=category)
+            if category is None:
+                results = broker._matching_personal_links(
+                    query, broker._mock.personal_links()
+                ) + results
             return broker._ok(
                 context=broker._context.value,
-                results=[
-                    row
-                    for row in broker._mock.search(query, category=category)
-                    if row["category"] in enabled_categories
-                ],
+                results=results,
                 source="synthetic",
                 unavailable=[],
             )
@@ -764,14 +867,15 @@ class BrokerOperations:
         unavailable = list(batch.unavailable)
         if category is None:
             try:
-                results = broker._matching_personal_links(
-                    query, broker._live.personal_links()
-                ) + results
+                results = (
+                    broker._matching_personal_links(
+                        query, broker._live.personal_links()
+                    )
+                    + results
+                )
             except RockRestError:
                 unavailable.append("Personal Links")
-        broker._live_health = (
-            HealthState.STALE if unavailable else HealthState.HEALTHY
-        )
+        broker._live_health = HealthState.STALE if unavailable else HealthState.HEALTHY
         return broker._ok(
             context=broker._context.value,
             results=results,
@@ -783,13 +887,26 @@ class BrokerOperations:
         )
 
     def _knowledge_result(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return self.broker._knowledge_detail(
-            sanitize_text(raw.get("safeId"), 100)
-        )
+        if self.broker._context is Context.DEV:
+            detail = self.broker._mock.knowledge_detail(
+                sanitize_text(raw.get("safeId"), 100)
+            )
+            return (
+                self.broker._ok(knowledgeDetail=detail)
+                if detail
+                else self.broker._error("knowledge_result_not_found")
+            )
+        return self.broker._knowledge_detail(sanitize_text(raw.get("safeId"), 100))
 
     def _knowledge_search(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
         query = sanitize_text(raw.get("query"), 120)
+        if broker._context is Context.DEV:
+            return broker._ok(
+                context=broker._context.value,
+                knowledgeResults=broker._mock.knowledge_search(query),
+                knowledgeSource="preview",
+            )
         try:
             results = broker._knowledge.search(query)
         except RockKbError:
@@ -805,9 +922,16 @@ class BrokerOperations:
         )
 
     def _knowledge_open_source(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return self.broker._open_knowledge_source(
-            sanitize_text(raw.get("safeId"), 100)
-        )
+        if self.broker._context is Context.DEV:
+            detail = self.broker._mock.knowledge_detail(
+                sanitize_text(raw.get("safeId"), 100)
+            )
+            if not detail:
+                return self.broker._error("knowledge_source_not_found")
+            return self.broker._ok(
+                previewAction="Preview only · no knowledge source was opened"
+            )
+        return self.broker._open_knowledge_source(sanitize_text(raw.get("safeId"), 100))
 
     def _person_quick_look(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker

@@ -5,6 +5,25 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-03
+
+### Added
+
+- Fill the gated preview workspace with realistic cross-entity search, Person
+  context, Personal Links, Recent Links, public-Knowledge-style results and
+  details, related records, and a navigable Magnus tree with text previews and
+  build history.
+- Keep every preview navigation, download, clipboard, source-open, history-clear,
+  and mobile-build action side-effect free while still demonstrating its full
+  confirmation and feedback flow.
+
+### Changed
+
+- Remove the visible DEV/PROD context badge from the panel and expose preview
+  context switching through the developer CLI/socket boundary instead.
+- Refresh the documentation with current live Demo Church and privacy-safe
+  preview screenshots, a full feature tour, and updated keyboard guidance.
+
 ## [0.24.5] - 2026-09-03
 
 ### Changed

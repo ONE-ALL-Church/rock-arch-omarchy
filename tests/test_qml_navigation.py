@@ -2,10 +2,7 @@ import unittest
 from pathlib import Path
 
 QML_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "plugin"
-    / "oneall.rock-arch"
-    / "RockLens.qml"
+    Path(__file__).resolve().parents[1] / "plugin" / "oneall.rock-arch" / "RockLens.qml"
 )
 SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
 BAR_BUTTON_PATH = QML_PATH.with_name("RockArchBarButton.qml")
@@ -38,8 +35,10 @@ PANEL_PATHS = (
 
 
 def all_qml_source() -> str:
-    return QML_PATH.read_text(encoding="utf-8") + "\n" + "\n".join(
-        path.read_text(encoding="utf-8") for path in PANEL_PATHS
+    return (
+        QML_PATH.read_text(encoding="utf-8")
+        + "\n"
+        + "\n".join(path.read_text(encoding="utf-8") for path in PANEL_PATHS)
     )
 
 
@@ -92,8 +91,7 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
         self.assertIn(
-            'request({op: "status"})\n'
-            "    refreshQuickReturns()",
+            'request({op: "status"})\n    refreshQuickReturns()',
             source,
         )
         self.assertIn("if (changedView) refreshPersonalLinks()", source)
@@ -102,7 +100,7 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
         self.assertIn(
-            'if (searchField.activeFocus) {\n'
+            "if (searchField.activeFocus) {\n"
             "        if (dy > 0 && activeSearchCount) selectSearchItem(0)",
             source,
         )
@@ -116,7 +114,9 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
         navigation = NAVIGATION_PATH.read_text(encoding="utf-8")
-        self.assertIn("model: navigation.controller.onboardingFlowActive ? [] :", navigation)
+        self.assertIn(
+            "model: navigation.controller.onboardingFlowActive ? [] :", navigation
+        )
         self.assertIn(
             'visible: !root.onboardingFlowActive && root.viewMode === "settings"',
             source,
@@ -188,27 +188,45 @@ class QmlNavigationTests(unittest.TestCase):
 
         self.assertIn('prefix === "kb" || prefix === "knowledge"', source)
         self.assertIn('sequence: "Alt+K"', source)
-        self.assertIn('onActivated: root.openKnowledge()', source)
-        self.assertIn('{ key: "knowledge", label: "Knowledge", shortcut: "Alt+K" }', source)
+        self.assertIn("onActivated: root.openKnowledge()", source)
+        self.assertIn(
+            '{ key: "knowledge", label: "Knowledge", shortcut: "Alt+K" }', source
+        )
         self.assertIn('root.scopeKeyForQuery(text) === "kb"', source)
         self.assertNotIn("Knowledge", search)
         self.assertNotIn("Your query is sent to Rock Agent KB", knowledge)
         for hint in ("mm:", "is:", "idea:", "lava:", "recipe:", "guide:"):
             self.assertIn(hint, knowledge)
-        self.assertIn('request({op: "knowledge_search", query: knowledgeQuery})', source)
-        self.assertIn('request({op: "knowledge_result", safeId: knowledgeResults[index].safeId})', source)
-        self.assertIn('request({op: "knowledge_result", safeId: knowledgeDetail.links[index].safeId})', source)
-        self.assertIn('op: "knowledge_open_source", safeId: knowledgeDetail.safeId', source)
+        self.assertIn(
+            'request({op: "knowledge_search", query: knowledgeQuery})', source
+        )
+        self.assertIn(
+            'request({op: "knowledge_result", safeId: knowledgeResults[index].safeId})',
+            source,
+        )
+        self.assertIn(
+            'request({op: "knowledge_result", safeId: knowledgeDetail.links[index].safeId})',
+            source,
+        )
+        self.assertIn(
+            'op: "knowledge_open_source", safeId: knowledgeDetail.safeId', source
+        )
         self.assertIn("function closeKnowledgeDetail()", source)
         self.assertIn("knowledgePanel.backButton.forceActiveFocus", source)
         self.assertIn('text: "Back"', source)
-        self.assertIn('text: knowledgePanel.controller.knowledgeBusy ? "Opening…" : "Open source"', source)
-        self.assertIn("Keys.onEscapePressed: knowledgePanel.controller.closeKnowledgeDetail()", source)
+        self.assertIn(
+            'text: knowledgePanel.controller.knowledgeBusy ? "Opening…" : "Open source"',
+            source,
+        )
+        self.assertIn(
+            "Keys.onEscapePressed: knowledgePanel.controller.closeKnowledgeDetail()",
+            source,
+        )
 
     def test_cli_ui_handoff_is_one_time_and_build_copy_is_honest(self):
         source = all_qml_source()
 
-        self.assertIn('function handoff(): void', source)
+        self.assertIn("function handoff(): void", source)
         self.assertIn('root.request({op: "ui_handoff_take"})', source)
         self.assertIn("function applyUiHandoff(handoff)", source)
         self.assertIn('"Last started " + relativeTime(acceptedAt)', source)
@@ -243,7 +261,9 @@ class QmlNavigationTests(unittest.TestCase):
             self.assertTrue(
                 "focusable: true" in excerpt or "activeFocusOnTab: true" in excerpt
             )
-        self.assertIn('request({op: "profile_rename", profileId: profileId, name: name})', source)
+        self.assertIn(
+            'request({op: "profile_rename", profileId: profileId, name: name})', source
+        )
         self.assertIn("Keys.onEscapePressed:", source)
 
     def test_unsent_credentials_are_purged_from_the_retry_queue(self):
@@ -304,14 +324,18 @@ class QmlNavigationTests(unittest.TestCase):
             "      else openKnowledge()",
             source,
         )
-        self.assertIn('else if (viewMode === "personal")\n        openKnowledge()', source)
-        self.assertIn('} else if (viewMode === "magnus") {\n      openKnowledge()', source)
+        self.assertIn(
+            'else if (viewMode === "personal")\n        openKnowledge()', source
+        )
+        self.assertIn(
+            '} else if (viewMode === "magnus") {\n      openKnowledge()', source
+        )
         self.assertIn(
             'if (viewMode === "settings")\n        focusSearch()',
             source,
         )
         self.assertIn(
-            '} else if (resultCursor >= 0 || recentCursor >= 0) {\n'
+            "} else if (resultCursor >= 0 || recentCursor >= 0) {\n"
             "      focusSearch()\n"
             "    } else {\n"
             "      openSettings(false)",
@@ -361,7 +385,9 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
 
         self.assertIn('label: "Show in the menu bar"', source)
-        self.assertIn("implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0", source)
+        self.assertIn(
+            "implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0", source
+        )
         self.assertIn("visible: controller.preferenceShowMenuBar", source)
         self.assertIn(
             'updatePreference("showMenuBar", controller.preferenceShowMenuBar)', source
@@ -381,22 +407,31 @@ class QmlNavigationTests(unittest.TestCase):
     def test_settings_exposes_bounded_opt_in_plugin_updates(self):
         source = all_qml_source()
 
-        self.assertIn('text: "Settings" + (navigation.controller.updateAvailable ? "  •" : "")', source)
+        self.assertIn(
+            'text: "Settings" + (navigation.controller.updateAvailable ? "  •" : "")',
+            source,
+        )
         self.assertIn('label: "Install updates automatically"', source)
         self.assertIn('request({op: "update_check"})', source)
         self.assertIn('request({op: "update_start"})', source)
-        self.assertIn('property bool preferenceAutomaticUpdates: false', source)
+        self.assertIn("property bool preferenceAutomaticUpdates: false", source)
         self.assertIn("interval: 86400000", source)
-        self.assertIn('"Check daily and install only after Omarchy validation."', source)
+        self.assertIn(
+            '"Check daily and install only after Omarchy validation."', source
+        )
 
     def test_terminal_and_agent_access_is_on_by_default_and_settings_only(self):
         source = all_qml_source()
         finish_setup = FINISH_SETUP_PATH.read_text(encoding="utf-8")
 
-        self.assertIn('property bool preferenceTerminalAccess: true', source)
+        self.assertIn("property bool preferenceTerminalAccess: true", source)
         self.assertIn('label: "Allow terminal and agent access"', source)
-        self.assertIn('updatePreference("terminalAccess", preferenceTerminalAccess)', source)
-        self.assertIn('"Use rock-arch from this account; no network listener is opened."', source)
+        self.assertIn(
+            'updatePreference("terminalAccess", preferenceTerminalAccess)', source
+        )
+        self.assertIn(
+            '"Use rock-arch from this account; no network listener is opened."', source
+        )
         self.assertNotIn("terminal", finish_setup.lower())
 
     def test_every_panel_has_a_keyboard_route_and_contextual_guidance(self):
@@ -407,9 +442,12 @@ class QmlNavigationTests(unittest.TestCase):
             self.assertIn(f'Shortcut {{ sequence: "{sequence}"', source)
         self.assertGreaterEqual(source.count("context: Qt.ApplicationShortcut"), 12)
         self.assertIn(
-            'readonly property bool showMagnus: contextName === "PROD" && magnusAvailable',
+            'readonly property bool showMagnus: contextName === "DEV" || magnusAvailable',
             source,
         )
+        navigation = NAVIGATION_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("navigation.controller.contextName", navigation)
+        self.assertNotIn("Switch preview context", navigation)
         self.assertIn('{ key: "magnus", label: "Magnus", shortcut: "Ctrl+3" }', source)
         self.assertIn('tooltipText: "Clear Recent Links · X"', source)
         self.assertIn("onDeleteRequested: root.deleteCurrentItem()", source)
@@ -470,7 +508,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('text: "B · Deploy"', source)
         self.assertIn('". This starts a production mobile-app build."', source)
         self.assertIn('"Last started " + searchPanel.controller.relativeTime', source)
-        self.assertIn('function deploymentSummary(title)', source)
+        self.assertIn("function deploymentSummary(title)", source)
         self.assertIn(
             "magnusPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
@@ -482,9 +520,7 @@ class QmlNavigationTests(unittest.TestCase):
             "searchPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
         self.assertGreaterEqual(source.count("focusable: true"), 4)
-        self.assertGreaterEqual(
-            source.count("Keys.onEscapePressed:"), 4
-        )
+        self.assertGreaterEqual(source.count("Keys.onEscapePressed:"), 4)
         self.assertNotIn("Server actions:", source)
 
     def test_footer_is_reserved_for_transient_status(self):
@@ -516,7 +552,10 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("RockLensHero {", source)
         self.assertIn("PanelSeparator {}", source)
         self.assertIn("panel.fittedContentWidth(Style.space(430))", source)
-        self.assertIn("panel.fittedContentHeight(content.implicitHeight, Style.space(600))", source)
+        self.assertIn(
+            "panel.fittedContentHeight(content.implicitHeight, Style.space(600))",
+            source,
+        )
         self.assertIn("spacing: Style.spacing.panelGap", source)
         self.assertIn("Border.controlSpec", source)
         self.assertNotIn('color: "#14532d"', source)

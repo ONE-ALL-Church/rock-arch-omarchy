@@ -6,13 +6,11 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "RockLensSearchScopes.js" as SearchScopes
-
 Panel {
   id: root
   moduleName: "oneall.rock-arch"
   ipcTarget: "oneall.rock-arch"
   manageIpc: false
-
   readonly property string runtimeDir: (Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))) + "/rock-arch"
   readonly property string socketPath: runtimeDir + "/broker.sock"
   readonly property string packageRoot: Quickshell.env("ROCK_ARCH_HOME") ||
@@ -40,7 +38,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.24.5"
+  property string currentVersion: "0.25.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -127,7 +125,7 @@ Panel {
   property int relativeTimeTick: 0
   readonly property int navigationCount: personalLinks.length
   readonly property int magnusCount: magnusItems.length
-  readonly property bool showMagnus: contextName === "PROD" && magnusAvailable
+  readonly property bool showMagnus: contextName === "DEV" || magnusAvailable
   readonly property bool updateBusy: updateState === "checking" || updateState === "updating"
   readonly property bool magnusPreviewCommandsEnabled: opened && viewMode === "magnus" &&
     magnusPreview !== null && !magnusBusy && !magnusActionBusy && pendingMagnusBuildId === ""
@@ -157,7 +155,6 @@ Panel {
     rockAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Secure password storage unavailable"
   implicitWidth: preferenceShowMenuBar ? button.implicitWidth : 0
   implicitHeight: preferenceShowMenuBar ? button.implicitHeight : 0
-
   function request(payload) {
     var next = []
     var coalesce = payload.op === "search" || payload.op === "knowledge_search" ||
@@ -195,7 +192,6 @@ Panel {
   function scopeKeyForQuery(value) {
     return SearchScopes.keyForQuery(value)
   }
-
   function activeProfileName() {
     for (var index = 0; index < profiles.length; index++)
       if (profiles[index].id === activeProfileId) return String(profiles[index].name || "Rock")
@@ -314,17 +310,14 @@ Panel {
   function categoryEnabled(category) {
     return enabledCategories.indexOf(category) >= 0
   }
-
   function categoryAvailable(category) {
     return contextName === "DEV" ||
       (searchCapabilitiesState === "ready" &&
        availableSearchCategories.indexOf(category) >= 0)
   }
-
   function effectiveCategoryEnabled(category) {
     return categoryEnabled(category) && categoryAvailable(category)
   }
-
   function availableCategoryOptions() {
     if (contextName === "DEV") return searchCategories
     if (searchCapabilitiesState !== "ready") return []
@@ -332,7 +325,6 @@ Panel {
       return availableSearchCategories.indexOf(item.key) >= 0
     })
   }
-
   function resetSearchCapabilities() {
     searchCapabilitiesState = contextName === "DEV" ? "ready" : "unknown"
     searchCapabilitiesInFlight = false
@@ -342,13 +334,11 @@ Panel {
     unavailableSearchCategories = []
     onboardingSetupPrepared = false
   }
-
   function displayCategory(category) {
     for (var index = 0; index < searchCategories.length; index++)
       if (searchCategories[index].key === category) return searchCategories[index].label
     return category
   }
-
   function onboardingCategoryEnabled(category) {
     return onboardingEnabledCategories.indexOf(category) >= 0
   }
@@ -361,7 +351,6 @@ Panel {
     if (!onboardingCategoryEnabled(category)) next.push(category)
     onboardingEnabledCategories = next
   }
-
   function initializeOnboardingSetup() {
     if (onboardingSetupPrepared || !searchCapabilitiesReady) return
     onboardingEnabledCategories = enabledCategories.filter(function(category) {
@@ -587,11 +576,15 @@ Panel {
     }
     if (response.magnusDownload) {
       magnusActionBusy = false
-      feedbackText = "Saved " + response.magnusDownload.savedAs + " to Downloads"
+      feedbackText = response.magnusDownload.previewOnly === true
+        ? "Preview only · no file was downloaded"
+        : "Saved " + response.magnusDownload.savedAs + " to Downloads"
     }
     if (response.magnusCopied) {
       magnusActionBusy = false
-      feedbackText = response.magnusCopied.value === "hash" ? "SHA-256 copied" : "File contents copied"
+      feedbackText = response.magnusCopied.previewOnly === true
+        ? "Preview only · clipboard unchanged"
+        : response.magnusCopied.value === "hash" ? "SHA-256 copied" : "File contents copied"
     }
     if (response.magnusBuild) {
       magnusActionBusy = false
@@ -599,7 +592,8 @@ Panel {
       pendingMagnusBuildTitle = ""
       pendingMagnusBuildRecent = false
       feedbackText = String(response.magnusBuild.message || "Build request accepted") +
-        (preferenceRecentLinks ? " · Added to Recent Links" : "")
+        (response.magnusBuild.previewOnly === true || !preferenceRecentLinks
+          ? "" : " · Added to Recent Links")
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
     if (response.uiHandoff) applyUiHandoff(response.uiHandoff)
@@ -801,6 +795,11 @@ Panel {
       feedbackText = preferenceRecentLinks ? "Opened in Rock and added to Recent Links" : "Opened in Rock"
       if (preferenceCloseAfterOpen) Qt.callLater(function() { root.close() })
     }
+    else if (response.previewAction) {
+      knowledgeBusy = false
+      magnusActionBusy = false
+      feedbackText = String(response.previewAction)
+    }
     else if (response.source === "unavailable" && !staleSearch)
       feedbackText = "Live Rock search needs a saved Rock login"
     else if (response.source === "knowledge_unavailable" && !staleSearch)
@@ -817,7 +816,8 @@ Panel {
     }
     if (response.knowledgeSource === "unavailable" && !staleKnowledgeSearch)
       feedbackText = "Rock Knowledge isn't available right now. Try again when you're online."
-    else if (response.knowledgeSource === "public" && !staleKnowledgeSearch)
+    else if ((response.knowledgeSource === "public" ||
+             response.knowledgeSource === "preview") && !staleKnowledgeSearch)
       feedbackText = ""
     if (staleSearch) Qt.callLater(function() { root.refreshSearch() })
     if (staleKnowledgeSearch) Qt.callLater(function() { root.refreshKnowledgeSearch() })
