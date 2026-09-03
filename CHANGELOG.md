@@ -5,6 +5,13 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-03
+
+### Fixed
+
+- Render the rock-arch mark as a native theme-colored QML shape so it remains
+  visible in the compact Omarchy bar slot.
+
 ## [0.16.0] - 2026-09-03
 
 ### Added
@@ -108,6 +115,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.16.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.1
 [0.16.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.0
 [0.15.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.1
 [0.15.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.0

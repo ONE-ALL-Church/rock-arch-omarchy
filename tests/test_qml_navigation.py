@@ -230,8 +230,8 @@ class QmlNavigationTests(unittest.TestCase):
     def test_menu_bar_uses_the_theme_colored_rock_arch_mark(self):
         source = all_qml_source()
 
-        self.assertIn('source: Qt.resolvedUrl("assets/rock-arch.svg")', source)
-        self.assertIn("colorizationColor: button.active ? button.activeColor : button.foreground", source)
+        self.assertIn("ShapePath.OddEvenFill", source)
+        self.assertIn("fillColor: button.active ? button.activeColor : button.foreground", source)
         self.assertIn('tooltipText: "Rock Arch"', source)
 
     def test_settings_exposes_bounded_opt_in_plugin_updates(self):
