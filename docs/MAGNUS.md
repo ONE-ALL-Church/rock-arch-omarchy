@@ -30,6 +30,13 @@ Authorized profiles receive a **Magnus** tab with:
 - explicit, confirmed mobile app builds;
 - same-origin validation for tree, content, and advertised action URIs.
 
+Magnus remains a drill-down tree rather than a combined file dashboard. The
+root returns content families such as Websites, Mobile Applications, Lava
+Shortcodes, Lava Applications, server files, and supported application types.
+Rock Arch follows each descriptor URI into its children. Mobile-app build
+capability is advertised on an application row in the parent Mobile
+Applications listing; it is not copied onto the app's child folders or files.
+
 The agent-friendly terminal interface uses the running broker and opaque IDs:
 
 ```bash

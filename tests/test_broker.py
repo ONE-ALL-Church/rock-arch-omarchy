@@ -1317,8 +1317,50 @@ class BrokerContractTests(unittest.TestCase):
         self.assertGreaterEqual(len(detail["links"]), 1)
 
         root = self.broker.handle({"op": "magnus_browse"})
-        self.assertEqual(root["magnusBrowser"]["items"][0]["title"], "Weekend Mobile")
-        file_id = root["magnusBrowser"]["items"][2]["safeId"]
+        root_items = root["magnusBrowser"]["items"]
+        self.assertEqual(root["magnusBrowser"]["title"], "Magnus")
+        self.assertEqual(
+            [row["title"] for row in root_items],
+            [
+                "Websites",
+                "Mobile Applications",
+                "Lava Shortcodes",
+                "Lava Applications",
+                "Server File System",
+                "Apple TV Applications",
+            ],
+        )
+        self.assertTrue(all(row["kind"] == "folder" for row in root_items))
+        self.assertTrue(all(row["actions"] == [] for row in root_items))
+
+        apps = self.broker.handle(
+            {
+                "op": "magnus_browse",
+                "safeId": "mock-magnus-root-mobileapps",
+            }
+        )["magnusBrowser"]
+        self.assertEqual(apps["title"], "Mobile Applications")
+        self.assertEqual(apps["items"][0]["title"], "Weekend Mobile")
+        self.assertEqual(apps["items"][0]["actions"], ["build"])
+
+        app = self.broker.handle(
+            {"op": "magnus_browse", "safeId": "mock-magnus-app-weekend"}
+        )["magnusBrowser"]
+        self.assertEqual(app["title"], "Weekend Mobile")
+        self.assertTrue(all("build" not in row["actions"] for row in app["items"]))
+
+        for folder_id in (
+            "mock-magnus-app-pages",
+            "mock-magnus-page-home",
+            "mock-magnus-page-blocks",
+            "mock-magnus-block-welcome",
+        ):
+            folder = self.broker.handle({"op": "magnus_browse", "safeId": folder_id})[
+                "magnusBrowser"
+            ]
+        self.assertEqual(folder["title"], "Welcome Content")
+        file_id = folder["items"][1]["safeId"]
+        self.assertEqual(folder["items"][1]["title"], "content.lava")
         preview = self.broker.handle({"op": "magnus_preview", "safeId": file_id})
         self.assertTrue(preview["magnusPreview"]["previewAvailable"])
         download = self.broker.handle({"op": "magnus_download", "safeId": file_id})

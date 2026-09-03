@@ -165,15 +165,19 @@ Magnus supports:
 - Starting a descriptor-approved mobile-app build after confirmation
 - Reviewing local build-acceptance receipts
 
-![Magnus browser preview](outputs/screenshots/magnus-preview-browser.png)
+![Magnus content-family root](outputs/screenshots/magnus-preview-browser.png)
+
+![Magnus Mobile Applications listing](outputs/screenshots/magnus-preview-mobile-apps.png)
 
 ![Magnus file actions preview](outputs/screenshots/magnus-preview-file.png)
 
 ![Magnus build confirmation preview](outputs/screenshots/magnus-build-confirmation.png)
 
 _The public Demo Church does not have Magnus. These images use the gated,
-side-effect-free preview workspace: its browse, file, and confirmation flows are
-real UI, while its content is deterministic and no build or local action runs._
+side-effect-free preview workspace. The hierarchy follows Magnus from content
+families into Mobile Applications, then through an application, page, blocks,
+and `content.lava`. Deploy appears only on the application row where Magnus
+advertises that capability. No build or local action runs._
 
 Deploy is the only Rock server mutation Rock Arch exposes. The build path must
 be advertised by Magnus, contain a numeric mobile-app ID, and pass same-origin

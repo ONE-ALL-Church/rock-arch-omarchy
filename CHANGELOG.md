@@ -5,6 +5,17 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-09-03
+
+### Fixed
+
+- Replace the flattened Magnus preview root with a realistic drill-down through
+  content families, mobile applications, pages, blocks, and files.
+- Show mobile-app deployment only on the app row returned by the Mobile
+  Applications listing, matching where Magnus advertises its build capability.
+- Replace the misleading Magnus documentation captures with root, application,
+  nested file, and confirmation views from the corrected hierarchy.
+
 ## [0.25.0] - 2026-09-03
 
 ### Added

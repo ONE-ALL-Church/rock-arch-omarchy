@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.25.0` release boundary. Historical feature
+This record describes the current `0.25.1` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -164,6 +164,7 @@ The README uses current, panel-only captures from two explicit sources:
 - [`personal-links-preview.png`](../outputs/screenshots/personal-links-preview.png),
   [`recent-links-preview.png`](../outputs/screenshots/recent-links-preview.png),
   [`magnus-preview-browser.png`](../outputs/screenshots/magnus-preview-browser.png),
+  [`magnus-preview-mobile-apps.png`](../outputs/screenshots/magnus-preview-mobile-apps.png),
   [`magnus-preview-file.png`](../outputs/screenshots/magnus-preview-file.png), and
   [`magnus-build-confirmation.png`](../outputs/screenshots/magnus-build-confirmation.png)
   contain deterministic, side-effect-free preview content because the public

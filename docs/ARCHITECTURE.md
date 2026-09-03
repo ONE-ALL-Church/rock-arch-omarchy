@@ -137,7 +137,9 @@ DEV data is available only when the broker process starts with the exact
 When enabled, an authorized local developer request may select either context;
 the panel still renders no context badge or end-user switch. DEV provides
 deterministic fixtures across Search, Personal Links, Recent Links, Knowledge,
-and Magnus. Its open, download, clipboard, source-open, history-clear, and build
+and Magnus. The Magnus fixture preserves the content-family, application,
+page/block, and file hierarchy and exposes Deploy only on the parent mobile-app
+listing. Its open, download, clipboard, source-open, history-clear, and build
 operations are explicit no-ops. PROD never falls back to fixture data, and only
 PROD can perform the narrowly gated Magnus mobile app build action.
 

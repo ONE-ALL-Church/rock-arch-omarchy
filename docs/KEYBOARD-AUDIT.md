@@ -43,8 +43,10 @@ development and documentation.
    inheriting a stale scroll offset from another panel.
 6. **Magnus browser — healthy.** The first item is selected, Up/Down and Enter
    browse, Backspace or Esc returns, `R` refreshes, and `B` opens the selected
-   mobile-app build confirmation. Preview context supplies deterministic
-   folders and files while suppressing every side effect.
+   mobile-app build confirmation. Preview context follows the actual hierarchy
+   from content-family folders to the Mobile Applications listing and then into
+   application, page, block, and file descendants. It shows Deploy only on the
+   application row and suppresses every side effect.
 7. **Magnus file preview — healthy with a bounded preview check.** The
    Download action receives focus when a preview opens. Tab walks every visible
    action; `D`, `C`, `H`, `O`, and `R` remain direct shortcuts. Code structure,

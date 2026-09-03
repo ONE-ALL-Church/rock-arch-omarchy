@@ -397,21 +397,65 @@ _KNOWLEDGE_DETAILS: dict[str, dict[str, Any]] = {
 }
 
 _MAGNUS_FILES = {
-    "mock-magnus-file-appsettings": (
-        "appsettings.preview.json",
-        '{\n  "Theme": "Current Omarchy palette",\n  "Campus": "North",\n  "FeatureFlags": ["check-in", "groups"]\n}\n',
+    "mock-magnus-file-navigation": (
+        "Navigation Action.xaml",
+        '<Rock:NavigateToPageAction PageGuid="{{ Page.Guid }}" />\n',
     ),
-    "mock-magnus-file-readme": (
-        "README.md",
-        "# Weekend Mobile\n\nMagnus-managed app configuration for the weekend team.\n",
+    "mock-magnus-file-routing": (
+        "Home Routing Logic.lava",
+        "{% if CurrentPerson %}/page/23{% else %}/page/24{% endif %}\n",
     ),
-    "mock-magnus-file-home": (
-        "home.lava",
-        "{% assign campus = CurrentPerson.PrimaryCampus %}\n<h1>Welcome to {{ campus.Name }}</h1>\n",
+    "mock-magnus-file-page-layout": (
+        "Layout.xaml",
+        '<VerticalStackLayout Spacing="16">\n  <Rock:Zone Name="Main" />\n</VerticalStackLayout>\n',
+    ),
+    "mock-magnus-file-page-styles": (
+        "Page Styles.xaml",
+        '<Style TargetType="Label" Class="welcome-title">\n  <Setter Property="FontSize" Value="28" />\n</Style>\n',
+    ),
+    "mock-magnus-file-page-events": (
+        "Page Events.lava",
+        "{% assign campus = CurrentPerson.PrimaryCampus %}\n{% comment %}Prepare page state.{% endcomment %}\n",
+    ),
+    "mock-magnus-file-pre-content": (
+        "pre-content",
+        '<Grid RowDefinitions="Auto,*">\n',
+    ),
+    "mock-magnus-file-content": (
+        "content.lava",
+        '{% assign campus = CurrentPerson.PrimaryCampus %}\n<Label Text="Welcome to {{ campus.Name }}" />\n',
+    ),
+    "mock-magnus-file-post-content": (
+        "post-content",
+        "</Grid>\n",
     ),
     "mock-magnus-file-theme": (
-        "theme.css",
-        ":root {\n  --brand-accent: #7aa2f7;\n  --panel-radius: 10px;\n}\n",
+        "theme.less",
+        "@brand-accent: #7aa2f7;\n@content-spacing: 1rem;\n",
+    ),
+    "mock-magnus-file-shortcode-template": (
+        "template.lava",
+        '<article class="event-card">{{ EventItem.Name }}</article>\n',
+    ),
+    "mock-magnus-file-shortcode-docs": (
+        "documentation.md",
+        "# Event Card\n\nRenders an event item as a compact card.\n",
+    ),
+    "mock-magnus-file-rigging": (
+        "application-rigging.lava",
+        "{% assign routePrefix = 'api/volunteers' %}\n",
+    ),
+    "mock-magnus-file-endpoint": (
+        "code-template.lava",
+        "{% webrequest url:'https://example.invalid' %}{% endwebrequest %}\n",
+    ),
+    "mock-magnus-file-robots": (
+        "robots.txt",
+        "User-agent: *\nDisallow: /admin/\n",
+    ),
+    "mock-magnus-file-tv-styles": (
+        "Application Styles.xaml",
+        "<ResourceDictionary>\n  <!-- Weekend TV styles -->\n</ResourceDictionary>\n",
     ),
 }
 
@@ -420,63 +464,325 @@ _MAGNUS_FOLDERS: dict[str, dict[str, Any]] = {
         "title": "Magnus",
         "items": [
             {
-                "safeId": "mock-magnus-app-weekend",
-                "title": "Weekend Mobile",
-                "kind": "folder",
-                "actions": ["build"],
-            },
-            {
-                "safeId": "mock-magnus-folder-theme",
-                "title": "Theme Files",
+                "safeId": "mock-magnus-root-websites",
+                "title": "Websites",
                 "kind": "folder",
                 "actions": [],
             },
             {
-                "safeId": "mock-magnus-file-appsettings",
-                "title": "appsettings.preview.json",
-                "kind": "file",
-                "actions": ["download", "copyHash", "copy", "view"],
+                "safeId": "mock-magnus-root-mobileapps",
+                "title": "Mobile Applications",
+                "kind": "folder",
+                "actions": [],
             },
             {
-                "safeId": "mock-magnus-file-readme",
-                "title": "README.md",
+                "safeId": "mock-magnus-root-shortcodes",
+                "title": "Lava Shortcodes",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-root-lavaapps",
+                "title": "Lava Applications",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-root-files",
+                "title": "Server File System",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-root-appletv",
+                "title": "Apple TV Applications",
+                "kind": "folder",
+                "actions": [],
+            },
+        ],
+    },
+    "mock-magnus-root-websites": {
+        "title": "Websites",
+        "items": [
+            {
+                "safeId": "mock-magnus-site-rock-solid",
+                "title": "Rock Solid Church",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-site-staff",
+                "title": "Staff Portal",
+                "kind": "folder",
+                "actions": [],
+            },
+        ],
+    },
+    "mock-magnus-site-rock-solid": {
+        "title": "Rock Solid Church",
+        "items": [
+            {
+                "safeId": "mock-magnus-site-pages",
+                "title": "Pages",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-site-theme",
+                "title": "Theme",
+                "kind": "folder",
+                "actions": [],
+            },
+        ],
+    },
+    "mock-magnus-site-staff": {"title": "Staff Portal", "items": []},
+    "mock-magnus-site-pages": {"title": "Pages", "items": []},
+    "mock-magnus-site-theme": {
+        "title": "Theme",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-theme",
+                "title": "theme.less",
                 "kind": "file",
                 "actions": ["download", "copyHash", "copy"],
-            },
+            }
+        ],
+    },
+    "mock-magnus-root-mobileapps": {
+        "title": "Mobile Applications",
+        "items": [
+            {
+                "safeId": "mock-magnus-app-weekend",
+                "title": "Weekend Mobile",
+                "kind": "folder",
+                "actions": ["build"],
+            }
         ],
     },
     "mock-magnus-app-weekend": {
         "title": "Weekend Mobile",
         "items": [
             {
-                "safeId": "mock-magnus-file-home",
-                "title": "home.lava",
-                "kind": "file",
-                "actions": ["download", "copyHash", "copy", "view"],
+                "safeId": "mock-magnus-app-pages",
+                "title": "Pages",
+                "kind": "folder",
+                "actions": [],
             },
             {
-                "safeId": "mock-magnus-file-appsettings",
-                "title": "appsettings.preview.json",
-                "kind": "file",
-                "actions": ["download", "copyHash", "copy", "view"],
+                "safeId": "mock-magnus-app-shell",
+                "title": "Shell Navigation",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-app-routing",
+                "title": "Home Routing Logic",
+                "kind": "folder",
+                "actions": [],
             },
         ],
     },
-    "mock-magnus-folder-theme": {
-        "title": "Theme Files",
+    "mock-magnus-app-shell": {
+        "title": "Shell Navigation",
         "items": [
             {
-                "safeId": "mock-magnus-file-theme",
-                "title": "theme.css",
+                "safeId": "mock-magnus-file-navigation",
+                "title": "Navigation Action.xaml",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            }
+        ],
+    },
+    "mock-magnus-app-routing": {
+        "title": "Home Routing Logic",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-routing",
+                "title": "Home Routing Logic.lava",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            }
+        ],
+    },
+    "mock-magnus-app-pages": {
+        "title": "Pages",
+        "items": [
+            {
+                "safeId": "mock-magnus-page-home",
+                "title": "Home",
+                "kind": "folder",
+                "actions": [],
+            },
+            {
+                "safeId": "mock-magnus-page-groups",
+                "title": "Groups",
+                "kind": "folder",
+                "actions": [],
+            },
+        ],
+    },
+    "mock-magnus-page-groups": {"title": "Groups", "items": []},
+    "mock-magnus-page-home": {
+        "title": "Home",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-page-layout",
+                "title": "Layout.xaml",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy", "view"],
+            },
+            {
+                "safeId": "mock-magnus-file-page-styles",
+                "title": "Page Styles.xaml",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy", "view"],
+            },
+            {
+                "safeId": "mock-magnus-file-page-events",
+                "title": "Page Events.lava",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy", "view"],
+            },
+            {
+                "safeId": "mock-magnus-page-blocks",
+                "title": "Blocks",
+                "kind": "folder",
+                "actions": [],
+            },
+        ],
+    },
+    "mock-magnus-page-blocks": {
+        "title": "Blocks",
+        "items": [
+            {
+                "safeId": "mock-magnus-block-welcome",
+                "title": "Welcome Content",
+                "kind": "folder",
+                "actions": [],
+            }
+        ],
+    },
+    "mock-magnus-block-welcome": {
+        "title": "Welcome Content",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-pre-content",
+                "title": "pre-content",
                 "kind": "file",
                 "actions": ["download", "copyHash", "copy"],
             },
             {
-                "safeId": "mock-magnus-file-home",
-                "title": "home.lava",
+                "safeId": "mock-magnus-file-content",
+                "title": "content.lava",
                 "kind": "file",
                 "actions": ["download", "copyHash", "copy", "view"],
             },
+            {
+                "safeId": "mock-magnus-file-post-content",
+                "title": "post-content",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            },
+        ],
+    },
+    "mock-magnus-root-shortcodes": {
+        "title": "Lava Shortcodes",
+        "items": [
+            {
+                "safeId": "mock-magnus-shortcode-event",
+                "title": "Event Card",
+                "kind": "folder",
+                "actions": [],
+            }
+        ],
+    },
+    "mock-magnus-shortcode-event": {
+        "title": "Event Card",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-shortcode-template",
+                "title": "template.lava",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            },
+            {
+                "safeId": "mock-magnus-file-shortcode-docs",
+                "title": "documentation.md",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            },
+        ],
+    },
+    "mock-magnus-root-lavaapps": {
+        "title": "Lava Applications",
+        "items": [
+            {
+                "safeId": "mock-magnus-lavaapp-volunteers",
+                "title": "Volunteer Check-in",
+                "kind": "folder",
+                "actions": [],
+            }
+        ],
+    },
+    "mock-magnus-lavaapp-volunteers": {
+        "title": "Volunteer Check-in",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-rigging",
+                "title": "application-rigging.lava",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            },
+            {
+                "safeId": "mock-magnus-lavaapp-endpoints",
+                "title": "Endpoints",
+                "kind": "folder",
+                "actions": [],
+            },
+        ],
+    },
+    "mock-magnus-lavaapp-endpoints": {
+        "title": "Endpoints",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-endpoint",
+                "title": "code-template.lava",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            }
+        ],
+    },
+    "mock-magnus-root-files": {
+        "title": "Server File System",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-robots",
+                "title": "robots.txt",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            }
+        ],
+    },
+    "mock-magnus-root-appletv": {
+        "title": "Apple TV Applications",
+        "items": [
+            {
+                "safeId": "mock-magnus-appletv-weekend",
+                "title": "Weekend TV",
+                "kind": "folder",
+                "actions": [],
+            }
+        ],
+    },
+    "mock-magnus-appletv-weekend": {
+        "title": "Weekend TV",
+        "items": [
+            {
+                "safeId": "mock-magnus-file-tv-styles",
+                "title": "Application Styles.xaml",
+                "kind": "file",
+                "actions": ["download", "copyHash", "copy"],
+            }
         ],
     },
 }
@@ -637,7 +943,12 @@ class MockAdapter:
         title, content = item
         raw = content.encode()
         actions = ["download", "copyHash", "copy"]
-        if safe_id in {"mock-magnus-file-appsettings", "mock-magnus-file-home"}:
+        if safe_id in {
+            "mock-magnus-file-page-layout",
+            "mock-magnus-file-page-styles",
+            "mock-magnus-file-page-events",
+            "mock-magnus-file-content",
+        }:
             actions.append("view")
         return {
             "safeId": safe_id,
