@@ -125,6 +125,14 @@ class QmlNavigationTests(unittest.TestCase):
         timeout = source[source.index("id: setupTimeoutTimer") :]
         self.assertIn("root.dropQueuedCredentialRequests()", timeout[:500])
 
+    def test_startup_status_retries_until_the_broker_responds(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        timer = source[source.index("id: startupStatusTimer") :]
+
+        self.assertIn("repeat: true", timer[:220])
+        self.assertIn("running: !root.statusLoaded", timer[:220])
+        self.assertIn('request({op: "status", probeMagnus: true})', timer[:220])
+
     def test_tab_ring_includes_settings_in_both_directions(self):
         source = all_qml_source()
 

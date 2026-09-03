@@ -127,7 +127,11 @@ Column {
         text: searchPanel.controller.pendingClearRecent ? "Confirm clear" : "X · Clear"
         activeFocusOnTab: enabled
         enabled: searchPanel.controller.quickReturns.length > 0 && !searchPanel.controller.setupBusy
-        background: searchPanel.controller.pendingClearRecent ? "#7f1d1d" : Style.selectedFillFor(Color.foreground, Color.accent)
+        background: Rectangle {
+          radius: 6
+          color: searchPanel.controller.pendingClearRecent ? "#7f1d1d" :
+            Style.selectedFillFor(Color.foreground, Color.accent)
+        }
         KeyNavigation.tab: clearRecentButton
         KeyNavigation.backtab: clearRecentButton
         onActiveFocusChanged: searchPanel.controller.revealFocusedControl(clearRecentButton)

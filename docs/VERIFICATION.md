@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 120 passing tests. Release-contract coverage keeps
+The suite contains 121 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.

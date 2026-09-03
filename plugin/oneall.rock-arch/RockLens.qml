@@ -1215,8 +1215,9 @@ Panel {
   }
   Timer {
     id: startupStatusTimer
-    interval: 300
-    running: true
+    interval: 500
+    repeat: true
+    running: !root.statusLoaded
     onTriggered: root.request({op: "status", probeMagnus: true})
   }
   Timer { id: magnusProbeTimer; interval: 800; onTriggered: root.probeMagnus() }
