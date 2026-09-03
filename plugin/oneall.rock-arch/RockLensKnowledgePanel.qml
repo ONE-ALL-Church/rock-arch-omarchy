@@ -95,20 +95,53 @@ Column {
       wrapMode: Text.WordWrap
     }
 
-    Text {
+    GridLayout {
       width: parent.width
-      text: "mm:  Model Map        is:  issues        idea:  feature ideas\nlava:  Lava contexts    recipe:  recipes    guide:  concept guides"
-      textFormat: Text.PlainText
-      color: Color.foreground
-      font.family: Style.font.family
-      font.pixelSize: Style.font.bodySmall
-      lineHeight: 1.45
-      wrapMode: Text.WordWrap
+      columns: 2
+      columnSpacing: Style.spacing.xl
+      rowSpacing: Style.spacing.sm
+
+      Repeater {
+        model: [
+          {prefix: "mm:", label: "Model Map"},
+          {prefix: "is:", label: "Issues"},
+          {prefix: "idea:", label: "Feature ideas"},
+          {prefix: "lava:", label: "Lava contexts"},
+          {prefix: "recipe:", label: "Recipes"},
+          {prefix: "guide:", label: "Concept guides"}
+        ]
+
+        delegate: RowLayout {
+          required property var modelData
+
+          Layout.fillWidth: true
+          spacing: Style.spacing.sm
+
+          Text {
+            text: modelData.prefix
+            textFormat: Text.PlainText
+            color: Color.foreground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            font.weight: Font.DemiBold
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: modelData.label
+            textFormat: Text.PlainText
+            color: knowledgePanel.dim
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            elide: Text.ElideRight
+          }
+        }
+      }
     }
 
     Text {
       width: parent.width
-      text: "Examples:  mm: Group Member   ·   is: check-in labels   ·   lava: workflow"
+      text: "Try mm: Group Member or is: check-in labels."
       textFormat: Text.PlainText
       color: knowledgePanel.dim
       font.family: Style.font.family
