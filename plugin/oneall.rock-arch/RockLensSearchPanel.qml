@@ -125,7 +125,7 @@ Column {
         Layout.preferredHeight: Style.space(30)
         visible: searchPanel.controller.contextName === "PROD"
         text: searchPanel.controller.pendingClearRecent ? "Confirm clear" : "X · Clear"
-        focusable: enabled
+        activeFocusOnTab: enabled
         enabled: searchPanel.controller.quickReturns.length > 0 && !searchPanel.controller.setupBusy
         background: searchPanel.controller.pendingClearRecent ? "#7f1d1d" : Style.selectedFillFor(Color.foreground, Color.accent)
         KeyNavigation.tab: clearRecentButton

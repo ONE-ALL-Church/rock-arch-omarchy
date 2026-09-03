@@ -155,6 +155,7 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
         key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
 
+        self.assertNotIn("focusable:", source)
         self.assertIn("property bool formMode: false", key_catcher)
         self.assertLess(
             key_catcher.index("if (event.key === Qt.Key_Escape)"),
