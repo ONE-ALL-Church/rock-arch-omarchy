@@ -55,6 +55,73 @@ class QuickReturnTests(unittest.TestCase):
             )
         self.assertEqual(len(self.store.public_items()), MAX_QUICK_RETURNS)
 
+    def test_public_items_are_globally_sorted_by_last_used(self):
+        self.store._write(
+            [
+                {
+                    "title": "Older person",
+                    "kind": "Person",
+                    "typeOrder": 10,
+                    "url": DEFAULT_ROCK_ORIGIN + "/Person/1",
+                    "createdDateTime": "2026-09-02T10:00:00+00:00",
+                },
+                {
+                    "title": "Newest page",
+                    "kind": "Page",
+                    "typeOrder": 50,
+                    "url": DEFAULT_ROCK_ORIGIN + "/page/2",
+                    "createdDateTime": "2026-09-02T12:00:00+00:00",
+                },
+                {
+                    "title": "Middle group",
+                    "kind": "Group",
+                    "typeOrder": 20,
+                    "url": DEFAULT_ROCK_ORIGIN + "/Group/3",
+                    "createdDateTime": "2026-09-02T11:00:00+00:00",
+                },
+            ]
+        )
+
+        self.assertEqual(
+            [item["title"] for item in self.store.public_items()],
+            ["Newest page", "Middle group", "Older person"],
+        )
+
+    def test_reopening_an_item_moves_it_to_the_top(self):
+        self.store._write(
+            [
+                {
+                    "title": "Person",
+                    "kind": "Person",
+                    "typeOrder": 10,
+                    "url": DEFAULT_ROCK_ORIGIN + "/Person/1",
+                    "createdDateTime": "2000-01-01T00:00:00+00:00",
+                },
+                {
+                    "title": "Group",
+                    "kind": "Group",
+                    "typeOrder": 20,
+                    "url": DEFAULT_ROCK_ORIGIN + "/Group/2",
+                    "createdDateTime": "2001-01-01T00:00:00+00:00",
+                },
+            ]
+        )
+
+        self.store.add(
+            NavigationTarget(
+                "Person",
+                "Person",
+                10,
+                DEFAULT_ROCK_ORIGIN + "/Person/1",
+            )
+        )
+
+        self.assertEqual(
+            [item["title"] for item in self.store.public_items()],
+            ["Person", "Group"],
+        )
+        self.assertEqual(len(self.store.public_items()), 2)
+
     def test_invalid_external_rows_are_ignored(self):
         self.path.parent.mkdir(parents=True)
         self.path.write_text(

@@ -36,18 +36,13 @@ class QuickReturnStore:
     def public_items(self) -> list[dict[str, Any]]:
         if not self.origin:
             return []
-        grouped: dict[int, list[dict[str, Any]]] = {}
-        for row in self._read():
-            grouped.setdefault(int(row["typeOrder"]), []).append(row)
-        rows = []
-        for type_order in sorted(grouped):
-            rows.extend(
-                sorted(
-                    grouped[type_order],
-                    key=lambda row: str(row["createdDateTime"]),
-                    reverse=True,
-                )
-            )
+        rows = sorted(
+            self._read(),
+            key=lambda row: datetime.fromisoformat(
+                str(row["createdDateTime"])
+            ).timestamp(),
+            reverse=True,
+        )
         result: list[dict[str, Any]] = []
         for row in rows:
             result.append(

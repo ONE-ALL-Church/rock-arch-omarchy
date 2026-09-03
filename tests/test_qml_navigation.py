@@ -15,6 +15,8 @@ class QmlNavigationTests(unittest.TestCase):
 
         self.assertIn("resultCursor = results.length ? 0 : -1", source)
         self.assertIn("recentCursor = quickReturns.length ? 0 : -1", source)
+        self.assertIn("border.width: index === root.resultCursor ? 1 : 0", source)
+        self.assertIn("border.width: index === root.recentCursor ? 1 : 0", source)
         self.assertIn(
             'request({op: "status"})\n'
             "    refreshQuickReturns()\n"

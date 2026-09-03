@@ -266,11 +266,17 @@
   mnemonic Alt shortcuts apply each scope without conflicting with current
   Hyprland bindings.
 - Opening Search selects the first Recent Link without taking typing focus from
-  the search field. A completed search similarly selects its first result.
+  the search field. A completed search similarly selects its first result. Both
+  selected rows use the themed fill plus a full-opacity one-pixel outline, so
+  selection remains visible while the search field keeps keyboard focus.
   Unscoped search also ranks matching Personal Links by allowlisted title and
   section before entity results; explicit entity scopes exclude those links. An
   installed PROD socket check refreshed 15 links, searched one title, and
   returned that opaque link as the first result with no unavailable categories.
+- Recent Links are globally ordered by their last-used timestamps, newest first,
+  without grouping by entity type. Reopening an existing item refreshes its
+  timestamp and returns it to the top while preserving deduplication and the
+  20-item cap.
 - Backspace on a highlighted search or link item is handled by the Rock
   Lens-local key catcher while the item owns focus. It returns focus to the
   search field, deletes the selection or character before the preserved cursor,

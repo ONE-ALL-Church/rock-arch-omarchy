@@ -1292,6 +1292,8 @@ Panel {
                   height: Style.space(50)
                   radius: 7
                   color: index === root.resultCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  border.width: index === root.resultCursor ? 1 : 0
+                  border.color: Style.selectedBorderFor(Color.foreground, Color.accent)
                   Column {
                     anchors.left: parent.left
                     anchors.right: openButton.visible ? openButton.left : parent.right
@@ -1456,6 +1458,8 @@ Panel {
                   height: Style.space(42)
                   radius: 7
                   color: index === root.recentCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+                  border.width: index === root.recentCursor ? 1 : 0
+                  border.color: Style.selectedBorderFor(Color.foreground, Color.accent)
                   Column {
                     anchors.fill: parent
                     anchors.margins: 7

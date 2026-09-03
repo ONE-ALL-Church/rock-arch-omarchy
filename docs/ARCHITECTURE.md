@@ -164,9 +164,11 @@ Recent Links. The underlying Quick Return store keeps the title, type, order,
 target, and timestamp locally, but
 returns only another process-local opaque ID, title, and type to QML. Its
 directory is `0700`, its file is `0600`, writes are atomic, entries are
-validated on every read, and the oldest entries are removed beyond 20. Each
-origin receives a separate store, and Recent Links are omitted from DEV
-responses. A Magnus Build entry cannot be opened as a URL; activation routes it
+validated on every read, and the oldest entries are removed beyond 20. The
+public list is sorted globally by its last-used timestamp, newest first, rather
+than grouping items by entity type. Each origin receives a separate store, and
+Recent Links are omitted from DEV responses. A Magnus Build entry cannot be
+opened as a URL; activation routes it
 back through the build-path validator after another UI confirmation. The broker
 serves this local list independently from Personal Links,
 so showing the empty Search state never performs a Rock network request. This

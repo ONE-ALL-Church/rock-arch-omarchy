@@ -28,8 +28,9 @@ returned to the panel.
 
 Rock Lens also emulates Rock's Quick Return behavior as **Recent Links**. It
 remembers only same-origin records or Personal Links that were opened from the
-launcher, deduplicates them, caps the list at 20, and stores private target data
-in an owner-only local file. It does not read or follow browser history.
+launcher, deduplicates them, orders them by last use with the newest item first,
+caps the list at 20, and stores private target data in an owner-only local file.
+It does not read or follow browser history.
 
 ![Rock Lens mock launcher](outputs/rock-lens-mvp.png)
 
