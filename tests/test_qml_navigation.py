@@ -8,6 +8,7 @@ QML_PATH = (
     / "RockLens.qml"
 )
 SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
+KEY_CATCHER_PATH = QML_PATH.with_name("RockLensKeyCatcher.qml")
 
 
 class QmlNavigationTests(unittest.TestCase):
@@ -114,6 +115,48 @@ class QmlNavigationTests(unittest.TestCase):
             "    } else {\n"
             "      openSettings(false)",
             source,
+        )
+
+    def test_settings_controls_use_native_keyboard_focus_chain(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("property bool formMode: false", key_catcher)
+        self.assertLess(
+            key_catcher.index("if (event.key === Qt.Key_Escape)"),
+            key_catcher.index("if (blocked || formMode) return"),
+        )
+        self.assertIn(
+            'formMode: root.onboardingRequired || root.viewMode === "settings"',
+            source,
+        )
+        self.assertIn(
+            "settingsAddProfileButton.forceActiveFocus(Qt.TabFocusReason)",
+            source,
+        )
+        for control_id in (
+            "settingsAddProfileButton",
+            "useProfileButton",
+            "removeProfileButton",
+            "changeLoginButton",
+            "testProfileButton",
+            "signOutButton",
+            "addProfileButton",
+            "saveLoginButton",
+        ):
+            start = source.index(f"id: {control_id}")
+            self.assertIn("focusable: true", source[start : start + 350])
+        self.assertGreaterEqual(
+            source.count("onActiveFocusChanged: root.revealSettingsControl"),
+            16,
+        )
+        self.assertEqual(
+            source.count("Keys.onReturnPressed: root.toggle"),
+            4,
+        )
+        self.assertEqual(
+            source.count("Keys.onEnterPressed: root.toggle"),
+            4,
         )
 
     def test_magnus_actions_and_recent_builds_are_explicit(self):

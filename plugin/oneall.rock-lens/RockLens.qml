@@ -567,7 +567,28 @@ Panel {
     feedbackText = ""
     panelFlick.contentY = 0
     request({op: "profiles_status"})
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function() {
+      settingsAddProfileButton.forceActiveFocus(Qt.TabFocusReason)
+      root.revealItem(settingsAddProfileButton)
+    })
+  }
+  function revealSettingsControl(control) {
+    if (viewMode !== "settings" || !control || !control.activeFocus) return
+    Qt.callLater(function() { root.revealItem(control) })
+  }
+  function togglePersonContextPreference() {
+    preferencePersonContext = !preferencePersonContext
+    updatePreference("showPersonContext", preferencePersonContext)
+  }
+  function toggleRecentLinksPreference() {
+    preferenceRecentLinks = !preferenceRecentLinks
+    updatePreference("recentLinks", preferenceRecentLinks)
+    if (!preferenceRecentLinks) quickReturns = []
+    else refreshQuickReturns()
+  }
+  function toggleCloseAfterOpenPreference() {
+    preferenceCloseAfterOpen = !preferenceCloseAfterOpen
+    updatePreference("closeAfterOpen", preferenceCloseAfterOpen)
   }
   function backspaceToSearch() {
     var selectionStart = searchField.selectionStart
@@ -1130,6 +1151,7 @@ Panel {
     RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      formMode: root.onboardingRequired || root.viewMode === "settings"
       blocked: searchField.activeFocus || onboardingDomainField.activeFocus || onboardingUsernameField.activeFocus || onboardingPasswordField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus || magnusTextArea.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
       onCloseRequested: root.escapePanel()
@@ -1882,8 +1904,11 @@ Panel {
                 }
                 Item { Layout.fillWidth: true }
                 Button {
+                  id: settingsAddProfileButton
                   text: root.addProfileMode ? "Cancel" : "Add profile"
+                  focusable: true
                   enabled: !root.setupBusy
+                  onActiveFocusChanged: root.revealSettingsControl(settingsAddProfileButton)
                   onClicked: {
                     root.addProfileMode = !root.addProfileMode
                     root.setupUsername = ""
@@ -1931,14 +1956,20 @@ Panel {
                         font.pixelSize: Style.font.bodySmall
                       }
                       Button {
+                        id: useProfileButton
                         visible: !modelData.isActive
                         text: "Use"
+                        focusable: true
                         enabled: !root.setupBusy
+                        onActiveFocusChanged: root.revealSettingsControl(useProfileButton)
                         onClicked: root.switchProfile(modelData.id)
                       }
                       Button {
+                        id: removeProfileButton
                         text: root.pendingRemoveProfileId === modelData.id ? "Confirm remove" : "Remove"
+                        focusable: true
                         enabled: !root.setupBusy
+                        onActiveFocusChanged: root.revealSettingsControl(removeProfileButton)
                         onClicked: root.removeProfile(modelData.id)
                       }
                     }
@@ -1967,9 +1998,12 @@ Panel {
                         elide: Text.ElideRight
                       }
                       Button {
+                        id: changeLoginButton
                         visible: root.rockConfigured
                         text: root.editLoginMode ? "Cancel" : "Change login"
+                        focusable: true
                         enabled: !root.setupBusy
+                        onActiveFocusChanged: root.revealSettingsControl(changeLoginButton)
                         onClicked: {
                           root.editLoginMode = !root.editLoginMode
                           root.setupUsername = ""
@@ -1978,9 +2012,12 @@ Panel {
                         }
                       }
                       Button {
+                        id: testProfileButton
                         visible: root.rockConfigured
                         text: "Test"
+                        focusable: true
                         enabled: !root.setupBusy
+                        onActiveFocusChanged: root.revealSettingsControl(testProfileButton)
                         onClicked: {
                           root.beginSetup("Testing connection…")
                           root.feedbackText = "Testing connection…"
@@ -1988,9 +2025,12 @@ Panel {
                         }
                       }
                       Button {
+                        id: signOutButton
                         visible: root.rockConfigured
                         text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
+                        focusable: true
                         enabled: !root.setupBusy
+                        onActiveFocusChanged: root.revealSettingsControl(signOutButton)
                         onClicked: root.signOut()
                       }
                     }
@@ -2013,45 +2053,56 @@ Panel {
                   TextField {
                     id: profileNameField
                     width: parent.width
+                    activeFocusOnTab: true
                     maximumLength: 80
                     placeholderText: "Profile name (for example Main Campus)"
                     text: root.newProfileName
                     selectByMouse: true
+                    onActiveFocusChanged: root.revealSettingsControl(profileNameField)
                     onTextChanged: root.newProfileName = text
                   }
                   TextField {
                     id: domainField
                     width: parent.width
+                    activeFocusOnTab: true
                     maximumLength: 250
                     placeholderText: "Rock domain (for example rock.example.org)"
                     text: root.newProfileDomain
                     selectByMouse: true
                     inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
+                    onActiveFocusChanged: root.revealSettingsControl(domainField)
                     onTextChanged: root.newProfileDomain = text
                   }
                   TextField {
                     id: usernameField
                     width: parent.width
+                    activeFocusOnTab: true
                     maximumLength: 200
                     placeholderText: "Rock username"
                     text: root.setupUsername
                     selectByMouse: true
+                    onActiveFocusChanged: root.revealSettingsControl(usernameField)
                     onTextChanged: root.setupUsername = text
                   }
                   TextField {
                     id: passwordField
                     width: parent.width
+                    activeFocusOnTab: true
                     placeholderText: "Rock password"
                     text: root.setupPassword
                     echoMode: TextInput.Password
                     selectByMouse: true
                     inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                    onActiveFocusChanged: root.revealSettingsControl(passwordField)
                     onTextChanged: root.setupPassword = text
                     onAccepted: root.addProfile()
                   }
                   Button {
+                    id: addProfileButton
                     text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
+                    focusable: true
                     enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                    onActiveFocusChanged: root.revealSettingsControl(addProfileButton)
                     onClicked: root.addProfile()
                   }
                 }
@@ -2077,26 +2128,33 @@ Panel {
                   TextField {
                     id: activeUsernameField
                     width: parent.width
+                    activeFocusOnTab: true
                     maximumLength: 200
                     placeholderText: "Rock username"
                     text: root.setupUsername
                     selectByMouse: true
+                    onActiveFocusChanged: root.revealSettingsControl(activeUsernameField)
                     onTextChanged: root.setupUsername = text
                   }
                   TextField {
                     id: activePasswordField
                     width: parent.width
+                    activeFocusOnTab: true
                     placeholderText: "Rock password"
                     text: root.setupPassword
                     echoMode: TextInput.Password
                     selectByMouse: true
                     inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                    onActiveFocusChanged: root.revealSettingsControl(activePasswordField)
                     onTextChanged: root.setupPassword = text
                     onAccepted: root.saveRockCredentials()
                   }
                   Button {
+                    id: saveLoginButton
                     text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Save login"
+                    focusable: true
                     enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                    onActiveFocusChanged: root.revealSettingsControl(saveLoginButton)
                     onClicked: root.saveRockCredentials()
                   }
                 }
@@ -2105,16 +2163,26 @@ Panel {
               Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.12) }
               Text { text: "Search and behavior"; color: Color.foreground; font.pixelSize: Style.font.heading; font.bold: true }
               CheckBox {
+                id: personContextCheckBox
                 text: "Person context · age, spouse, campus, and status"
+                activeFocusOnTab: true
                 checked: root.preferencePersonContext
+                onActiveFocusChanged: root.revealSettingsControl(personContextCheckBox)
+                Keys.onReturnPressed: root.togglePersonContextPreference()
+                Keys.onEnterPressed: root.togglePersonContextPreference()
                 onClicked: {
                   root.preferencePersonContext = checked
                   root.updatePreference("showPersonContext", checked)
                 }
               }
               CheckBox {
+                id: recentLinksCheckBox
                 text: "Remember Recent Links"
+                activeFocusOnTab: true
                 checked: root.preferenceRecentLinks
+                onActiveFocusChanged: root.revealSettingsControl(recentLinksCheckBox)
+                Keys.onReturnPressed: root.toggleRecentLinksPreference()
+                Keys.onEnterPressed: root.toggleRecentLinksPreference()
                 onClicked: {
                   root.preferenceRecentLinks = checked
                   root.updatePreference("recentLinks", checked)
@@ -2123,8 +2191,13 @@ Panel {
                 }
               }
               CheckBox {
+                id: closeAfterOpenCheckBox
                 text: "Close Rock Lens after opening an item"
+                activeFocusOnTab: true
                 checked: root.preferenceCloseAfterOpen
+                onActiveFocusChanged: root.revealSettingsControl(closeAfterOpenCheckBox)
+                Keys.onReturnPressed: root.toggleCloseAfterOpenPreference()
+                Keys.onEnterPressed: root.toggleCloseAfterOpenPreference()
                 onClicked: {
                   root.preferenceCloseAfterOpen = checked
                   root.updatePreference("closeAfterOpen", checked)
@@ -2144,9 +2217,14 @@ Panel {
                     {key: "Content Channel Items", label: "Content Items"}
                   ]
                   delegate: CheckBox {
+                    id: categoryCheckBox
                     required property var modelData
                     text: modelData.label
+                    activeFocusOnTab: true
                     checked: root.categoryEnabled(modelData.key)
+                    onActiveFocusChanged: root.revealSettingsControl(categoryCheckBox)
+                    Keys.onReturnPressed: root.toggleCategory(modelData.key)
+                    Keys.onEnterPressed: root.toggleCategory(modelData.key)
                     onClicked: root.toggleCategory(modelData.key)
                   }
                 }

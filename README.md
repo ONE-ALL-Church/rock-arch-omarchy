@@ -21,7 +21,10 @@ A compact Settings view supports multiple Rock instances or accounts. Each
 profile card owns its login state, Magnus availability, connection testing,
 sign-out, removal, and per-profile Recent Links. Search category controls,
 person-context visibility, and close-after-open behavior (enabled by default)
-stay in a separate preferences section.
+stay in a separate preferences section. Opening Settings focuses **Add profile**;
+`Tab` and `Shift+Tab` walk every available action, field, preference, and search
+category while keeping the focused control visible. `Enter` or `Space` activates
+the focused control, and `Esc` returns to Search.
 On first launch, or whenever the active profile has no saved login, Rock Lens
 shows a focused onboarding screen with only the Rock domain, username, password,
 and **Connect** action. Navigation and settings stay hidden until the login has

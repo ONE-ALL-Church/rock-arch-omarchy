@@ -289,6 +289,18 @@
   the screen contains exactly three fields: Rock domain, username, and masked
   password. The existing secure broker operations still verify and store the
   login, and a successful connection transfers focus to Search.
+- Settings uses Qt's native form focus chain instead of the launcher's result
+  key catcher. Opening the view focuses **Add profile**; every visible profile
+  action, login field, preference, and category is tabbable, automatically
+  scrolled into view, and activatable with Enter or Space. Shift+Tab reverses
+  the same chain, while Esc remains a panel-level return to Search. A bounded
+  installed-shell pass confirmed Shift+Tab from Search entered Settings with
+  **Add profile** focused, Tab advanced through a profile action to the first
+  preference, reverse traversal returned to **Add profile**, Enter opened the
+  add-profile form with its first field focused, and Esc returned to Search.
+  Enter on the focused Person context preference changed the broker value from
+  true to false; a second Enter restored it to true. No profile or login was
+  changed, and all temporary captures were deleted after inspection.
 - Search results, Recent Links, Personal Links, and Magnus items share one
   accent-tint, outline, and side-marker component. Every two-line selectable row
   uses the same 52-pixel height, clips its contents, and reserves consistent

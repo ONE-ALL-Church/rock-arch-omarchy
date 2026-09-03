@@ -7,6 +7,7 @@ Item {
   id: root
 
   property bool blocked: false
+  property bool formMode: false
   property bool backspaceEnabled: false
 
   signal moveRequested(int dx, int dy)
@@ -21,14 +22,17 @@ Item {
   focus: true
   Keys.priority: Keys.BeforeItem
   Keys.onPressed: function(event) {
-    if (blocked) return
+    if (event.key === Qt.Key_Escape) {
+      closeRequested(); event.accepted = true; return
+    }
+
+    // Forms use Qt's native focus chain so Tab, Shift+Tab, typing, and control
+    // activation reach the focused field or button. Escape remains global.
+    if (blocked || formMode) return
 
     if (backspaceEnabled && event.key === Qt.Key_Backspace &&
         !(event.modifiers & (Qt.AltModifier | Qt.MetaModifier))) {
       backspaceRequested(); event.accepted = true; return
-    }
-    if (event.key === Qt.Key_Escape) {
-      closeRequested(); event.accepted = true; return
     }
     if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
       tabRequested((event.modifiers & Qt.ShiftModifier) ||
