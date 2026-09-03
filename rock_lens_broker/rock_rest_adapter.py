@@ -327,7 +327,7 @@ class RockRestReadOnlyAdapter:
                             spec,
                             normalized,
                             include_person_context,
-                            allow_numeric_id=category is not None,
+                            allow_numeric_id=True,
                         ),
                         cookie,
                     )

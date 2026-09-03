@@ -73,7 +73,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('text: root.feedbackText || root.guidanceText()', source)
         self.assertIn('"Changes save automatically. Press Esc to return to Search."', source)
         self.assertIn('"Getting your Rock workspace ready…"', source)
-        self.assertIn("Scoped IDs and any GUID work too.", source)
+        self.assertIn("Any ID or GUID checks every category.", source)
         for old_copy in (
             "Checking saved Rock login",
             "Tab Search · Shift+Tab previous",

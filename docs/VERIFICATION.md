@@ -245,8 +245,8 @@
   which returned focus to the selected mobile app. No build POST was sent, and
   the captures were deleted.
 - Scoped searches now use exact Rock `Id` or typed `Guid` OData filters for all
-  six supported entities. An unscoped GUID fans out only across enabled entity
-  types, while an unscoped number remains text because integer IDs overlap.
+  six supported entities. An unscoped ID or GUID fans out only across enabled
+  entity types; overlapping numeric IDs intentionally return every matching type.
   Privacy-bounded live no-match checks completed with zero unavailable
   categories. Seventy-seven tests, Ruff, ty, bytecode compilation, the installed
   socket checks, shell restart, `hyprctl reload`, and an empty

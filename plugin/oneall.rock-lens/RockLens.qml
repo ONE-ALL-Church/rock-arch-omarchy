@@ -219,7 +219,7 @@ Panel {
       return "Showing " + scopeLabel + " only. Esc returns to all categories."
     if (showRecentLinks)
       return "Start typing to search, or use Up/Down and Enter to open a recent item."
-    return "Narrow results with p:, g:, w:, j:, pg:, or c:. Scoped IDs and any GUID work too."
+    return "Narrow results with p:, g:, w:, j:, pg:, or c:. Any ID or GUID checks every category."
   }
 
   function categoryEnabled(category) {

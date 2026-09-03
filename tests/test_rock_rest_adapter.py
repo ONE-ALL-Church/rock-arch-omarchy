@@ -384,7 +384,7 @@ class RockRestAdapterTests(unittest.TestCase):
             "Guid eq guid'a81b7c6d-1234-4abc-9876-0123456789ab'",
         )
 
-    def test_unscoped_guid_searches_all_enabled_entities_but_number_is_text(self):
+    def test_unscoped_ids_and_guids_search_all_enabled_entities(self):
         http = FakeHttp()
         adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
         guid = "a81b7c6d-1234-4abc-9876-0123456789ab"
@@ -401,7 +401,7 @@ class RockRestAdapterTests(unittest.TestCase):
         http.calls.clear()
         adapter.search("17")
         self.assertTrue(
-            all("Id eq" not in params["$filter"] for _, params, _ in http.calls)
+            all(params["$filter"] == "Id eq 17" for _, params, _ in http.calls)
         )
 
     def test_scoped_search_rejects_unknown_internal_categories(self):

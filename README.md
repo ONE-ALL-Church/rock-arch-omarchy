@@ -169,12 +169,12 @@ prefix such as `g:` lists the first three items in that category.
 
 For example, `g: youth` calls only the Groups endpoint. Every scope also accepts
 an exact Rock ID or GUID, such as `g: 42` or `p: a81b7c6d-1234-4abc-9876-0123456789ab`.
-A GUID entered without a prefix is checked across all enabled categories. A bare
-numeric ID is not searched across categories because Rock IDs overlap between
-entity types; add the appropriate prefix instead. The active scope appears as a
-badge beside the search field. `Esc` clears the scope before closing the panel,
-and `Alt+0` clears it directly. Unknown prefixes remain ordinary search text;
-no slash-command mode is required.
+An ID or GUID entered without a prefix is checked across all enabled categories,
+so a numeric ID can return several entity types when their IDs overlap. Add a
+prefix when you know the entity type and want only that match. The active scope
+appears as a badge beside the search field. `Esc` clears the scope before closing
+the panel, and `Alt+0` clears it directly. Unknown prefixes remain ordinary
+search text; no slash-command mode is required.
 
 The search field keeps native editing behavior. Up and Down move through Recent
 Links or results and across the Search/Personal Links boundary. Tab cycles the
