@@ -231,6 +231,7 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
 
         self.assertIn("ShapePath.OddEvenFill", source)
+        self.assertIn("hasVisualContent: true", source)
         self.assertIn("fillColor: button.active ? button.activeColor : button.foreground", source)
         self.assertIn('tooltipText: "Rock Arch"', source)
 

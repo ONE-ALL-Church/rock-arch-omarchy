@@ -34,7 +34,7 @@ Panel {
   property bool preferenceAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.16.1"
+  property string currentVersion: "0.16.2"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""

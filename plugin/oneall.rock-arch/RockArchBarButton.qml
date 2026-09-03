@@ -10,6 +10,7 @@ WidgetButton {
   visible: controller.preferenceShowMenuBar
   text: ""
   keepSpace: true
+  hasVisualContent: true
   labelVisible: false
   active: controller.opened
   fixedWidth: button.barSize
