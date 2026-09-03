@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.21.0` release boundary. Historical feature
+This record describes the current `0.23.0` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 148 passing tests. Release-contract coverage keeps
+The suite contains 165 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
@@ -27,6 +27,9 @@ public-source URL validation, and keyboard-complete detail navigation. Updater
 coverage verifies remote revision detection, manifest identity and
 version validation, local-change refusal, fixed worker launch arguments, private
 state permissions, broker routing, and the opt-in automatic-update preference.
+CLI coverage verifies command routing, masked interactive login, confirmation
+gates, bounded JSON transport, socket ownership checks, default-on preference
+enforcement, and safe launcher installation without replacing another command.
 
 GitHub Actions runs the unit tests, Ruff, ty, and bytecode compilation on every
 push to `main` and on pull requests.
@@ -41,11 +44,30 @@ push to `main` and on pull requests.
   contract test verifies that secret values are supplied to `secret-tool` only
   on stdin, never in argv.
 - The experimental OpenID client, loopback callback server, bearer-token store,
-  CLI configuration path, and broker operations are absent from the release.
+  OpenID CLI configuration path, and broker operations are absent from the release.
   Legacy `auth_status`, `auth_login`, and `auth_disconnect` requests return
   `unsupported_operation`.
 - Old user-owned `oidc.json` and keyring records are ignored and are not silently
   deleted during upgrade.
+
+## Terminal and agent boundary
+
+- `rock-arch` is a JSON client of the existing broker; it has no independent
+  Rock, Knowledge, Magnus, cookie, or credential implementation.
+- The client validates the Unix socket and parent directory as current-user
+  owned with no group/other access. Requests are capped at 16 KiB and responses
+  at 5 MiB. A missing broker may be started through fixed module arguments;
+  `--no-start` refuses that behavior.
+- Terminal access defaults on, is configured in Settings rather than onboarding,
+  and marked CLI requests fail with `terminal_access_disabled` when it is off.
+  The Unix account remains the OS trust boundary.
+- The launcher is installed atomically in `~/.local/bin`, refuses unsafe shapes
+  and unrelated existing commands, and contains no credentials or profile data.
+- `rock-arch login` always reads the password from a masked prompt. No password
+  argument exists. JSON responses never contain submitted credentials.
+- Search, Knowledge, links, profiles, Magnus, and updates reuse the broker's
+  allowlists and process-local opaque IDs. Browser, clipboard, download,
+  deletion, sign-out, removal, update, and build actions require `--confirm`.
 
 ## Data and navigation boundary
 

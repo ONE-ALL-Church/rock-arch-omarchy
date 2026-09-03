@@ -32,6 +32,7 @@ Panel {
   property bool preferenceRecentLinks: true
   property bool preferenceCloseAfterOpen: true
   property bool preferenceShowMenuBar: true
+  property bool preferenceTerminalAccess: true
   property bool preferenceAutomaticUpdates: false
   property bool preferenceOnboardingSetupCompleted: false
   property bool onboardingSetupPending: false
@@ -39,12 +40,15 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.22.0"
+  property string currentVersion: "0.23.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
   property string updateError: ""
   property bool updateAvailable: false
+  property bool terminalInstalled: false
+  property bool terminalInPath: false
+  property string terminalError: ""
   property var searchCategories: [
     {key: "People", label: "People"},
     {key: "Groups", label: "Groups"},
@@ -604,6 +608,7 @@ Panel {
       preferenceRecentLinks = preferences.recentLinks !== false
       preferenceCloseAfterOpen = preferences.closeAfterOpen === true
       preferenceShowMenuBar = preferences.showMenuBar !== false
+      preferenceTerminalAccess = preferences.terminalAccess !== false
       preferenceAutomaticUpdates = preferences.automaticUpdates === true
       preferenceOnboardingSetupCompleted = preferences.onboardingSetupCompleted === true
       if (Array.isArray(preferences.enabledCategories))
@@ -647,6 +652,11 @@ Panel {
         results = []
         feedbackText = "Rock Arch couldn't check what this account can search."
       }
+    }
+    if (response.terminal) {
+      terminalInstalled = response.terminal.installed === true
+      terminalInPath = response.terminal.inPath === true
+      terminalError = String(response.terminal.error || "")
     }
     if (isStatusResponse) {
       statusLoaded = true
@@ -1012,6 +1022,10 @@ Panel {
   function toggleCloseAfterOpenPreference() {
     preferenceCloseAfterOpen = !preferenceCloseAfterOpen
     updatePreference("closeAfterOpen", preferenceCloseAfterOpen)
+  }
+  function toggleTerminalAccessPreference() {
+    preferenceTerminalAccess = !preferenceTerminalAccess
+    updatePreference("terminalAccess", preferenceTerminalAccess)
   }
   function toggleAutomaticUpdatesPreference() {
     preferenceAutomaticUpdates = !preferenceAutomaticUpdates

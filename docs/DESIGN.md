@@ -131,4 +131,6 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   dedicated production confirmation.
 - **Settings:** profiles, preferences, categories, and updates are four visibly
   separate groups. The active profile includes Magnus availability so there is
-  no redundant Connection section.
+  no redundant Connection section. Terminal and agent access is a default-on
+  preference here, not another onboarding choice; its copy names `rock-arch`
+  and explains that no network listener is opened.

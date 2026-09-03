@@ -355,6 +355,16 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("interval: 86400000", source)
         self.assertIn('"Check daily and install only after Omarchy validation."', source)
 
+    def test_terminal_and_agent_access_is_on_by_default_and_settings_only(self):
+        source = all_qml_source()
+        finish_setup = FINISH_SETUP_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('property bool preferenceTerminalAccess: true', source)
+        self.assertIn('label: "Allow terminal and agent access"', source)
+        self.assertIn('updatePreference("terminalAccess", preferenceTerminalAccess)', source)
+        self.assertIn('"Use rock-arch from this account; no network listener is opened."', source)
+        self.assertNotIn("terminal", finish_setup.lower())
+
     def test_every_panel_has_a_keyboard_route_and_contextual_guidance(self):
         source = all_qml_source()
         key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")

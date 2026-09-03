@@ -5,6 +5,34 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-03
+
+### Added
+
+- Add the owner-local `rock-arch` JSON CLI for Rock status and login, detected
+  search capabilities, entity search and person context, public Knowledge and
+  related-item traversal, Personal and Recent Links, profiles, controlled
+  Magnus operations, and plugin updates.
+- Install a small managed launcher into `~/.local/bin` when the broker starts,
+  without replacing an unrelated existing command.
+- Add a default-on **Allow terminal and agent access** preference in Settings.
+  Keep it out of onboarding so the initial Rock connection flow stays focused.
+- Add a registered-file Magnus hash command that returns only title, size, and
+  SHA-256 without returning file contents.
+
+### Security
+
+- Reuse the existing owner-only broker, Secret Service login, memory-only
+  cookie, fixed endpoints, permission detection, and process-local opaque IDs;
+  the CLI has no parallel HTTP or authentication implementation.
+- Validate socket ownership and permissions, cap CLI requests and responses,
+  never accept a password argument, and require `--confirm` for browser,
+  clipboard, download, history deletion, sign-out, removal, update, and build
+  actions.
+- Refuse unsafe launcher directories, symlinks, non-files, foreign files,
+  unrelated existing `rock-arch` commands, and source-checkout attempts to
+  repoint the managed launcher.
+
 ## [0.22.0] - 2026-09-03
 
 ### Added

@@ -7,14 +7,20 @@ import stat
 from pathlib import Path
 
 from .broker import Broker
+from .terminal_access import TerminalAccessManager
 
 MAX_REQUEST = 16 * 1024
 
 
 class BrokerServer:
-    def __init__(self, socket_path: Path, state_file: Path) -> None:
+    def __init__(
+        self,
+        socket_path: Path,
+        state_file: Path,
+        terminal_access: TerminalAccessManager | None = None,
+    ) -> None:
         self.socket_path = socket_path
-        self.broker = Broker(state_file)
+        self.broker = Broker(state_file, terminal_access=terminal_access)
 
     async def _client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter

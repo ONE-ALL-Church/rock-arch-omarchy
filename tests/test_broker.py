@@ -22,6 +22,7 @@ from rock_lens_broker.magnus_adapter import MagnusBuildOutcome
 from rock_lens_broker.navigation import NavigationTarget
 from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
 from rock_lens_broker.rock_rest_adapter import SearchBatch, SearchCapabilities
+from rock_lens_broker.terminal_access import CLI_CLIENT
 
 
 class FakeSession:
@@ -159,6 +160,13 @@ class FakeMagnus:
 
     def copy_value(self, safe_id, value):
         return "test" if value == "content" else "a" * 64
+
+    def file_hash(self, safe_id):
+        return {
+            "title": "test.lava",
+            "sizeBytes": 4,
+            "sha256": "a" * 64,
+        }
 
     def view_target(self, safe_id):
         return NavigationTarget(
@@ -411,6 +419,27 @@ class BrokerContractTests(unittest.TestCase):
         started = broker.handle({"op": "update_start"})
         self.assertEqual(started["update"]["state"], "updating")
         self.assertEqual(updates.start_calls, 1)
+
+    def test_official_terminal_client_is_enabled_by_default_and_can_be_disabled(self):
+        broker = Broker(
+            self.state,
+            instance_file=self.instance,
+            developer_mode=True,
+        )
+
+        self.assertTrue(broker.handle({"op": "status", "client": CLI_CLIENT})["ok"])
+        disabled = broker.handle(
+            {
+                "op": "preferences_update",
+                "preferences": {"terminalAccess": False},
+            }
+        )
+        self.assertFalse(disabled["profiles"]["preferences"]["terminalAccess"])
+        self.assertEqual(
+            broker.handle({"op": "status", "client": CLI_CLIENT}),
+            {"ok": False, "error": "terminal_access_disabled"},
+        )
+        self.assertTrue(broker.handle({"op": "status"})["ok"])
 
     def test_onboarding_setup_choices_are_explicit_and_persisted(self):
         updates = FakeUpdates()
@@ -810,9 +839,12 @@ class BrokerContractTests(unittest.TestCase):
         preview = broker.handle(
             {"op": "magnus_preview", "safeId": "opaque-magnus-item"}
         )
+        file_hash = broker.handle({"op": "magnus_hash", "safeId": "opaque-magnus-item"})
         self.assertTrue(preview["ok"])
         self.assertEqual(preview["magnus"]["state"], "available")
         self.assertEqual(preview["magnusPreview"]["sha256"], "a" * 64)
+        self.assertTrue(file_hash["ok"])
+        self.assertEqual(file_hash["magnusHash"]["sha256"], "a" * 64)
 
     def test_magnus_file_actions_keep_values_private(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

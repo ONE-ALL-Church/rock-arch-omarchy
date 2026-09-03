@@ -38,6 +38,7 @@ from .rock_rest_adapter import (
     SearchCapabilities,
 )
 from .rock_session import RockSessionError, RockSessionProvider
+from .terminal_access import UnmanagedTerminalAccess
 from .updates import UpdateManager
 
 
@@ -81,6 +82,8 @@ class MagnusStatusProvider(Protocol):
     def preview(self, safe_id: str) -> dict[str, Any]: ...
 
     def download(self, safe_id: str) -> dict[str, Any]: ...
+
+    def file_hash(self, safe_id: str) -> dict[str, Any]: ...
 
     def copy_value(self, safe_id: str, value: str) -> str: ...
 
@@ -133,6 +136,12 @@ class UpdateStatusProvider(Protocol):
     def start_update(self) -> dict[str, Any]: ...
 
 
+class TerminalAccessProvider(Protocol):
+    def ensure_launcher(self) -> None: ...
+
+    def status(self, *, enabled: bool) -> dict[str, Any]: ...
+
+
 class Broker:
     def __init__(
         self,
@@ -148,6 +157,7 @@ class Broker:
         profile_file: Path | None = None,
         developer_mode: bool | None = None,
         updates: UpdateStatusProvider | None = None,
+        terminal_access: TerminalAccessProvider | None = None,
     ) -> None:
         self._state_file = state_file
         self._developer_mode = (
@@ -199,6 +209,8 @@ class Broker:
             self._quick_return_path(), self._origin
         )
         self._updates = updates or UpdateManager(self._quick_root / "updates.json")
+        self._terminal_access = terminal_access or UnmanagedTerminalAccess()
+        self._terminal_access.ensure_launcher()
         if (
             not quick_returns
             and self._profile_store.migrated_profile_id
@@ -461,11 +473,15 @@ class Broker:
         self._live_health = HealthState.UNKNOWN
 
     def _profile_response(self, **payload: Any) -> dict[str, Any]:
+        preferences = self._profile_store.preferences()
         return self._ok(
             profiles=self._profile_store.snapshot(),
             instance=self._instance_status(),
             rock=self._session.status(),
             magnus=self._magnus.status(),
+            terminal=self._terminal_access.status(
+                enabled=preferences["terminalAccess"]
+            ),
             **payload,
         )
 

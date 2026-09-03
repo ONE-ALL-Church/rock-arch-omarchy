@@ -335,6 +335,10 @@ class MagnusAdapterTests(unittest.TestCase):
             safe_id = row["safeId"]
             self.assertEqual(adapter.copy_value(safe_id, "content"), '{"name":"ONE&ALL"}')
             self.assertEqual(len(adapter.copy_value(safe_id, "hash")), 64)
+            file_hash = adapter.file_hash(safe_id)
+            self.assertEqual(file_hash["title"], "mobile.json")
+            self.assertEqual(file_hash["sizeBytes"], 18)
+            self.assertEqual(len(file_hash["sha256"]), 64)
             first = adapter.download(safe_id)
             second = adapter.download(safe_id)
             self.assertEqual(first["savedAs"], "mobile.json")

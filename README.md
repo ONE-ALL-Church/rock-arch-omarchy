@@ -14,6 +14,9 @@ features. Public Knowledge search is credentialless and isolated from that
 session. Rock Arch does not require an OpenID client, Rock MCP, Rock KB client,
 Magnus CLI, Node.js, or npm.
 
+An owner-local `rock-arch` command exposes the same bounded Search, Knowledge,
+Links, profile, Magnus, and update capabilities to terminal users and agents.
+
 ![Current Rock Arch search with a selected result](outputs/keyboard-audit/02-search-results.png)
 
 Accounts with Magnus access automatically receive the Magnus tab, including
@@ -107,13 +110,49 @@ Rock Arch while the item is hidden, so it can always be restored from Settings.
 The equivalent terminal commands are:
 
 ```bash
-python3 -m rock_lens_broker rock login
-python3 -m rock_lens_broker rock status
+rock-arch login
+rock-arch --pretty status
 ```
 
 Rock Arch does not read legacy `oidc.json` metadata or use stored OAuth client
 secrets/tokens. Version 0.14 removed that dormant experimental code; existing
 user-owned legacy records are left untouched rather than silently deleted.
+
+## Terminal and agent access
+
+A managed Omarchy installation creates `rock-arch` in `~/.local/bin` without
+replacing an unrelated existing command. A source checkout cannot repoint that
+launcher. Terminal access is enabled by default and has a toggle in
+**Settings**. It is not repeated during onboarding because it opens no network
+listener and remains inside the current Unix account's existing owner-only
+broker boundary. Disabling it leaves the command present but makes official
+CLI requests fail with `terminal_access_disabled`.
+
+Commands return JSON, use the active Rock profile, and can safely start the
+local broker when the Omarchy panel is closed. Login is interactive: the
+password uses a masked prompt and is never accepted as an argument.
+
+```bash
+rock-arch status
+rock-arch capabilities --refresh
+rock-arch login
+rock-arch search "Alex Smith"
+rock-arch search 42 --entity groups
+rock-arch knowledge search "mm: Group"
+rock-arch links personal
+rock-arch links recent
+rock-arch magnus status
+rock-arch magnus browse
+```
+
+Results and Magnus descriptors return process-local opaque `safeId` values for
+follow-up commands. Actions that open something, change local state, copy or
+download content, install an update, or start a mobile build require an
+explicit `--confirm`. The CLI provides no arbitrary endpoint, SQL, Magnus
+write/upload/delete, job-run, or generic Rock mutation command.
+
+See [docs/CLI.md](docs/CLI.md) for the complete command reference and agent
+safety model.
 
 ## Developer mode
 

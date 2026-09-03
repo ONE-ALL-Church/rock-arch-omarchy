@@ -30,18 +30,22 @@ Authorized profiles receive a **Magnus** tab with:
 - explicit, confirmed mobile app builds;
 - same-origin validation for tree, content, and advertised action URIs.
 
-The terminal interface uses the same native adapter:
+The agent-friendly terminal interface uses the running broker and opaque IDs:
 
 ```bash
-python3 -m rock_lens_broker magnus status
-python3 -m rock_lens_broker magnus ls
-python3 -m rock_lens_broker magnus ls \
-  api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14
-python3 -m rock_lens_broker magnus cat \
-  /FileContent/block-handler/5350/content.lava
-python3 -m rock_lens_broker magnus hash \
-  /FileContent/block-handler/5350/content.lava
+rock-arch magnus status
+rock-arch magnus browse
+rock-arch magnus browse SAFE_FOLDER_ID
+rock-arch magnus preview SAFE_FILE_ID
+rock-arch magnus hash SAFE_FILE_ID
+rock-arch magnus download SAFE_FILE_ID --confirm
+rock-arch magnus build SAFE_APP_ID --confirm
 ```
+
+The legacy path-oriented `python3 -m rock_lens_broker magnus ls|cat|hash`
+commands remain available for local diagnostics and obey the same Settings
+access preference. The public `rock-arch` client is preferred for agents because
+raw server paths stay behind the broker.
 
 Tree paths must begin with
 `api/TriumphTech/Magnus/GetTreeItems/`. Content paths must begin with

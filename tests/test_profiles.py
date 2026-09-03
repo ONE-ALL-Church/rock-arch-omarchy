@@ -56,6 +56,7 @@ class ProfileStoreTests(unittest.TestCase):
         )
         self.assertFalse(updated["showPersonContext"])
         self.assertTrue(updated["closeAfterOpen"])
+        self.assertTrue(updated["terminalAccess"])
         self.assertFalse(updated["automaticUpdates"])
         self.assertFalse(updated["automaticUpdatesPrompted"])
         self.assertFalse(updated["onboardingSetupCompleted"])
@@ -74,6 +75,8 @@ class ProfileStoreTests(unittest.TestCase):
         )
         self.assertFalse(declined["automaticUpdates"])
         self.assertTrue(declined["automaticUpdatesPrompted"])
+        terminal_disabled = store.update_preferences({"terminalAccess": False})
+        self.assertFalse(terminal_disabled["terminalAccess"])
         with self.assertRaisesRegex(ProfileError, "invalid_preferences"):
             store.update_preferences({"rawCookie": True})
         with self.assertRaisesRegex(ProfileError, "invalid_profile_name"):

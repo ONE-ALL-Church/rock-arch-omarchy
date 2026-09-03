@@ -555,6 +555,28 @@ Column {
     }
 
     Toggle {
+      id: terminalAccessCheckBox
+      width: parent.width
+      label: "Allow terminal and agent access"
+      description: !settingsPanel.controller.preferenceTerminalAccess
+        ? "The rock-arch command stays installed, but official requests are refused."
+        : settingsPanel.controller.terminalError === "cli_launcher_conflict"
+          ? "Another rock-arch command already exists, so Rock Arch left it unchanged."
+          : settingsPanel.controller.terminalError === "cli_launcher_managed_manually"
+            ? "This source checkout will not change your installed rock-arch command."
+            : settingsPanel.controller.terminalError
+          ? "The terminal launcher could not be installed automatically."
+          : settingsPanel.controller.terminalInstalled &&
+            settingsPanel.controller.terminalInPath
+            ? "Use rock-arch from this account; no network listener is opened."
+            : "Use python3 -m rock_lens_broker.cli until rock-arch is available."
+      checked: settingsPanel.controller.preferenceTerminalAccess
+      onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(
+        terminalAccessCheckBox)
+      onClicked: settingsPanel.controller.toggleTerminalAccessPreference()
+    }
+
+    Toggle {
       id: personContextCheckBox
       width: parent.width
       label: "Show person context"

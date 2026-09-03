@@ -18,6 +18,7 @@ from .origin import OriginError
 from .profiles import ProfileError, ProfileStore
 from .rock_session import RockSessionError, RockSessionProvider
 from .server import BrokerServer
+from .terminal_access import TerminalAccessManager
 
 
 def magnus(argv: list[str]) -> None:
@@ -39,6 +40,8 @@ def magnus(argv: list[str]) -> None:
     profile_store = ProfileStore(
         default_instance_path().with_name("profiles.json"), instance_store
     )
+    if not profile_store.preferences()["terminalAccess"]:
+        raise SystemExit("terminal_access_disabled")
     active_profile = profile_store.active()
     session = RockSessionProvider(
         origin=active_profile.origin if active_profile else None,
@@ -137,7 +140,13 @@ def main() -> None:
     parser.add_argument("--socket", type=Path, default=runtime / "broker.sock")
     parser.add_argument("--state-file", type=Path, default=state / "context")
     args = parser.parse_args()
-    asyncio.run(BrokerServer(args.socket, args.state_file).run())
+    asyncio.run(
+        BrokerServer(
+            args.socket,
+            args.state_file,
+            terminal_access=TerminalAccessManager(),
+        ).run()
+    )
 
 
 if __name__ == "__main__":

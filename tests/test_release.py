@@ -39,6 +39,21 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertFalse((ROOT / "plugin/oneall.rock-arch/manifest.json").exists())
 
+    def test_terminal_cli_is_packaged_and_documented(self):
+        pyproject = tomllib.loads(
+            (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertEqual(
+            pyproject["project"]["scripts"]["rock-arch"],
+            "rock_lens_broker.cli:main",
+        )
+        self.assertTrue((ROOT / "rock_lens_broker/cli.py").is_file())
+        self.assertTrue((ROOT / "rock_lens_broker/terminal_access.py").is_file())
+        self.assertTrue((ROOT / "docs/CLI.md").is_file())
+        self.assertIn("docs/CLI.md", readme)
+
     def test_public_install_url_is_not_a_placeholder(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn(

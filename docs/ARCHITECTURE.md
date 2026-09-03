@@ -8,31 +8,33 @@
    primitives.
 2. `rock_lens_broker`: an allowlist-based local broker using an owner-only Unix
    socket (`0700` directory, `0600` socket).
-3. `RockSessionProvider`: native per-profile Rock login, Secret Service
+3. `rock-arch`: an owner-local, JSON-producing terminal and agent client for
+   the same broker. It adds no independent HTTP or credential implementation.
+4. `RockSessionProvider`: native per-profile Rock login, Secret Service
    credential storage, and a validated memory-only `.ROCK` cookie.
-4. `SecretToolStore`: the small Secret Service adapter used only for
+5. `SecretToolStore`: the small Secret Service adapter used only for
    per-profile Rock usernames and passwords.
-5. `MockAdapter`: deterministic, synthetic records for People, Groups, Group
+6. `MockAdapter`: deterministic, synthetic records for People, Groups, Group
    Types, Workflow Types, Jobs, Pages, Content Channel Types, and Content
    Channel Items.
-6. `MagnusReadOnlyAdapter`: optional native capability probe plus descriptor-
+7. `MagnusReadOnlyAdapter`: optional native capability probe plus descriptor-
    driven browsing, bounded previews/downloads, clipboard values, hashes,
    same-origin view links, and confirmed mobile app builds on the selected Rock
    origin. It reuses `RockSessionProvider`; no external CLI is launched.
-7. `RockRestReadOnlyAdapter`: eight fixed Rock REST v1 entity GETs plus the fixed
+8. `RockRestReadOnlyAdapter`: eight fixed Rock REST v1 entity GETs plus the fixed
    current-user Personal Links action, authenticated by the native Rock session.
-8. `RockKbReadOnlyAdapter`: explicit public Knowledge search and exact-result
+9. `RockKbReadOnlyAdapter`: explicit public Knowledge search and exact-result
    reads through a fixed, credentialless HTTPS origin, with bounded response
    transformation, short in-memory caches, and opaque result/source IDs.
-9. `QuickReturnStore`: same-origin launcher and successful-build history,
+10. `QuickReturnStore`: same-origin launcher and successful-build history,
    deduplicated and capped at 20 in an owner-only JSON file. Build entries are
    executed only through the Magnus validator and require confirmation again.
-10. `BrokerOperations`: the explicit operation-name router and request handlers;
+11. `BrokerOperations`: the explicit operation-name router and request handlers;
    broker construction, state ownership, and lifecycle transitions remain in
    `Broker`.
-11. `http_security`: shared redirect refusal, authenticated cookie-header
+12. `http_security`: shared redirect refusal, authenticated cookie-header
     validation, and bounded JSON decoding used by every Rock HTTP client.
-12. `UpdateManager`: daily public-Git revision checks plus a fixed detached
+13. `UpdateManager`: daily public-Git revision checks plus a fixed detached
     worker that delegates installation, validation, rollback, and plugin reload
     to Omarchy. Automatic installation is an explicit preference and defaults
     to off.
@@ -59,6 +61,24 @@ path. A stale socket is removed only after its device, inode, owner, type, and
 permissions are rechecked; a live private socket is treated as an already
 running broker. QML launches the broker through `/usr/bin/python3`, avoiding a
 PATH-selected executable at this credential boundary.
+
+The supported terminal client validates the owner and permissions of the same
+socket and its directory, bounds responses to 5 MiB, and adds an explicit
+official-client marker. The broker refuses marked terminal requests when the
+default-on `terminalAccess` preference is disabled. This preference is a
+supported-client control, not a sandbox against hostile software already
+running as the same Unix account. The Unix account remains the OS security
+boundary.
+
+When the broker runs from the canonical Git-managed plugin installation,
+`TerminalAccessManager` atomically installs a small `~/.local/bin/rock-arch`
+Python launcher pointing at that installation. It refuses source-checkout
+repointing, symlinks, foreign or unsafe paths, and any unrelated existing
+command. The launcher contains no credentials or profile data. CLI login reads
+the password from a masked terminal prompt and never accepts it in argv.
+Commands produce bounded JSON and use process-local opaque IDs; IDs expire when
+the broker restarts. Browser, clipboard, download, history deletion, sign-out,
+profile removal, update installation, and mobile builds require `--confirm`.
 
 The updater is active only when the running repository is the canonical
 Git-managed `oneall.rock-arch` installation. It fetches only `origin HEAD`,

@@ -523,6 +523,15 @@ class MagnusReadOnlyAdapter:
             return str(preview["content"])
         raise MagnusError("magnus_copy_unavailable")
 
+    def file_hash(self, safe_id: str) -> dict[str, Any]:
+        target = self._resolve_file(safe_id)
+        content = self.read_file(target.path)
+        return {
+            "title": target.title,
+            "sizeBytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        }
+
     def view_target(self, safe_id: str) -> NavigationTarget:
         target = self._resolve_file(safe_id)
         if not target.view_url:

@@ -17,6 +17,7 @@ from .profiles import ProfileError, RockProfile, default_profile_name
 from .rock_kb_adapter import RockKbError
 from .rock_rest_adapter import RockRestError
 from .rock_session import RockSessionError
+from .terminal_access import CLI_CLIENT
 from .updates import UpdateError
 
 if TYPE_CHECKING:
@@ -54,6 +55,7 @@ class BrokerOperations:
             "magnus_browse": self._magnus_browse,
             "magnus_preview": self._magnus_preview,
             "magnus_download": self._magnus_download,
+            "magnus_hash": self._magnus_hash,
             "magnus_copy": self._magnus_copy,
             "magnus_open": self._magnus_open,
             "magnus_build": self._magnus_build,
@@ -68,6 +70,13 @@ class BrokerOperations:
         }
 
     def handle(self, raw: dict[str, Any]) -> dict[str, Any]:
+        if raw.get("client") == CLI_CLIENT:
+            try:
+                enabled = self.broker._profile_store.preferences()["terminalAccess"]
+            except ProfileError as error:
+                return self.broker._error(str(error))
+            if not enabled:
+                return self.broker._error("terminal_access_disabled")
         operation = sanitize_text(raw.get("op"), 40)
         handler = self._handlers.get(operation)
         return handler(raw) if handler else self.broker._error("unsupported_operation")
@@ -86,6 +95,9 @@ class BrokerOperations:
             instance=broker._instance_status(),
             magnus=magnus,
             profiles=profiles,
+            terminal=broker._terminal_access.status(
+                enabled=profiles["preferences"]["terminalAccess"]
+            ),
             update=broker._updates.status(
                 automatic_install=profiles["preferences"]["automaticUpdates"]
             ),
@@ -273,12 +285,13 @@ class BrokerOperations:
 
     def _preferences_update(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
+        requested = raw.get("preferences")
         try:
-            preferences = broker._profile_store.update_preferences(
-                raw.get("preferences")
-            )
+            preferences = broker._profile_store.update_preferences(requested)
         except ProfileError as error:
             return broker._error(str(error))
+        if isinstance(requested, dict) and requested.get("terminalAccess") is True:
+            broker._terminal_access.ensure_launcher()
         response = broker._profile_response()
         response["update"] = broker._updates.status(
             automatic_install=preferences["automaticUpdates"]
@@ -391,6 +404,9 @@ class BrokerOperations:
 
     def _magnus_download(self, raw: dict[str, Any]) -> dict[str, Any]:
         return self._magnus_value(raw, "download", "magnusDownload")
+
+    def _magnus_hash(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return self._magnus_value(raw, "file_hash", "magnusHash")
 
     def _magnus_value(
         self,
