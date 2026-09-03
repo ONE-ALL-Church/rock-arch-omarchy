@@ -186,7 +186,12 @@ class RockSessionTests(unittest.TestCase):
         )
 
     def test_invalid_credentials_and_cookie_fail_closed(self):
-        for username, password in (("", "password"), ("user", "bad\npassword")):
+        for username, password in (
+            ("", "password"),
+            ("user", "bad\npassword"),
+            ("bad\ud800user", "password"),
+            ("user", "bad\ud800password"),
+        ):
             with self.subTest(username=username), self.assertRaises(RockSessionError):
                 self.session.configure(username, password)
         client = RockSessionHttpClient(FakeOpener(FakeResponse(["Other=value"])))

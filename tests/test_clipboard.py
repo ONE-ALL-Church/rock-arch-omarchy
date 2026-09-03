@@ -7,8 +7,8 @@ from rock_lens_broker.clipboard import copy_to_clipboard
 
 class ClipboardTests(unittest.TestCase):
     @patch("rock_lens_broker.clipboard.subprocess.run")
-    @patch("rock_lens_broker.clipboard.shutil.which", return_value="/usr/bin/wl-copy")
-    def test_value_is_passed_only_on_stdin(self, _which, run):
+    @patch("pathlib.Path.is_file", return_value=True)
+    def test_value_is_passed_only_on_stdin(self, _exists, run):
         run.return_value = subprocess.CompletedProcess(["/usr/bin/wl-copy"], 0)
 
         self.assertTrue(copy_to_clipboard("private Magnus content"))

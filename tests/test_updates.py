@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from rock_lens_broker.updates import (
+    CANONICAL_REPOSITORY_URLS,
     PLUGIN_ID,
     PYTHON,
     UpdateError,
@@ -15,15 +16,25 @@ from rock_lens_broker.updates import (
 
 
 class FakeGit:
-    def __init__(self, *, dirty=False, current="a" * 40, available="b" * 40):
+    def __init__(
+        self,
+        *,
+        dirty=False,
+        current="a" * 40,
+        available="b" * 40,
+        remote="https://github.com/ONE-ALL-Church/rock-arch-omarchy.git",
+    ):
         self.dirty = dirty
         self.current = current
         self.available = available
+        self.remote = remote
         self.commands = []
 
     def __call__(self, command, timeout):
         self.commands.append((command, timeout))
         arguments = command[3:]
+        if arguments == ["remote", "get-url", "origin"]:
+            return self._result(command, self.remote + "\n")
         if arguments[:2] == ["status", "--porcelain"]:
             return self._result(command, "tracked change\n" if self.dirty else "")
         if arguments == ["rev-parse", "HEAD"]:
@@ -77,6 +88,26 @@ class UpdateManagerTests(unittest.TestCase):
         self.assertEqual(state["availableVersion"], "0.16.0")
         self.assertTrue(state["updateAvailable"])
         self.assertEqual(state["lastCheckedAt"], "2026-09-02T12:30:00Z")
+
+    def test_only_canonical_origin_can_check_or_install_updates(self):
+        git = FakeGit(remote="https://attacker.example/rock-arch.git")
+        manager = self.manager(git)
+
+        with self.assertRaisesRegex(UpdateError, "update_source_not_allowed"):
+            manager._check_once()
+
+        manager._state.update(state="available", updateAvailable=True)
+        with self.assertRaisesRegex(UpdateError, "update_source_not_allowed"):
+            manager.start_update()
+        self.assertEqual(manager._state["error"], "update_source_not_allowed")
+        self.assertFalse(
+            any("fetch" in command for command, _timeout in git.commands)
+        )
+
+        self.assertIn(
+            "git@github.com:ONE-ALL-Church/rock-arch-omarchy.git",
+            CANONICAL_REPOSITORY_URLS,
+        )
 
     def test_current_revision_is_up_to_date_without_reading_remote_manifest(self):
         revision = "a" * 40

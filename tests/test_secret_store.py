@@ -3,10 +3,13 @@ from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from rock_lens_broker.contracts import Context
-from rock_lens_broker.secret_store import SecretToolStore
+from rock_lens_broker.secret_store import SECRET_TOOL, SecretStoreError, SecretToolStore
 
 
 class SecretStoreTests(unittest.TestCase):
+    def test_production_store_uses_the_fixed_system_binary(self):
+        self.assertEqual(SecretToolStore().executable, str(SECRET_TOOL))
+
     def test_secret_tool_passes_secret_only_on_stdin(self):
         store = SecretToolStore("/usr/bin/secret-tool")
         with patch("subprocess.run") as run:
@@ -37,6 +40,19 @@ class SecretStoreTests(unittest.TestCase):
         with patch("subprocess.run", return_value=failed) as run:
             self.assertFalse(store.clear(Context.PROD, "rock_password"))
         run.assert_called_once()
+
+    def test_invalid_or_oversized_secret_output_is_rejected(self):
+        store = SecretToolStore("/usr/bin/secret-tool")
+        for output in (b"\xff", b"x" * 2_049):
+            with self.subTest(size=len(output)), patch("subprocess.run") as run:
+                run.return_value = CompletedProcess([], 0, stdout=output, stderr=b"")
+                self.assertIsNone(store.lookup(Context.PROD, "rock_password"))
+
+    def test_unencodable_secret_is_not_sent(self):
+        store = SecretToolStore("/usr/bin/secret-tool")
+        with patch("subprocess.run") as run, self.assertRaises(SecretStoreError):
+            store.store(Context.PROD, "rock_password", "\ud800")
+        run.assert_not_called()
 
 
 if __name__ == "__main__":

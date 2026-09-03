@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 import urllib.parse
 from dataclasses import dataclass
+from pathlib import Path
 
 from .contracts import sanitize_text
 from .origin import OriginError, validate_rock_origin
 
 MAX_ROCK_URL_LENGTH = 2_048
+XDG_OPEN = Path("/usr/bin/xdg-open")
 
 
 class NavigationError(Exception):
@@ -27,6 +28,10 @@ def validate_rock_url(value: str, origin: str) -> str:
     if not isinstance(value, str):
         raise NavigationError("invalid_rock_url")
     candidate = value.strip()
+    try:
+        candidate.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise NavigationError("invalid_rock_url") from error
     if (
         not candidate
         or len(candidate) > MAX_ROCK_URL_LENGTH
@@ -63,12 +68,11 @@ def validate_rock_url(value: str, origin: str) -> str:
 
 def open_rock_url(value: str, origin: str) -> bool:
     url = validate_rock_url(value, origin)
-    executable = shutil.which("xdg-open")
-    if not executable:
+    if not XDG_OPEN.is_file():
         return False
     try:
         subprocess.Popen(
-            [executable, url],
+            [str(XDG_OPEN), url],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

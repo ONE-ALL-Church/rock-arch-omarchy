@@ -13,6 +13,7 @@ from .updates import (
     OMARCHY,
     PLUGIN_ID,
     VERSION_PATTERN,
+    is_canonical_repository_url,
     iso_time,
     utc_now,
     write_update_state,
@@ -49,6 +50,20 @@ def _revision(plugin_root: Path) -> str:
     except (OSError, subprocess.SubprocessError):
         return ""
     return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _origin_is_canonical(plugin_root: Path) -> bool:
+    try:
+        result = subprocess.run(
+            [str(GIT), "-C", str(plugin_root), "remote", "get-url", "origin"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and is_canonical_repository_url(result.stdout)
 
 
 def _notify(message: str) -> None:
@@ -88,10 +103,15 @@ def run_update(state_file: Path, plugin_root: Path, parent_pid: int) -> int:
     ).resolve()
     plugin_root = plugin_root.resolve()
     now = iso_time(utc_now())
+    valid_install = (
+        plugin_root == expected_root
+        and (plugin_root / ".git").exists()
+        and bool(_validated_version(plugin_root))
+    )
+    canonical_source = valid_install and _origin_is_canonical(plugin_root)
     if (
-        plugin_root != expected_root
-        or not (plugin_root / ".git").exists()
-        or not _validated_version(plugin_root)
+        not valid_install
+        or not canonical_source
     ):
         write_update_state(
             state_file,
@@ -104,14 +124,18 @@ def run_update(state_file: Path, plugin_root: Path, parent_pid: int) -> int:
                 "lastUpdatedAt": "",
                 "operationStartedAt": "",
                 "updateAvailable": False,
-                "error": "update_managed_manually",
+                "error": (
+                    "update_source_not_allowed"
+                    if valid_install
+                    else "update_managed_manually"
+                ),
             },
         )
         return 1
 
     environment = os.environ.copy()
     environment["GIT_TERMINAL_PROMPT"] = "0"
-    environment.setdefault("GIT_SSH_COMMAND", "ssh -oBatchMode=yes")
+    environment["GIT_SSH_COMMAND"] = "/usr/bin/ssh -oBatchMode=yes"
     try:
         result = subprocess.run(
             [str(OMARCHY), "plugin", "update", PLUGIN_ID, "--yes"],

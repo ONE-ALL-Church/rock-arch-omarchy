@@ -25,11 +25,12 @@ endpoints after login, hides denied categories, and independently enforces the
 detected allowlist in the broker before search requests are issued.
 
 Update checks are limited to the canonical Git-managed Rock Arch installation.
-They fetch the public `origin HEAD`, refuse local tracked changes or diverged
-history, validate the remote plugin ID and version, and expose only bounded
-status codes to QML. Installation always delegates to Omarchy's fixed plugin
-updater so its fast-forward, validation, rollback, and rescan safeguards remain
-authoritative. Automatic installation is disabled by default.
+They first require `origin` to be the canonical ONE&ALL Church repository, fetch
+its public `HEAD`, refuse local tracked changes or diverged history, validate
+the remote plugin ID and version, and expose only bounded status codes to QML.
+Installation always delegates to Omarchy's fixed plugin updater so its
+fast-forward, validation, rollback, and rescan safeguards remain authoritative.
+Automatic installation is disabled by default.
 
 The supported CLI uses the same owner-only broker and emits a versioned,
 bounded JSON contract. Private search input can be read from stdin so person
@@ -48,8 +49,10 @@ status when Magnus does not expose a dependable status endpoint.
 Rock profile usernames and passwords are stored in desktop Secret Service. The
 Rock session cookie is held only in broker memory and expires after 15 idle
 minutes. Secret values are passed to `secret-tool` through stdin, never argv.
-Sign-out reports an error if Secret Service does not confirm deletion. The
-removed experimental OAuth subsystem and its legacy records are not read.
+The broker invokes the fixed `/usr/bin/secret-tool` binary and rejects invalid
+or oversized secret output. Sign-out reports an error if Secret Service does
+not confirm deletion. The removed experimental OAuth subsystem and its legacy
+records are not read.
 
 Do not attach a live tenant or retrieve production credentials when testing a
 security report. The unit suite uses synthetic stores, cookies, responses, and

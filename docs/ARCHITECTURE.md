@@ -89,7 +89,8 @@ fixed plugin IPC method without putting the query in argv, and erases an
 unclaimed payload after 30 seconds.
 
 The updater is active only when the running repository is the canonical
-Git-managed `oneall.rock-arch` installation. It fetches only `origin HEAD`,
+Git-managed `oneall.rock-arch` installation. It also requires `origin` to match
+the canonical ONE&ALL Church repository before it fetches `origin HEAD`,
 compares revisions, and validates the remote root manifest's plugin ID and
 semantic version. It will not install over tracked changes or diverged history.
 Both the manual and optional automatic path launch a detached fixed module that

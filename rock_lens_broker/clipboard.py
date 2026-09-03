@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
+from pathlib import Path
+
+WL_COPY = Path("/usr/bin/wl-copy")
 
 
 def copy_to_clipboard(value: str) -> bool:
     """Copy text through stdin so content never appears in argv."""
 
-    executable = shutil.which("wl-copy")
-    if not executable:
+    if not WL_COPY.is_file():
         return False
     try:
         result = subprocess.run(
-            [executable],
+            [str(WL_COPY)],
             input=value.encode("utf-8"),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

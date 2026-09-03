@@ -4,7 +4,6 @@ import hashlib
 import hmac
 import ipaddress
 import secrets
-import shutil
 import subprocess
 import time
 import urllib.error
@@ -12,6 +11,7 @@ import urllib.parse
 import urllib.request
 from collections import OrderedDict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from .contracts import ALLOWED_RESULT_KEYS, allowlist, sanitize_text
@@ -32,6 +32,7 @@ MAX_RESULT_ID_LENGTH = 500
 MAX_BODY_LENGTH = 20_000
 MAX_RELATED_LINKS = 20
 MODEL_MAP_SOURCE = "https://community.rockrms.com/modelmap"
+XDG_OPEN = Path("/usr/bin/xdg-open")
 
 KNOWLEDGE_SCOPE_ALIASES = {
     "mm": "model",
@@ -1004,12 +1005,11 @@ def validate_public_source_url(value: object) -> str:
 
 def open_public_source_url(value: str) -> bool:
     url = validate_public_source_url(value)
-    executable = shutil.which("xdg-open")
-    if not executable:
+    if not XDG_OPEN.is_file():
         return False
     try:
         subprocess.Popen(
-            [executable, url],
+            [str(XDG_OPEN), url],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -1024,6 +1024,10 @@ def _validate_result_id(value: object) -> str:
     if not isinstance(value, str):
         raise RockKbError("invalid_knowledge_response")
     result_id = value.strip()
+    try:
+        result_id.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise RockKbError("invalid_knowledge_response") from error
     if (
         not result_id
         or len(result_id) > MAX_RESULT_ID_LENGTH
@@ -1099,7 +1103,10 @@ def _without_duplicate_title(body: str, title: str) -> str:
 def _sanitize_body(value: object, limit: int) -> str:
     text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
     cleaned = "".join(
-        char for char in text if char in {"\n", "\t"} or ord(char) >= 32
+        char
+        for char in text
+        if (char in {"\n", "\t"} or ord(char) >= 32)
+        and not 0xD800 <= ord(char) <= 0xDFFF
     )
     lines = [" ".join(line.split()) for line in cleaned.split("\n")]
     compact: list[str] = []

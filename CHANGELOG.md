@@ -5,6 +5,17 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+### Security
+
+- Reject malformed or oversized Magnus mobile-app identifiers before any
+  build request is attempted, and refuse downloads into group- or
+  world-writable directories.
+- Require the managed updater's `origin` to match the canonical ONE&ALL Church
+  repository before checking or installing an update.
+- Use fixed system paths for credential, clipboard, and browser helpers and
+  fail closed on invalid UTF-8 at credential, CLI, Rock, Magnus, and public
+  Knowledge boundaries.
+
 ## [0.25.2] - 2026-09-03
 
 ### Fixed

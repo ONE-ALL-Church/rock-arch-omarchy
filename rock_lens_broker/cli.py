@@ -392,7 +392,11 @@ def _read_query(
     else:
         value = query or ""
     value = value.rstrip("\r\n")
-    if len(value.encode("utf-8")) > MAX_QUERY_INPUT_BYTES:
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise CliError("invalid_query_encoding", 2) from None
+    if len(encoded) > MAX_QUERY_INPUT_BYTES:
         raise CliError("query_too_large", 2)
     return value
 

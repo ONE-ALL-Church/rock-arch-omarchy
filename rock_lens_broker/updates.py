@@ -21,6 +21,13 @@ VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
 GIT = Path("/usr/bin/git")
 OMARCHY = Path("/usr/bin/omarchy")
 PYTHON = Path("/usr/bin/python3")
+CANONICAL_REPOSITORY_URLS = frozenset(
+    {
+        "git@github.com:ONE-ALL-Church/rock-arch-omarchy.git",
+        "ssh://git@github.com/ONE-ALL-Church/rock-arch-omarchy.git",
+        "https://github.com/ONE-ALL-Church/rock-arch-omarchy.git",
+    }
+)
 
 CommandRunner = Callable[[list[str], int], subprocess.CompletedProcess[str]]
 ProcessLauncher = Callable[[list[str], Path], None]
@@ -29,6 +36,10 @@ Clock = Callable[[], datetime]
 
 class UpdateError(Exception):
     """A stable updater error that contains no command output or local paths."""
+
+
+def is_canonical_repository_url(value: object) -> bool:
+    return isinstance(value, str) and value.strip() in CANONICAL_REPOSITORY_URLS
 
 
 def utc_now() -> datetime:
@@ -46,7 +57,7 @@ def _default_command_runner(
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment["GIT_TERMINAL_PROMPT"] = "0"
-    environment.setdefault("GIT_SSH_COMMAND", "ssh -oBatchMode=yes")
+    environment["GIT_SSH_COMMAND"] = "/usr/bin/ssh -oBatchMode=yes"
     return subprocess.run(
         command,
         check=False,
@@ -155,6 +166,9 @@ class UpdateManager:
     def start_update(self) -> dict[str, Any]:
         if not self._managed:
             raise UpdateError("update_managed_manually")
+        if not self._origin_is_canonical():
+            self._set_error("update_source_not_allowed")
+            raise UpdateError("update_source_not_allowed")
 
         with self._lock:
             if self._state["state"] == "updating":
@@ -236,6 +250,8 @@ class UpdateManager:
 
     def _check_once(self) -> dict[str, Any]:
         checked_at = iso_time(self._clock())
+        if not self._origin_is_canonical():
+            raise UpdateError("update_source_not_allowed")
         clean = self._git("status", "--porcelain", "--untracked-files=no", timeout=5)
         if clean.returncode != 0:
             raise UpdateError("update_check_failed")
@@ -363,7 +379,18 @@ class UpdateManager:
             )
         except (OSError, json.JSONDecodeError, RecursionError):
             return False
-        return isinstance(manifest, dict) and manifest.get("id") == PLUGIN_ID
+        return (
+            isinstance(manifest, dict)
+            and manifest.get("id") == PLUGIN_ID
+            and self._origin_is_canonical()
+        )
+
+    def _origin_is_canonical(self) -> bool:
+        try:
+            result = self._git("remote", "get-url", "origin", timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return result.returncode == 0 and is_canonical_repository_url(result.stdout)
 
     def _load_state(self) -> dict[str, Any]:
         default = default_update_state()

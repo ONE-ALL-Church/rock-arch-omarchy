@@ -140,8 +140,9 @@ push to `main` and on pull requests.
 ## Update boundary
 
 - Update checks run only for the exact Git-managed
-  `oneall.rock-arch` installation and fetch the public remote without prompting
-  for credentials.
+  `oneall.rock-arch` installation, require the canonical ONE&ALL Church
+  repository as `origin`, and fetch the public remote without prompting for
+  credentials.
 - Remote metadata must contain the same plugin ID and a bounded semantic
   version. A non-fast-forward history or local tracked changes disables the
   install action and leaves the checkout untouched.

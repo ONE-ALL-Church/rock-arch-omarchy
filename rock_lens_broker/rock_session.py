@@ -312,6 +312,11 @@ class RockSessionProvider:
     @staticmethod
     def _validate_credentials(username: str, password: str) -> tuple[str, str]:
         safe_username = username.strip()
+        try:
+            safe_username.encode("utf-8")
+            password_bytes = password.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise RockSessionError("invalid_rock_credentials") from error
         if (
             not safe_username
             or len(safe_username) > 200
@@ -320,7 +325,7 @@ class RockSessionProvider:
             raise RockSessionError("invalid_rock_username")
         if (
             not password
-            or len(password.encode("utf-8")) > MAX_PASSWORD_BYTES
+            or len(password_bytes) > MAX_PASSWORD_BYTES
             or any(char in password for char in "\x00\r\n")
         ):
             raise RockSessionError("invalid_rock_password")

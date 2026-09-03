@@ -39,6 +39,7 @@ MAX_REGISTERED_ITEMS = 2_000
 HTTP_TIMEOUT_SECONDS = 20
 MAX_ACTION_OUTPUT_BYTES = 64 * 1024
 MOBILE_APP_BUILD_PREFIX = MAGNUS_API_PREFIX + "/Build/mobileapps/"
+MAX_MOBILE_APP_ID_DIGITS = 20
 ROCK_ARCH_USER_AGENT = HTTP_USER_AGENT
 
 
@@ -95,6 +96,10 @@ def validate_magnus_server(value: str) -> str:
 def _decoded_path_for_validation(path: str) -> str:
     """Decode nested escapes before checking route and traversal boundaries."""
 
+    try:
+        path.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise MagnusError("invalid_magnus_path") from error
     decoded = path
     for _ in range(10):
         try:
@@ -110,6 +115,15 @@ def _decoded_path_for_validation(path: str) -> str:
     if "%" in decoded:
         raise MagnusError("invalid_magnus_path")
     return decoded
+
+
+def _valid_mobile_app_id(value: str) -> bool:
+    return (
+        1 <= len(value) <= MAX_MOBILE_APP_ID_DIGITS
+        and value.isascii()
+        and value.isdigit()
+        and value.strip("0") != ""
+    )
 
 
 def validate_tree_path(value: str) -> str:
@@ -173,7 +187,7 @@ def _validate_http_path(path: str, method: str) -> None:
         return
     if method == "POST" and path.startswith(MOBILE_APP_BUILD_PREFIX):
         app_id = path.removeprefix(MOBILE_APP_BUILD_PREFIX)
-        if app_id.isdigit() and int(app_id) > 0 and "/" not in app_id:
+        if _valid_mobile_app_id(app_id):
             return
     raise MagnusError("invalid_magnus_path")
 
@@ -679,9 +693,7 @@ class MagnusReadOnlyAdapter:
         app_id = path.removeprefix(MOBILE_APP_BUILD_PREFIX)
         if (
             not path.startswith(MOBILE_APP_BUILD_PREFIX)
-            or not app_id.isdigit()
-            or int(app_id) < 1
-            or "/" in app_id
+            or not _valid_mobile_app_id(app_id)
         ):
             raise MagnusError("magnus_build_uri_not_allowed")
         return path
@@ -737,7 +749,11 @@ class MagnusReadOnlyAdapter:
                 flags |= os.O_NOFOLLOW
             descriptor = os.open(self.downloads_dir, flags)
             info = os.fstat(descriptor)
-            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            if (
+                not stat.S_ISDIR(info.st_mode)
+                or info.st_uid != os.getuid()
+                or info.st_mode & 0o022
+            ):
                 os.close(descriptor)
                 raise MagnusError("magnus_download_failed")
             return descriptor

@@ -260,6 +260,42 @@ class MagnusAdapterTests(unittest.TestCase):
         self.assertEqual(rows[1]["actions"], [])
         self.assertEqual(rows[2]["actions"], [])
 
+    def test_oversized_or_non_ascii_mobile_app_ids_fail_closed(self):
+        tree = [
+            {
+                "DisplayName": "Oversized",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/14",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/mobileapps/" + "9" * 5_000,
+            },
+            {
+                "DisplayName": "Unicode",
+                "IsFolder": True,
+                "Uri": "/api/TriumphTech/Magnus/GetTreeItems/mobileapps/app/15",
+                "BuildUri": "/api/TriumphTech/Magnus/Build/mobileapps/١٤",
+            },
+        ]
+        adapter = MagnusReadOnlyAdapter(
+            FakeCookieProvider(),
+            CANONICAL_MAGNUS_SERVER,
+            FakeMagnusHttp({"/" + DEFAULT_TREE_PATH: tree}),
+        )
+
+        self.assertEqual(
+            [item["actions"] for item in adapter.browse()["items"]],
+            [[], []],
+        )
+
+        opener = FakeOpener()
+        client = MagnusHttpClient(opener)
+        with self.assertRaisesRegex(MagnusError, "invalid_magnus_path"):
+            client.post_json(
+                CANONICAL_MAGNUS_SERVER,
+                "/api/TriumphTech/Magnus/Build/mobileapps/" + "9" * 5_000,
+                ".ROCK=test-session",
+            )
+        self.assertEqual(opener.calls, [])
+
     def test_generic_uri_is_discriminated_by_folder_type(self):
         tree = [
             {
@@ -354,6 +390,31 @@ class MagnusAdapterTests(unittest.TestCase):
                 CANONICAL_MAGNUS_SERVER + "/page/123?file=mobile.json",
             )
             self.assertNotIn(str(downloads), json.dumps(first))
+
+    def test_download_rejects_a_directory_writable_by_other_users(self):
+        tree = [
+            {
+                "DisplayName": "private.txt",
+                "IsFolder": False,
+                "FileContentUri": "/api/TriumphTech/Magnus/FileContent/private.txt",
+            }
+        ]
+        path = MAGNUS_API_PREFIX + "/FileContent/private.txt"
+        with tempfile.TemporaryDirectory() as temporary:
+            downloads = Path(temporary) / "Downloads"
+            downloads.mkdir(mode=0o777)
+            downloads.chmod(0o777)
+            adapter = MagnusReadOnlyAdapter(
+                FakeCookieProvider(),
+                CANONICAL_MAGNUS_SERVER,
+                FakeMagnusHttp({"/" + DEFAULT_TREE_PATH: tree, path: b"private"}),
+                downloads,
+            )
+            safe_id = adapter.browse()["items"][0]["safeId"]
+
+            with self.assertRaisesRegex(MagnusError, "magnus_download_failed"):
+                adapter.download(safe_id)
+            self.assertEqual(list(downloads.iterdir()), [])
 
     def test_mobile_app_build_posts_descriptor_uri_and_returns_repeat_target(self):
         tree = [

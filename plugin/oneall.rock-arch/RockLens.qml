@@ -284,8 +284,8 @@ Panel {
       return "Local plugin changes must be committed or removed before updating."
     if (code === "update_history_diverged")
       return "This installation has a different Git history and must be updated manually."
-    if (code === "update_managed_manually")
-      return "Updates for this installation are managed manually."
+    if (code === "update_managed_manually") return "Updates for this installation are managed manually."
+    if (code === "update_source_not_allowed") return "This installation's update source isn't trusted. Update it manually."
     if (code === "update_launch_failed" || code === "update_failed")
       return "Rock Arch couldn't install the update. Try again from Settings."
     if (code === "update_check_failed" || code === "update_interrupted")

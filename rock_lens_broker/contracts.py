@@ -96,7 +96,16 @@ class Capability:
 
 
 def sanitize_text(value: Any, limit: int) -> str:
-    text = " ".join(str(value or "").replace("\x00", "").split())
+    # JSON permits escaped lone surrogates even though they are not valid UTF-8.
+    # Remove them at the shared display boundary so later hashing, subprocess,
+    # and persistence code cannot fail with UnicodeEncodeError.
+    raw = str(value or "").replace("\x00", "")
+    raw = "".join(
+        character
+        for character in raw
+        if not 0xD800 <= ord(character) <= 0xDFFF
+    )
+    text = " ".join(raw.split())
     return text[:limit]
 
 
