@@ -8,6 +8,7 @@ Item {
 
   property bool blocked: false
   property bool formMode: false
+  property bool commandMode: false
   property bool backspaceEnabled: false
 
   signal moveRequested(int dx, int dy)
@@ -24,6 +25,13 @@ Item {
   Keys.onPressed: function(event) {
     if (event.key === Qt.Key_Escape) {
       closeRequested(); event.accepted = true; return
+    }
+
+    // Magnus previews use native Tab focus, but their displayed single-key
+    // commands still need to work from a focused action button.
+    if (!blocked && commandMode && event.text && event.text.length === 1 &&
+        "dchor".indexOf(event.text.toLowerCase()) >= 0) {
+      textKey(event.text); event.accepted = true; return
     }
 
     // Forms use Qt's native focus chain so Tab, Shift+Tab, typing, and control
@@ -59,7 +67,7 @@ Item {
     if (event.key === Qt.Key_Space) {
       activateRequested(); event.accepted = true; return
     }
-    if (event.text === "x" || event.text === "X") {
+    if (event.key === Qt.Key_Delete || event.text === "x" || event.text === "X") {
       deleteRequested(); event.accepted = true; return
     }
     if (event.text && event.text.length === 1) textKey(event.text)

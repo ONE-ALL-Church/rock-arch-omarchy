@@ -197,6 +197,15 @@ Enter or Space opens the selected live target. Backspace on a highlighted item
 returns to the search field and deletes at the search cursor, so narrowing can
 continue without an extra navigation step.
 
+Every main view also has a direct keyboard route: `Ctrl+1` opens Search,
+`Ctrl+2` opens Personal Links, `Ctrl+3` opens Magnus when the active profile has
+access, and `Ctrl+4` opens Settings. In an empty Search, press `X` or `Delete`
+to prepare clearing Recent Links, then `Enter` to confirm or `Esc` to cancel.
+Magnus folders use Up/Down and Enter; `B` prepares a selected mobile-app build.
+In a file preview, Tab walks the visible actions and the matching single-key
+commands are shown on each button (`D`, `C`, `H`, `O`, and `R`). Build and clear
+confirmations always move focus to an explicit action and remain escapable.
+
 People results include compact duplicate-name context when Rock provides it:
 age, conservatively identified spouse, family campus, and connection status.
 Spouse is shown only for a married person with exactly one other active Adult

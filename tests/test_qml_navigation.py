@@ -88,6 +88,8 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('placeholderText: "Rock username"', form)
         self.assertIn('placeholderText: "Rock password"', form)
         self.assertNotIn("profileNameField", form)
+        self.assertIn("KeyNavigation.backtab: onboardingConnectButton", form)
+        self.assertIn("KeyNavigation.tab: onboardingDomainField", form)
         self.assertIn("function completeOnboarding()", source)
         self.assertIn('"profile_add" : "rock_configure"', source)
 
@@ -101,7 +103,7 @@ class QmlNavigationTests(unittest.TestCase):
         )
         self.assertIn(
             'if (viewMode === "settings") {\n'
-            "      if (magnusAvailable) openMagnus()\n"
+            "      if (showMagnus) openMagnus()\n"
             "      else selectPersonalLink(Math.max(0, navigationCount - 1))",
             source,
         )
@@ -147,7 +149,7 @@ class QmlNavigationTests(unittest.TestCase):
             start = source.index(f"id: {control_id}")
             self.assertIn("focusable: true", source[start : start + 350])
         self.assertGreaterEqual(
-            source.count("onActiveFocusChanged: root.revealSettingsControl"),
+            source.count("onActiveFocusChanged: root.revealFocusedControl"),
             16,
         )
         self.assertEqual(
@@ -158,6 +160,67 @@ class QmlNavigationTests(unittest.TestCase):
             source.count("Keys.onEnterPressed: root.toggle"),
             4,
         )
+
+    def test_every_panel_has_a_keyboard_route_and_contextual_guidance(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
+
+        for sequence in ("Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4"):
+            self.assertIn(f'Shortcut {{ sequence: "{sequence}"', source)
+        self.assertGreaterEqual(source.count("context: Qt.ApplicationShortcut"), 12)
+        self.assertIn(
+            'readonly property bool showMagnus: contextName === "PROD" && magnusAvailable',
+            source,
+        )
+        self.assertIn(
+            'root.showMagnus ? ["search", "personal", "magnus"]',
+            source,
+        )
+        self.assertIn('text: "X · Clear"', source.replace(
+            'root.pendingClearRecent ? "Confirm clear" : ', ""
+        ))
+        self.assertIn("onDeleteRequested: root.deleteCurrentItem()", source)
+        self.assertIn("event.key === Qt.Key_Delete", key_catcher)
+        self.assertIn(
+            '"Use Up/Down to choose a Personal Link. Enter opens it in Rock."',
+            source,
+        )
+        self.assertIn("if (changedView) panelFlick.contentY = 0", source)
+
+    def test_magnus_preview_actions_are_tabbable_and_keep_shortcuts(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+        key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null',
+            source,
+        )
+        self.assertIn(
+            "magnusDownloadButton.forceActiveFocus(Qt.TabFocusReason)",
+            source,
+        )
+        for control_id in (
+            "magnusBackButton",
+            "magnusRefreshButton",
+            "magnusDownloadButton",
+            "magnusCopyButton",
+            "magnusHashButton",
+            "magnusOpenButton",
+        ):
+            start = source.index(f"id: {control_id}")
+            self.assertIn("focusable: true", source[start : start + 350])
+        self.assertIn("commandMode: root.magnusPreviewCommandsEnabled", source)
+        self.assertIn('"dchor".indexOf(event.text.toLowerCase())', key_catcher)
+        for key in ("d", "c", "h", "o", "r"):
+            self.assertIn(f'key === "{key}"', source)
+        for label in (
+            "D · Download",
+            "C · Copy",
+            "H · Copy hash",
+            "O · Open in Rock",
+            "R · Refresh",
+        ):
+            self.assertIn(label, source)
 
     def test_magnus_actions_and_recent_builds_are_explicit(self):
         source = QML_PATH.read_text(encoding="utf-8")
@@ -181,6 +244,10 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn(
             "magnusBuildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
+        self.assertIn("KeyNavigation.tab: magnusBuildCancelButton", source)
+        self.assertIn("KeyNavigation.backtab: magnusBuildConfirmButton", source)
+        self.assertIn("KeyNavigation.tab: recentBuildCancelButton", source)
+        self.assertIn("KeyNavigation.backtab: recentBuildConfirmButton", source)
         self.assertIn(
             "recentBuildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
         )

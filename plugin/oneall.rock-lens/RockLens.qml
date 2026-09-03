@@ -75,6 +75,9 @@ Panel {
   property int relativeTimeTick: 0
   readonly property int navigationCount: personalLinks.length
   readonly property int magnusCount: magnusItems.length
+  readonly property bool showMagnus: contextName === "PROD" && magnusAvailable
+  readonly property bool magnusPreviewCommandsEnabled: opened && viewMode === "magnus" &&
+    magnusPreview !== null && !magnusBusy && !magnusActionBusy && pendingMagnusBuildId === ""
   readonly property bool onboardingRequired: contextName === "PROD" &&
     statusLoaded && profilesLoaded && !rockConfigured
   readonly property bool queryIsEmpty: query.trim().length === 0
@@ -200,6 +203,8 @@ Panel {
   function guidanceText() {
     if (setupBusy)
       return setupSlow ? setupBusyText + " Rock is taking longer than usual." : setupBusyText
+    if (pendingClearRecent)
+      return "Press Enter to clear Recent Links, or Esc to cancel."
     if ((contextName === "DEV" || rockConfigured) && searchInFlight)
       return "Looking for matches…"
     if (!statusLoaded) return "Getting your Rock workspace ready…"
@@ -207,6 +212,12 @@ Panel {
       return "Sign in from Settings to search Rock."
     if (viewMode === "settings")
       return "Changes save automatically. Press Esc to return to Search."
+    if (viewMode === "personal")
+      return personalLinks.length ?
+        "Use Up/Down to choose a Personal Link. Enter opens it in Rock." :
+        (showMagnus ?
+          "Press Tab for Magnus; Shift+Tab returns to Search." :
+          "Press Tab for Settings; Shift+Tab returns to Search.")
     if (viewMode === "magnus") {
       if (pendingMagnusBuildId !== "")
         return "Press Enter to deploy, or Esc to cancel."
@@ -222,7 +233,11 @@ Panel {
     if (scopeKey)
       return "Showing " + scopeLabel + " only. Esc returns to all categories."
     if (showRecentLinks)
-      return "Start typing to search, or use Up/Down and Enter to open a recent item."
+      return quickReturns.length ?
+        "Start typing to search, or use Up/Down and Enter to open a recent item. X or Delete clears the list." :
+        (contextName === "PROD" ?
+          "Start typing to search Rock. Opened items will appear here." :
+          "Start typing to search preview data.")
     return "Narrow results with p:, g:, w:, j:, pg:, or c:. Any ID or GUID checks every category."
   }
 
@@ -302,6 +317,12 @@ Panel {
       cancelMagnusBuild()
       return
     }
+    if (pendingClearRecent) {
+      pendingClearRecent = false
+      feedbackText = "Clear cancelled"
+      focusSearch()
+      return
+    }
     if (viewMode === "settings") {
       focusSearch()
       return
@@ -362,7 +383,7 @@ Panel {
       magnusAvailable = response.magnus.available === true
       magnusState = String(response.magnus.state || "unknown")
       magnusProbeInFlight = false
-      if (!magnusAvailable && viewMode === "magnus") focusSearch()
+      if (!showMagnus && viewMode === "magnus") focusSearch()
     }
     if (response.magnusBrowser) {
       magnusBusy = false
@@ -371,10 +392,23 @@ Panel {
       magnusFolderTitle = String(response.magnusBrowser.title || "Magnus")
       magnusItems = Array.isArray(response.magnusBrowser.items) ? response.magnusBrowser.items : []
       magnusCursor = magnusItems.length ? 0 : -1
+      panelFlick.contentY = 0
+      Qt.callLater(function() {
+        if (root.viewMode !== "magnus") return
+        keyCatcher.forceActiveFocus()
+        if (root.magnusCursor >= 0)
+          root.revealItem(magnusRepeater.itemAt(root.magnusCursor))
+      })
     }
     if (response.magnusPreview) {
       magnusBusy = false
       magnusPreview = response.magnusPreview
+      panelFlick.contentY = 0
+      Qt.callLater(function() {
+        if (root.viewMode !== "magnus" || root.magnusPreview === null) return
+        magnusDownloadButton.forceActiveFocus(Qt.TabFocusReason)
+        root.revealFocusedControl(magnusDownloadButton)
+      })
     }
     if (response.magnusDownload) {
       magnusActionBusy = false
@@ -433,6 +467,11 @@ Panel {
       results = response.results
       resultCursor = results.length ? 0 : -1
       recentCursor = -1
+      panelFlick.contentY = 0
+      Qt.callLater(function() {
+        if (root.viewMode === "search" && root.resultCursor >= 0)
+          root.revealItem(resultRepeater.itemAt(root.resultCursor))
+      })
     }
     if (Array.isArray(response.personalLinks)) personalLinks = response.personalLinks
     if (Array.isArray(response.quickReturns)) {
@@ -446,6 +485,8 @@ Panel {
     }
     if (linkCursor >= navigationCount) linkCursor = navigationCount - 1
     if (viewMode === "personal" && linkCursor < 0 && navigationCount) linkCursor = 0
+    if (viewMode === "personal" && linkCursor >= 0)
+      Qt.callLater(function() { root.revealItem(personalLinkRepeater.itemAt(root.linkCursor)) })
     if (response.personalLinksAvailable !== undefined)
       personalLinksAvailable = response.personalLinksAvailable === true
     if (response.person) quickLook = response.person
@@ -572,8 +613,8 @@ Panel {
       root.revealItem(settingsAddProfileButton)
     })
   }
-  function revealSettingsControl(control) {
-    if (viewMode !== "settings" || !control || !control.activeFocus) return
+  function revealFocusedControl(control) {
+    if (!control || !control.activeFocus) return
     Qt.callLater(function() { root.revealItem(control) })
   }
   function togglePersonContextPreference() {
@@ -650,6 +691,7 @@ Panel {
     recentCursor = -1
     linkCursor = navigationCount ? Math.max(0, Math.min(navigationCount - 1, index)) : -1
     quickLook = null
+    if (changedView) panelFlick.contentY = 0
     if (changedView) refreshPersonalLinks()
     Qt.callLater(function() {
       keyCatcher.forceActiveFocus()
@@ -657,7 +699,7 @@ Panel {
     })
   }
   function openMagnus() {
-    if (!magnusAvailable) return
+    if (!showMagnus) return
     viewMode = "magnus"
     resultCursor = -1
     recentCursor = -1
@@ -789,7 +831,7 @@ Panel {
         selectSearchItem(0)
       else if (viewMode === "search")
         selectPersonalLink(0)
-      else if (viewMode === "personal" && magnusAvailable)
+      else if (viewMode === "personal" && showMagnus)
         openMagnus()
       else if (viewMode === "personal" || viewMode === "magnus")
         openSettings(false)
@@ -798,7 +840,7 @@ Panel {
       return
     }
     if (viewMode === "settings") {
-      if (magnusAvailable) openMagnus()
+      if (showMagnus) openMagnus()
       else selectPersonalLink(Math.max(0, navigationCount - 1))
     } else if (viewMode === "magnus") {
       selectPersonalLink(Math.max(0, navigationCount - 1))
@@ -995,12 +1037,19 @@ Panel {
     if (!quickReturns.length || setupBusy) return
     if (!pendingClearRecent) {
       pendingClearRecent = true
-      feedbackText = "Press Clear again to remove this profile's Recent Links"
+      feedbackText = "Press Enter to clear Recent Links, or Esc to cancel"
+      Qt.callLater(function() { clearRecentButton.forceActiveFocus(Qt.TabFocusReason) })
       return
     }
     pendingClearRecent = false
     request({op: "recent_links_clear"})
+    quickReturns = []
     feedbackText = "Recent Links cleared"
+    focusSearch()
+  }
+  function deleteCurrentItem() {
+    if (viewMode === "search" && showRecentLinks && quickReturns.length)
+      clearRecentLinks()
   }
   function switchContext() {
     if (!developerMode) return
@@ -1118,14 +1167,18 @@ Panel {
     }
   }
 
-  Shortcut { sequence: "Alt+P"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("p") }
-  Shortcut { sequence: "Alt+G"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("g") }
-  Shortcut { sequence: "Alt+W"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("w") }
-  Shortcut { sequence: "Alt+J"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("j") }
-  Shortcut { sequence: "Alt+Shift+P"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("page") }
-  Shortcut { sequence: "Alt+C"; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("c") }
-  Shortcut { sequence: "Alt+0"; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
-  Shortcut { sequence: "Ctrl+,"; enabled: root.opened; onActivated: root.openSettings(false) }
+  Shortcut { sequence: "Alt+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("p") }
+  Shortcut { sequence: "Alt+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("g") }
+  Shortcut { sequence: "Alt+W"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("w") }
+  Shortcut { sequence: "Alt+J"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("j") }
+  Shortcut { sequence: "Alt+Shift+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("page") }
+  Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("c") }
+  Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
+  Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openSettings(false) }
+  Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.focusSearch() }
+  Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.selectPersonalLink(0) }
+  Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired && root.showMagnus; onActivated: root.openMagnus() }
+  Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.openSettings(false) }
 
   WidgetButton {
     id: button
@@ -1151,13 +1204,16 @@ Panel {
     RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      formMode: root.onboardingRequired || root.viewMode === "settings"
+      formMode: root.onboardingRequired || root.viewMode === "settings" ||
+        root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null
+      commandMode: root.magnusPreviewCommandsEnabled
       blocked: searchField.activeFocus || onboardingDomainField.activeFocus || onboardingUsernameField.activeFocus || onboardingPasswordField.activeFocus || domainField.activeFocus || usernameField.activeFocus || passwordField.activeFocus || profileNameField.activeFocus || activeUsernameField.activeFocus || activePasswordField.activeFocus || magnusTextArea.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
       onActivateRequested: root.activateCursor()
+      onDeleteRequested: root.deleteCurrentItem()
       onTextKey: function(value) { root.handleMagnusKey(value) }
       onBackspaceRequested: {
         if (root.viewMode === "magnus") root.magnusBack()
@@ -1185,7 +1241,7 @@ Panel {
           Item { Layout.fillWidth: true }
           Repeater {
             model: root.onboardingRequired ? [] :
-              (root.magnusAvailable ? ["search", "personal", "magnus"] : ["search", "personal"])
+              (root.showMagnus ? ["search", "personal", "magnus"] : ["search", "personal"])
             delegate: Rectangle {
               required property var modelData
               Layout.preferredWidth: tabText.implicitWidth + 20
@@ -1364,6 +1420,7 @@ Panel {
                 selectByMouse: true
                 inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
                 KeyNavigation.tab: onboardingUsernameField
+                KeyNavigation.backtab: onboardingConnectButton
                 onTextChanged: root.newProfileDomain = text
                 onAccepted: onboardingUsernameField.forceActiveFocus(Qt.TabFocusReason)
               }
@@ -1399,6 +1456,7 @@ Panel {
                 text: root.setupBusy ? (root.setupSlow ? "Still connecting…" : "Connecting…") : "Connect"
                 focusable: true
                 enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                KeyNavigation.tab: onboardingDomainField
                 KeyNavigation.backtab: onboardingPasswordField
                 onClicked: root.completeOnboarding()
               }
@@ -1506,26 +1564,18 @@ Panel {
                   font.bold: true
                 }
                 Item { Layout.fillWidth: true }
-                Rectangle {
-                  Layout.preferredWidth: clearRecentLabel.implicitWidth + 20
+                Button {
+                  id: clearRecentButton
                   Layout.preferredHeight: Style.space(30)
-                  radius: 6
                   visible: root.contextName === "PROD"
-                  opacity: root.quickReturns.length > 0 && !root.setupBusy ? 1 : 0.4
-                  color: root.pendingClearRecent ? "#7f1d1d" : Style.selectedFillFor(Color.foreground, Color.accent)
-                  Text {
-                    id: clearRecentLabel
-                    anchors.centerIn: parent
-                    text: root.pendingClearRecent ? "Confirm clear" : "Clear"
-                    color: Color.foreground
-                    font.bold: true
-                  }
-                  MouseArea {
-                    anchors.fill: parent
-                    enabled: root.quickReturns.length > 0 && !root.setupBusy
-                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onClicked: root.clearRecentLinks()
-                  }
+                  text: root.pendingClearRecent ? "Confirm clear" : "X · Clear"
+                  focusable: enabled
+                  enabled: root.quickReturns.length > 0 && !root.setupBusy
+                  background: root.pendingClearRecent ? "#7f1d1d" : Style.selectedFillFor(Color.foreground, Color.accent)
+                  KeyNavigation.tab: clearRecentButton
+                  KeyNavigation.backtab: clearRecentButton
+                  onActiveFocusChanged: root.revealFocusedControl(clearRecentButton)
+                  onClicked: root.clearRecentLinks()
                 }
               }
               Text {
@@ -1561,6 +1611,7 @@ Panel {
                       enabled: !root.magnusActionBusy
                       KeyNavigation.right: recentBuildConfirmButton
                       KeyNavigation.tab: recentBuildConfirmButton
+                      KeyNavigation.backtab: recentBuildConfirmButton
                       Keys.onEscapePressed: root.cancelMagnusBuild()
                       onClicked: root.cancelMagnusBuild()
                     }
@@ -1570,6 +1621,7 @@ Panel {
                       focusable: true
                       enabled: !root.magnusActionBusy
                       KeyNavigation.left: recentBuildCancelButton
+                      KeyNavigation.tab: recentBuildCancelButton
                       KeyNavigation.backtab: recentBuildCancelButton
                       Keys.onEscapePressed: root.cancelMagnusBuild()
                       onClicked: root.confirmMagnusBuild()
@@ -1681,9 +1733,12 @@ Panel {
               RowLayout {
                 width: parent.width
                 Button {
+                  id: magnusBackButton
                   visible: root.magnusPreview !== null || root.magnusHistory.length > 0
                   text: "Back"
+                  focusable: true
                   enabled: !root.magnusBusy
+                  onActiveFocusChanged: root.revealFocusedControl(magnusBackButton)
                   onClicked: root.magnusBack()
                 }
                 Text {
@@ -1702,8 +1757,11 @@ Panel {
                   font.bold: true
                 }
                 Button {
-                  text: "Refresh"
+                  id: magnusRefreshButton
+                  text: "R · Refresh"
+                  focusable: true
                   enabled: !root.magnusBusy && !root.magnusActionBusy
+                  onActiveFocusChanged: root.revealFocusedControl(magnusRefreshButton)
                   onClicked: root.refreshMagnus()
                 }
               }
@@ -1731,6 +1789,7 @@ Panel {
                       enabled: !root.magnusActionBusy
                       KeyNavigation.right: magnusBuildConfirmButton
                       KeyNavigation.tab: magnusBuildConfirmButton
+                      KeyNavigation.backtab: magnusBuildConfirmButton
                       Keys.onEscapePressed: root.cancelMagnusBuild()
                       onClicked: root.cancelMagnusBuild()
                     }
@@ -1740,6 +1799,7 @@ Panel {
                       focusable: true
                       enabled: !root.magnusActionBusy
                       KeyNavigation.left: magnusBuildCancelButton
+                      KeyNavigation.tab: magnusBuildCancelButton
                       KeyNavigation.backtab: magnusBuildCancelButton
                       Keys.onEscapePressed: root.cancelMagnusBuild()
                       onClicked: root.confirmMagnusBuild()
@@ -1774,10 +1834,40 @@ Panel {
                 RowLayout {
                   width: parent.width
                   spacing: 6
-                  Button { text: root.magnusActionBusy ? "Working…" : "Download"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_download", "") }
-                  Button { visible: root.hasMagnusAction("copy"); text: "Copy"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_copy", "content") }
-                  Button { text: "Copy hash"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_copy", "hash") }
-                  Button { visible: root.hasMagnusAction("view"); text: "Open in Rock"; enabled: !root.magnusActionBusy; onClicked: root.runMagnusAction("magnus_open", "") }
+                  Button {
+                    id: magnusDownloadButton
+                    text: root.magnusActionBusy ? "Working…" : "D · Download"
+                    focusable: true
+                    enabled: !root.magnusActionBusy
+                    onActiveFocusChanged: root.revealFocusedControl(magnusDownloadButton)
+                    onClicked: root.runMagnusAction("magnus_download", "")
+                  }
+                  Button {
+                    id: magnusCopyButton
+                    visible: root.hasMagnusAction("copy")
+                    text: "C · Copy"
+                    focusable: true
+                    enabled: !root.magnusActionBusy
+                    onActiveFocusChanged: root.revealFocusedControl(magnusCopyButton)
+                    onClicked: root.runMagnusAction("magnus_copy", "content")
+                  }
+                  Button {
+                    id: magnusHashButton
+                    text: "H · Copy hash"
+                    focusable: true
+                    enabled: !root.magnusActionBusy
+                    onActiveFocusChanged: root.revealFocusedControl(magnusHashButton)
+                    onClicked: root.runMagnusAction("magnus_copy", "hash")
+                  }
+                  Button {
+                    id: magnusOpenButton
+                    visible: root.hasMagnusAction("view")
+                    text: "O · Open in Rock"
+                    focusable: true
+                    enabled: !root.magnusActionBusy
+                    onActiveFocusChanged: root.revealFocusedControl(magnusOpenButton)
+                    onClicked: root.runMagnusAction("magnus_open", "")
+                  }
                   Item { Layout.fillWidth: true }
                 }
                 Text {
@@ -1908,7 +1998,7 @@ Panel {
                   text: root.addProfileMode ? "Cancel" : "Add profile"
                   focusable: true
                   enabled: !root.setupBusy
-                  onActiveFocusChanged: root.revealSettingsControl(settingsAddProfileButton)
+                  onActiveFocusChanged: root.revealFocusedControl(settingsAddProfileButton)
                   onClicked: {
                     root.addProfileMode = !root.addProfileMode
                     root.setupUsername = ""
@@ -1961,7 +2051,7 @@ Panel {
                         text: "Use"
                         focusable: true
                         enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealSettingsControl(useProfileButton)
+                        onActiveFocusChanged: root.revealFocusedControl(useProfileButton)
                         onClicked: root.switchProfile(modelData.id)
                       }
                       Button {
@@ -1969,7 +2059,7 @@ Panel {
                         text: root.pendingRemoveProfileId === modelData.id ? "Confirm remove" : "Remove"
                         focusable: true
                         enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealSettingsControl(removeProfileButton)
+                        onActiveFocusChanged: root.revealFocusedControl(removeProfileButton)
                         onClicked: root.removeProfile(modelData.id)
                       }
                     }
@@ -2003,7 +2093,7 @@ Panel {
                         text: root.editLoginMode ? "Cancel" : "Change login"
                         focusable: true
                         enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealSettingsControl(changeLoginButton)
+                        onActiveFocusChanged: root.revealFocusedControl(changeLoginButton)
                         onClicked: {
                           root.editLoginMode = !root.editLoginMode
                           root.setupUsername = ""
@@ -2017,7 +2107,7 @@ Panel {
                         text: "Test"
                         focusable: true
                         enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealSettingsControl(testProfileButton)
+                        onActiveFocusChanged: root.revealFocusedControl(testProfileButton)
                         onClicked: {
                           root.beginSetup("Testing connection…")
                           root.feedbackText = "Testing connection…"
@@ -2030,7 +2120,7 @@ Panel {
                         text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
                         focusable: true
                         enabled: !root.setupBusy
-                        onActiveFocusChanged: root.revealSettingsControl(signOutButton)
+                        onActiveFocusChanged: root.revealFocusedControl(signOutButton)
                         onClicked: root.signOut()
                       }
                     }
@@ -2058,7 +2148,7 @@ Panel {
                     placeholderText: "Profile name (for example Main Campus)"
                     text: root.newProfileName
                     selectByMouse: true
-                    onActiveFocusChanged: root.revealSettingsControl(profileNameField)
+                    onActiveFocusChanged: root.revealFocusedControl(profileNameField)
                     onTextChanged: root.newProfileName = text
                   }
                   TextField {
@@ -2070,7 +2160,7 @@ Panel {
                     text: root.newProfileDomain
                     selectByMouse: true
                     inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-                    onActiveFocusChanged: root.revealSettingsControl(domainField)
+                    onActiveFocusChanged: root.revealFocusedControl(domainField)
                     onTextChanged: root.newProfileDomain = text
                   }
                   TextField {
@@ -2081,7 +2171,7 @@ Panel {
                     placeholderText: "Rock username"
                     text: root.setupUsername
                     selectByMouse: true
-                    onActiveFocusChanged: root.revealSettingsControl(usernameField)
+                    onActiveFocusChanged: root.revealFocusedControl(usernameField)
                     onTextChanged: root.setupUsername = text
                   }
                   TextField {
@@ -2093,7 +2183,7 @@ Panel {
                     echoMode: TextInput.Password
                     selectByMouse: true
                     inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                    onActiveFocusChanged: root.revealSettingsControl(passwordField)
+                    onActiveFocusChanged: root.revealFocusedControl(passwordField)
                     onTextChanged: root.setupPassword = text
                     onAccepted: root.addProfile()
                   }
@@ -2102,7 +2192,7 @@ Panel {
                     text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
                     focusable: true
                     enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                    onActiveFocusChanged: root.revealSettingsControl(addProfileButton)
+                    onActiveFocusChanged: root.revealFocusedControl(addProfileButton)
                     onClicked: root.addProfile()
                   }
                 }
@@ -2133,7 +2223,7 @@ Panel {
                     placeholderText: "Rock username"
                     text: root.setupUsername
                     selectByMouse: true
-                    onActiveFocusChanged: root.revealSettingsControl(activeUsernameField)
+                    onActiveFocusChanged: root.revealFocusedControl(activeUsernameField)
                     onTextChanged: root.setupUsername = text
                   }
                   TextField {
@@ -2145,7 +2235,7 @@ Panel {
                     echoMode: TextInput.Password
                     selectByMouse: true
                     inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                    onActiveFocusChanged: root.revealSettingsControl(activePasswordField)
+                    onActiveFocusChanged: root.revealFocusedControl(activePasswordField)
                     onTextChanged: root.setupPassword = text
                     onAccepted: root.saveRockCredentials()
                   }
@@ -2154,7 +2244,7 @@ Panel {
                     text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Save login"
                     focusable: true
                     enabled: root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                    onActiveFocusChanged: root.revealSettingsControl(saveLoginButton)
+                    onActiveFocusChanged: root.revealFocusedControl(saveLoginButton)
                     onClicked: root.saveRockCredentials()
                   }
                 }
@@ -2167,7 +2257,7 @@ Panel {
                 text: "Person context · age, spouse, campus, and status"
                 activeFocusOnTab: true
                 checked: root.preferencePersonContext
-                onActiveFocusChanged: root.revealSettingsControl(personContextCheckBox)
+                onActiveFocusChanged: root.revealFocusedControl(personContextCheckBox)
                 Keys.onReturnPressed: root.togglePersonContextPreference()
                 Keys.onEnterPressed: root.togglePersonContextPreference()
                 onClicked: {
@@ -2180,7 +2270,7 @@ Panel {
                 text: "Remember Recent Links"
                 activeFocusOnTab: true
                 checked: root.preferenceRecentLinks
-                onActiveFocusChanged: root.revealSettingsControl(recentLinksCheckBox)
+                onActiveFocusChanged: root.revealFocusedControl(recentLinksCheckBox)
                 Keys.onReturnPressed: root.toggleRecentLinksPreference()
                 Keys.onEnterPressed: root.toggleRecentLinksPreference()
                 onClicked: {
@@ -2195,7 +2285,7 @@ Panel {
                 text: "Close Rock Lens after opening an item"
                 activeFocusOnTab: true
                 checked: root.preferenceCloseAfterOpen
-                onActiveFocusChanged: root.revealSettingsControl(closeAfterOpenCheckBox)
+                onActiveFocusChanged: root.revealFocusedControl(closeAfterOpenCheckBox)
                 Keys.onReturnPressed: root.toggleCloseAfterOpenPreference()
                 Keys.onEnterPressed: root.toggleCloseAfterOpenPreference()
                 onClicked: {
@@ -2222,7 +2312,7 @@ Panel {
                     text: modelData.label
                     activeFocusOnTab: true
                     checked: root.categoryEnabled(modelData.key)
-                    onActiveFocusChanged: root.revealSettingsControl(categoryCheckBox)
+                    onActiveFocusChanged: root.revealFocusedControl(categoryCheckBox)
                     Keys.onReturnPressed: root.toggleCategory(modelData.key)
                     Keys.onEnterPressed: root.toggleCategory(modelData.key)
                     onClicked: root.toggleCategory(modelData.key)

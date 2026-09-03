@@ -29,7 +29,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.12` identifier,
   which is now fixed in the client.
-- Broker/auth/Magnus/REST/navigation/instance tests: 79 passing via
+- Broker/auth/Magnus/REST/navigation/instance tests: 87 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -322,6 +322,20 @@
   status on all three, age on one, and family campus on two; no sampled row met
   the conservative spouse rule. Repeating it completed in 0.283 seconds. Only
   counts were printed, and no person values were retained.
+- A cross-panel keyboard audit covered onboarding, header navigation, Search and
+  Recent Links, Personal Links, Magnus browse/preview/build flows, and Settings.
+  View and scope shortcuts now use application scope so they reach the separate
+  keyboard-panel window from the bar widget. Personal Links resets stale scroll,
+  unusable DEV Magnus navigation is hidden, Recent Links clear has a focused
+  confirmation, and Magnus preview actions use native focus plus displayed
+  single-key commands. Live verification used `Ctrl+2` in DEV and `Ctrl+3` in
+  PROD, opened the `Test` build confirmation with Deploy now focused, moved Tab
+  to Cancel and Shift+Tab back to Deploy now, then cancelled with Esc. No build
+  was submitted. The final 87-test suite, Ruff, ty, bytecode compilation,
+  plugin validation, QML syntax parsing, and empty Hyprland config-error check
+  passed. Retained evidence contains only synthetic panel content and the
+  bounded `Test` confirmation; temporary captures with live context were
+  deleted.
 - The privacy-safe visual evidence is
   [`outputs/rock-lens-mock-launcher.png`](../outputs/rock-lens-mock-launcher.png).
   It is cropped to the Rock Lens panel and shows only synthetic records,
