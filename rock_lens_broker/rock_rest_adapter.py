@@ -5,6 +5,7 @@ import hmac
 import json
 import re
 import secrets
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +29,7 @@ from .rock_session import RockSessionError
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_TARGETS = 256
 MAX_PERSONAL_LINKS = 200
+PERSONAL_LINK_CACHE_SECONDS = 5 * 60
 ROWS_PER_CATEGORY = 3
 ROCK_LENS_USER_AGENT = "Rock-Lens/0.12"
 GUID_PATTERN = re.compile(
@@ -266,6 +268,9 @@ class RockRestReadOnlyAdapter:
         self._key = secrets.token_bytes(32)
         self._registry: OrderedDict[str, _RegistryEntry] = OrderedDict()
         self._family_contexts: OrderedDict[str, _FamilyContext] = OrderedDict()
+        self._personal_links_cache: list[dict[str, Any]] = []
+        self._personal_links_cache_deadline = 0.0
+        self._personal_links_loaded = False
 
     def set_origin(self, origin: str) -> None:
         try:
@@ -280,6 +285,9 @@ class RockRestReadOnlyAdapter:
     def clear(self) -> None:
         self._registry.clear()
         self._family_contexts.clear()
+        self._personal_links_cache = []
+        self._personal_links_cache_deadline = 0.0
+        self._personal_links_loaded = False
 
     def search(
         self,
@@ -361,7 +369,13 @@ class RockRestReadOnlyAdapter:
             raise RockRestError("rock_search_failed")
         return SearchBatch(results, tuple(unavailable))
 
-    def personal_links(self) -> list[dict[str, Any]]:
+    def personal_links(self, force_refresh: bool = False) -> list[dict[str, Any]]:
+        if (
+            not force_refresh
+            and self._personal_links_loaded
+            and time.monotonic() < self._personal_links_cache_deadline
+        ):
+            return [dict(item) for item in self._personal_links_cache]
         try:
             with self._cookie_provider.authenticated_cookie() as cookie:
                 value = self._http.get_json(
@@ -418,7 +432,13 @@ class RockRestReadOnlyAdapter:
                 link_order = self._integer(self._field(link, "Order"), 0)
                 flattened.append((section_order, link_order, public))
         flattened.sort(key=lambda item: (item[0], item[1], item[2]["title"]))
-        return [item[2] for item in flattened]
+        result = [item[2] for item in flattened]
+        self._personal_links_cache = [dict(item) for item in result]
+        self._personal_links_cache_deadline = (
+            time.monotonic() + PERSONAL_LINK_CACHE_SECONDS
+        )
+        self._personal_links_loaded = True
+        return result
 
     def resolve(self, safe_id: str) -> NavigationTarget | None:
         entry = self._registry.get(sanitize_text(safe_id, 100))

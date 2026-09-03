@@ -10,6 +10,27 @@ QML_PATH = (
 
 
 class QmlNavigationTests(unittest.TestCase):
+    def test_first_recent_and_search_results_are_selected_automatically(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("resultCursor = results.length ? 0 : -1", source)
+        self.assertIn("recentCursor = quickReturns.length ? 0 : -1", source)
+        self.assertIn(
+            'request({op: "status"})\n'
+            "    refreshQuickReturns()\n"
+            "    refreshPersonalLinks()",
+            source,
+        )
+        self.assertIn(
+            'viewMode === "search" && searchField.activeFocus && activeSearchCount',
+            source,
+        )
+        self.assertIn(
+            'if (searchField.activeFocus) {\n'
+            "        if (dy > 0 && activeSearchCount) selectSearchItem(0)",
+            source,
+        )
+
     def test_tab_ring_includes_settings_in_both_directions(self):
         source = QML_PATH.read_text(encoding="utf-8")
 

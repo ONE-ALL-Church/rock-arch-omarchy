@@ -29,7 +29,7 @@
   a count during verification. The tenant edge returned 403 for Python's
   default user-agent and 200 for the transparent `Rock-Lens/0.12` identifier,
   which is now fixed in the client.
-- Broker/auth/Magnus/REST/navigation/instance tests: 77 passing via
+- Broker/auth/Magnus/REST/navigation/instance tests: 79 passing via
   `python3 -m unittest discover -s tests -v`; `ruff check`, `ty check`, bytecode
   compilation, and `git diff --check` also pass.
 - QML validation: Qt's full-path `qmllint` parsed the plugin without errors
@@ -248,7 +248,7 @@
   six supported entities. An unscoped ID or GUID fans out only across enabled
   entity types; overlapping numeric IDs intentionally return every matching type.
   Privacy-bounded live no-match checks completed with zero unavailable
-  categories. Seventy-seven tests, Ruff, ty, bytecode compilation, the installed
+  categories. Seventy-nine tests, Ruff, ty, bytecode compilation, the installed
   socket checks, shell restart, `hyprctl reload`, and an empty
   `hyprctl configerrors` check pass.
 - After the confirmation-focus fix, the user explicitly authorized one live
@@ -265,6 +265,12 @@
   badge; `Esc` clears that badge before closing, `Alt+0` clears it directly, and
   mnemonic Alt shortcuts apply each scope without conflicting with current
   Hyprland bindings.
+- Opening Search selects the first Recent Link without taking typing focus from
+  the search field. A completed search similarly selects its first result.
+  Unscoped search also ranks matching Personal Links by allowlisted title and
+  section before entity results; explicit entity scopes exclude those links. An
+  installed PROD socket check refreshed 15 links, searched one title, and
+  returned that opaque link as the first result with no unavailable categories.
 - Backspace on a highlighted search or link item is handled by the Rock
   Lens-local key catcher while the item owns focus. It returns focus to the
   search field, deletes the selection or character before the preserved cursor,

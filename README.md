@@ -147,10 +147,13 @@ also deletes that profile's local metadata and Recent Links. Both actions
 require a second click in the launcher and never modify the Rock server.
 
 In the launcher, an empty **Search** view shows local **Recent Links**, with a
-confirmed **Clear** action in the section header. Typing immediately replaces
-them with search results. **Personal Links** has its own tab and is fetched only
-when that tab is opened, so its Rock network read cannot delay Search or Recent
-Links. **Open** is offered for every search category:
+confirmed **Clear** action in the section header and the first recent item
+selected. Typing immediately replaces them with search results and selects the
+first match. Unscoped searches include matching **Personal Links** by title or
+section; an entity prefix keeps the search limited to that Rock category.
+Personal Links are refreshed when the panel opens, then held briefly in memory
+so searching them adds no request per keystroke. **Open** is offered for every
+search category:
 People, Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel
 Items. Each target uses a fixed Rock route and must resolve to the exact
 configured Rock origin; Personal Links have the same origin restriction.

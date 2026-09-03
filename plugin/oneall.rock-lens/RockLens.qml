@@ -413,12 +413,18 @@ Panel {
     }
     if (isSearchResponse && !staleSearch) {
       results = response.results
-      if (resultCursor >= results.length) resultCursor = results.length - 1
+      resultCursor = results.length ? 0 : -1
+      recentCursor = -1
     }
     if (Array.isArray(response.personalLinks)) personalLinks = response.personalLinks
     if (Array.isArray(response.quickReturns)) {
       quickReturns = response.quickReturns
-      if (recentCursor >= quickReturns.length) recentCursor = quickReturns.length - 1
+      if (showRecentLinks) {
+        recentCursor = quickReturns.length ? 0 : -1
+        resultCursor = -1
+      } else if (recentCursor >= quickReturns.length) {
+        recentCursor = quickReturns.length - 1
+      }
     }
     if (linkCursor >= navigationCount) linkCursor = navigationCount - 1
     if (viewMode === "personal" && linkCursor < 0 && navigationCount) linkCursor = 0
@@ -440,7 +446,7 @@ Panel {
       Qt.callLater(function() {
         root.refreshSearch()
         root.refreshQuickReturns()
-        if (root.viewMode === "personal") root.refreshPersonalLinks()
+        root.refreshPersonalLinks()
         if (root.viewMode === "search") searchField.forceActiveFocus()
         root.request({op: "status", probeMagnus: true})
       })
@@ -736,7 +742,7 @@ Panel {
     if (direction >= 0) {
       if (viewMode === "settings")
         focusSearch()
-      else if (viewMode === "search" && resultCursor < 0 && recentCursor < 0 && activeSearchCount)
+      else if (viewMode === "search" && searchField.activeFocus && activeSearchCount)
         selectSearchItem(0)
       else if (viewMode === "search")
         selectPersonalLink(0)
@@ -756,6 +762,8 @@ Panel {
     } else if (viewMode === "personal") {
       if (activeSearchCount) selectSearchItem(activeSearchCount - 1)
       else focusSearch()
+    } else if (viewMode === "search" && searchField.activeFocus) {
+      openSettings(false)
     } else if (resultCursor >= 0 || recentCursor >= 0) {
       focusSearch()
     } else {
@@ -778,6 +786,11 @@ Panel {
       return
     }
     if (viewMode === "search") {
+      if (searchField.activeFocus) {
+        if (dy > 0 && activeSearchCount) selectSearchItem(0)
+        else if (dy < 0) selectPersonalLink(navigationCount - 1)
+        return
+      }
       var searchCursor = showRecentLinks ? recentCursor : resultCursor
       if (searchCursor < 0) {
         if (dy > 0 && activeSearchCount) selectSearchItem(0)
@@ -954,6 +967,7 @@ Panel {
   function resetPanel() {
     query = ""
     focusSearch()
+    recentCursor = quickReturns.length ? 0 : -1
     quickLook = null
     feedbackText = ""
     statusLoaded = false
@@ -962,6 +976,7 @@ Panel {
     searchInFlightQuery = ""
     request({op: "status"})
     refreshQuickReturns()
+    refreshPersonalLinks()
   }
 
   onOpenedChanged: if (opened) resetPanel()

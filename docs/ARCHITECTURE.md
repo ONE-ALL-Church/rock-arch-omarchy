@@ -113,10 +113,13 @@ specification. Bare prefixes omit `$filter` but retain the fixed projection,
 ordering, and `$top=3`. Unknown prefixes stay in the search text and cannot
 select an API path.
 Personal Links use only `PersonalLinks/GetPersonalLinksData`. Responses are
-capped at 2 MiB and transformed immediately into display allowlists. A failed
-category is reported as unavailable; PROD never falls back to mock data. There
-is no raw HTTP, generic entity, SQL, mutation, job execution, or Run Now
-operation.
+capped at 2 MiB, transformed immediately into display allowlists, and cached in
+memory for five minutes. Unscoped search matches the allowlisted title and
+section locally, ranks Personal Links before entity results, and never exposes
+their URLs. Opening the panel force-refreshes that cache; scoped entity searches
+do not include Personal Links. A failed category is reported as unavailable;
+PROD never falls back to mock data. There is no raw HTTP, generic entity, SQL,
+mutation, job execution, or Run Now operation.
 
 The cookie authenticates the actor but does not override Rock authorization.
 Rock controller/action permissions still apply; endpoints that enforce entity

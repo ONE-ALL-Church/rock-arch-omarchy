@@ -227,7 +227,7 @@ class FakeLive:
             "campus": "Not requested",
         }
 
-    def personal_links(self):
+    def personal_links(self, force_refresh=False):
         self.personal_link_calls += 1
         return [
             {
@@ -429,6 +429,32 @@ class BrokerContractTests(unittest.TestCase):
         broker.handle({"op": "search", "query": "g: Delta"})
         self.assertEqual(live.search_calls[-1], "Delta")
         self.assertEqual(live.search_categories[-1], "Groups")
+
+    def test_unscoped_search_includes_matching_personal_links_first(self):
+        InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)
+        live = FakeLive()
+        broker = Broker(
+            self.state,
+            config_file=self.config,
+            session=FakeSession(True),
+            magnus=FakeMagnus(False),
+            live=live,
+            instance_file=self.instance,
+        )
+        broker.handle({"op": "set_context", "context": "PROD"})
+
+        response = broker.handle({"op": "search", "query": "people"})
+
+        self.assertEqual(response["results"][0]["category"], "Personal Links")
+        self.assertEqual(response["results"][0]["safeId"], "rock-safe-link")
+        self.assertEqual(response["results"][0]["subtitle"], "My tools")
+        self.assertEqual(response["results"][0]["status"], "Personal")
+        self.assertNotIn("url", json.dumps(response["results"][0]).lower())
+
+        scoped = broker.handle({"op": "search", "query": "p: people"})
+        self.assertTrue(
+            all(item["category"] != "Personal Links" for item in scoped["results"])
+        )
 
     def test_prod_search_and_links_do_not_require_magnus_access(self):
         InstanceStore(self.instance).set(DEFAULT_ROCK_ORIGIN)

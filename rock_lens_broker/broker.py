@@ -10,9 +10,11 @@ from typing import Any, Protocol
 from .auth import AuthState, ConfigStore, OAuthManager, default_config_path
 from .clipboard import copy_to_clipboard
 from .contracts import (
+    ALLOWED_RESULT_KEYS,
     Capability,
     Context,
     HealthState,
+    allowlist,
     developer_mode_enabled,
     parse_search_query,
     sanitize_text,
@@ -91,7 +93,9 @@ class LiveReadAdapter(Protocol):
 
     def person_quick_look(self, safe_id: str) -> dict[str, Any] | None: ...
 
-    def personal_links(self) -> list[dict[str, Any]]: ...
+    def personal_links(
+        self, force_refresh: bool = False
+    ) -> list[dict[str, Any]]: ...
 
     def resolve(self, safe_id: str) -> NavigationTarget | None: ...
 
@@ -535,14 +539,23 @@ class Broker:
                     rock=self._session.status(),
                     magnus=self._magnus.status(),
                 )
+            results = list(batch.results)
+            unavailable = list(batch.unavailable)
+            if category is None:
+                try:
+                    results = self._matching_personal_links(
+                        query, self._live.personal_links()
+                    ) + results
+                except RockRestError:
+                    unavailable.append("Personal Links")
             self._live_health = (
-                HealthState.STALE if batch.unavailable else HealthState.HEALTHY
+                HealthState.STALE if unavailable else HealthState.HEALTHY
             )
             return self._ok(
                 context=self._context.value,
-                results=batch.results,
+                results=results,
                 source="live",
-                unavailable=list(batch.unavailable),
+                unavailable=unavailable,
                 rock=self._session.status(),
                 magnus=self._magnus.status(),
             )
@@ -583,7 +596,7 @@ class Broker:
                 and self._session.status()["configured"]
             ):
                 try:
-                    personal_links = self._live.personal_links()
+                    personal_links = self._live.personal_links(force_refresh=True)
                     self._live_health = HealthState.HEALTHY
                     available = True
                 except RockRestError:
@@ -600,6 +613,51 @@ class Broker:
                 else []
             )
         return self._ok(**response)
+
+    @staticmethod
+    def _matching_personal_links(
+        query: str, links: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        terms = sanitize_text(query, 120).casefold().split()
+        if not terms:
+            return []
+        matches: list[tuple[int, int, dict[str, Any]]] = []
+        for index, link in enumerate(links):
+            title = sanitize_text(link.get("title"), 160)
+            section = sanitize_text(link.get("section"), 120)
+            title_folded = title.casefold()
+            haystack = f"{title} {section}".casefold()
+            if not title or not all(term in haystack for term in terms):
+                continue
+            phrase = " ".join(terms)
+            rank = (
+                0
+                if title_folded == phrase
+                else 1
+                if title_folded.startswith(phrase)
+                else 2
+                if all(term in title_folded for term in terms)
+                else 3
+            )
+            matches.append(
+                (
+                    rank,
+                    index,
+                    allowlist(
+                        {
+                            "category": "Personal Links",
+                            "safeId": link.get("safeId"),
+                            "title": title,
+                            "subtitle": section or "Rock bookmark",
+                            "status": "Shared" if link.get("isShared") else "Personal",
+                            "canOpen": True,
+                        },
+                        ALLOWED_RESULT_KEYS,
+                    ),
+                )
+            )
+        matches.sort(key=lambda item: (item[0], item[1]))
+        return [item[2] for item in matches]
 
     def _open_navigation(self, safe_id: str) -> dict[str, Any]:
         if self._context is not Context.PROD:

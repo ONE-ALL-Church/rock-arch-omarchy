@@ -443,6 +443,14 @@ class RockRestAdapterTests(unittest.TestCase):
         assert target is not None
         self.assertEqual(target.url, "https://rock.example.org/page/12")
 
+        cached = adapter.personal_links()
+        self.assertEqual(cached, links)
+        self.assertEqual(len(http.calls), 1)
+
+        refreshed = adapter.personal_links(force_refresh=True)
+        self.assertEqual(refreshed, links)
+        self.assertEqual(len(http.calls), 2)
+
     def test_all_category_failures_are_stable(self):
         http = FakeHttp(failures={spec.path for spec in SEARCH_SPECS})
         cookie_provider = FakeCookieProvider()
