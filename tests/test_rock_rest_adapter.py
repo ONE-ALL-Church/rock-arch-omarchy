@@ -136,6 +136,9 @@ class RockRestAdapterTests(unittest.TestCase):
                         "GroupType": {"Name": "Small Group"},
                     }
                 ],
+                "/api/GroupTypes": [
+                    {"Id": 5, "Name": "Small Group"}
+                ],
                 "/api/WorkflowTypes": [
                     {"Id": 6, "Name": "Follow-up", "IsActive": True}
                 ],
@@ -149,6 +152,9 @@ class RockRestAdapterTests(unittest.TestCase):
                 ],
                 "/api/Pages": [
                     {"Id": 9, "PageTitle": "Directory", "InternalName": "Dir"}
+                ],
+                "/api/ContentChannelTypes": [
+                    {"Id": 11, "Name": "Blog"}
                 ],
                 "/api/ContentChannelItems": [
                     {"Id": 12, "Title": "Weekend Update", "Status": 1}
@@ -191,12 +197,20 @@ class RockRestAdapterTests(unittest.TestCase):
         expected_targets = {
             "People": ("Person", "/Person/17"),
             "Groups": ("Group", "/Group/4"),
+            "Group Types": (
+                "Group Type",
+                "/admin/general/group-types?GroupTypeId=5",
+            ),
             "Workflows": (
                 "Workflow Type",
                 "/admin/general/workflows?WorkflowTypeId=6",
             ),
             "Jobs": ("Scheduled Job", "/admin/system/jobs/7"),
             "Pages": ("Page", "/page/9"),
+            "Content Channel Types": (
+                "Content Channel Type",
+                "/admin/cms/content-channel-type?ContentChannelTypeId=11",
+            ),
             "Content Channel Items": (
                 "Content Channel Item",
                 "/ContentChannelItem/12",

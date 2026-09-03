@@ -12,13 +12,14 @@
    credential storage, and a validated memory-only `.ROCK` cookie.
 4. `SecretToolStore`: the small Secret Service adapter used only for
    per-profile Rock usernames and passwords.
-5. `MockAdapter`: deterministic, synthetic records for People, Groups,
-   Workflow Types, Jobs, Pages, and Content Channel Items.
+5. `MockAdapter`: deterministic, synthetic records for People, Groups, Group
+   Types, Workflow Types, Jobs, Pages, Content Channel Types, and Content
+   Channel Items.
 6. `MagnusReadOnlyAdapter`: optional native capability probe plus descriptor-
    driven browsing, bounded previews/downloads, clipboard values, hashes,
    same-origin view links, and confirmed mobile app builds on the selected Rock
    origin. It reuses `RockSessionProvider`; no external CLI is launched.
-7. `RockRestReadOnlyAdapter`: six fixed Rock REST v1 entity GETs plus the fixed
+7. `RockRestReadOnlyAdapter`: eight fixed Rock REST v1 entity GETs plus the fixed
    current-user Personal Links action, authenticated by the native Rock session.
 8. `QuickReturnStore`: same-origin launcher and successful-build history,
    deduplicated and capped at 20 in an owner-only JSON file. Build entries are
@@ -116,9 +117,10 @@ available when the plugin is absent or the account lacks Magnus permission.
 
 The client cannot choose an endpoint. These are Rock's established REST v1
 controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
-`WorkflowTypes`, `ServiceJobs`, `Pages`, and `ContentChannelItems`, with fixed
-`$select`, `$orderby`, `$top=3`, and generated `startswith` filters. The six
-fixed reads share one native Rock session cookie and start in
+`GroupTypes`, `WorkflowTypes`, `ServiceJobs`, `Pages`, `ContentChannelTypes`,
+and `ContentChannelItems`, with fixed `$select`, `$orderby`, `$top=3`, and
+generated `startswith` filters. The eight fixed reads share one native Rock
+session cookie and start in
 parallel; results are still transformed in a deterministic category order.
 The Groups projection also expands only `GroupType.Name` for its subtitle.
 People project age, Giving Group, marital/connection/record status, then perform

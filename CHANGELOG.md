@@ -5,6 +5,23 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-03
+
+### Added
+
+- Added Group Types and Content Channel Types to the bounded Rock REST v1
+  search, including exact ID/GUID lookup, same-origin admin navigation,
+  Settings controls, `gt:`/`ct:` prefixes, and keyboard shortcuts.
+- Replaced the separate update question with one post-login **Finish setup**
+  screen for choosing search categories and optional automatic updates. All
+  eight categories default on, automatic updates default off, and one Enter
+  accepts the defaults.
+
+### Changed
+
+- Migrate existing profile stores once so both new categories are enabled by
+  default while preserving later user choices.
+
 ## [0.18.0] - 2026-09-03
 
 ### Added
@@ -154,6 +171,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.19.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.19.0
 [0.18.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.18.0
 [0.17.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.17.0
 [0.16.2]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.2

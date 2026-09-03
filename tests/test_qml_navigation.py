@@ -13,7 +13,7 @@ ICON_PATH = QML_PATH.with_name("RockArchIcon.qml")
 HERO_PATH = QML_PATH.with_name("RockLensHero.qml")
 KEY_CATCHER_PATH = QML_PATH.with_name("RockLensKeyCatcher.qml")
 LOGIN_PATH = QML_PATH.with_name("RockLensLoginPanel.qml")
-UPDATE_ONBOARDING_PATH = QML_PATH.with_name("RockLensUpdateOnboardingPanel.qml")
+FINISH_SETUP_PATH = QML_PATH.with_name("RockLensFinishSetupPanel.qml")
 MAGNUS_PATH = QML_PATH.with_name("RockLensMagnusPanel.qml")
 NAVIGATION_PATH = QML_PATH.with_name("RockLensNavigationTabs.qml")
 PERSONAL_PATH = QML_PATH.with_name("RockLensPersonalPanel.qml")
@@ -24,7 +24,7 @@ PANEL_PATHS = (
     ICON_PATH,
     HERO_PATH,
     LOGIN_PATH,
-    UPDATE_ONBOARDING_PATH,
+    FINISH_SETUP_PATH,
     MAGNUS_PATH,
     NAVIGATION_PATH,
     PERSONAL_PATH,
@@ -123,7 +123,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("property alias profileNameField", form)
         self.assertIn("KeyNavigation.backtab: onboardingProfileNameField", form)
         self.assertIn("KeyNavigation.tab: onboardingProfileNameField", form)
-        self.assertIn("focusTarget: root.automaticUpdatesOnboardingRequired", source)
+        self.assertIn("focusTarget: root.finishSetupOnboardingRequired", source)
         self.assertIn(
             ": (root.onboardingRequired ? onboardingForm.profileNameField : searchField)",
             source,
@@ -131,31 +131,47 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("function completeOnboarding()", source)
         self.assertIn('"profile_add" : "rock_configure"', source)
 
-    def test_one_time_update_choice_follows_successful_login(self):
+    def test_one_time_finish_setup_follows_successful_login(self):
         source = all_qml_source()
-        prompt = UPDATE_ONBOARDING_PATH.read_text(encoding="utf-8")
+        prompt = FINISH_SETUP_PATH.read_text(encoding="utf-8")
 
         self.assertIn(
-            'readonly property bool automaticUpdatesOnboardingRequired: contextName === "PROD"',
-            source,
-        )
-        self.assertIn("rockConfigured && updateManaged", source)
-        self.assertIn(
-            "!preferenceAutomaticUpdates && !preferenceAutomaticUpdatesPrompted",
-            source,
-        )
-        self.assertIn('text: "Keep Rock Arch up to date?"', prompt)
-        self.assertIn('text: "Not now"', prompt)
-        self.assertIn('"Enable automatic updates"', prompt)
-        self.assertEqual(prompt.count("Keys.onEscapePressed:"), 2)
-        self.assertIn(
-            'request({op: "onboarding_updates_choice", enabled: enabled === true})',
+            'readonly property bool finishSetupOnboardingRequired: contextName === "PROD"',
             source,
         )
         self.assertIn(
-            "updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)",
+            "!preferenceOnboardingSetupCompleted",
             source,
         )
+        self.assertIn('text: "Finish setup"', prompt)
+        self.assertIn('PanelSectionHeader { text: "SEARCH CATEGORIES" }', prompt)
+        self.assertIn('PanelSectionHeader { text: "UPDATES" }', prompt)
+        self.assertIn('"Automatic updates · On"', prompt)
+        self.assertIn('"Continue to Search"', prompt)
+        self.assertIn("controller.searchCategories", prompt)
+        self.assertIn("onboardingEnabledCategories.length > 0", prompt)
+        self.assertGreaterEqual(prompt.count("Keys.onEscapePressed:"), 3)
+        self.assertIn(
+            'op: "onboarding_setup_complete"',
+            source,
+        )
+        self.assertIn(
+            "finishSetupPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)",
+            source,
+        )
+
+    def test_search_category_model_includes_type_entities_and_shortcuts(self):
+        source = all_qml_source()
+
+        self.assertIn('{key: "Group Types", label: "Group Types"}', source)
+        self.assertIn(
+            '{key: "Content Channel Types", label: "Content Channel Types"}',
+            source,
+        )
+        self.assertIn('sequence: "Alt+Shift+G"', source)
+        self.assertIn('onActivated: root.applyScope("gt")', source)
+        self.assertIn('sequence: "Alt+Shift+C"', source)
+        self.assertIn('onActivated: root.applyScope("ct")', source)
 
     def test_existing_profiles_have_a_keyboard_accessible_rename_form(self):
         source = all_qml_source()
@@ -417,7 +433,7 @@ class QmlNavigationTests(unittest.TestCase):
 
         for component in (
             "RockLensLoginPanel",
-            "RockLensUpdateOnboardingPanel",
+            "RockLensFinishSetupPanel",
             "RockLensSearchPanel",
             "RockLensPersonalPanel",
             "RockLensMagnusPanel",

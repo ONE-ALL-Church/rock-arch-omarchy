@@ -1,7 +1,7 @@
 # Keyboard and panel audit
 
 Audited 2026-09-02 against the installed Omarchy shell. The review covered
-every Rock Arch surface: login and update onboarding, header navigation, Search and Recent
+every Rock Arch surface: login and Finish setup onboarding, header navigation, Search and Recent
 Links, Personal Links, Magnus browsing and file actions, build confirmation,
 and Settings.
 
@@ -17,7 +17,9 @@ only in PROD and only when the active Rock profile reports access.
 
 1. **Onboarding — healthy.** Profile name, domain, username, password, and Connect form a
    closed Tab/Shift+Tab loop. Enter advances fields or submits from the
-   password field. Navigation remains hidden until login succeeds.
+   password field. After login, Finish setup offers all eight search categories
+   plus automatic updates in one keyboard-complete screen. Navigation remains
+   hidden until setup succeeds.
 2. **Header — healthy.** Tab/Shift+Tab continue to cycle the launcher views.
    `Ctrl+1` through `Ctrl+4` provide deterministic access to Search, Personal
    Links, Magnus when available, and Settings. These shortcuts use application

@@ -49,7 +49,7 @@ push to `main` and on pull requests.
 - The QML process receives no credentials, cookies, raw Rock IDs, raw server
   URLs, response bodies, or exception text. A user-selected bounded Magnus text
   preview is the sole content exception.
-- Search uses six fixed Rock REST v1 resources with fixed projections, bounded
+- Search uses eight fixed Rock REST v1 resources with fixed projections, bounded
   results, and exact-origin navigation targets. It exposes no generic HTTP,
   REST v2, SQL, mutation, job-run, or Run Now transport.
 - Personal Links are same-origin and represented outside the broker by opaque

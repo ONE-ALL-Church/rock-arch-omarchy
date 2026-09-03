@@ -6,7 +6,11 @@ from pathlib import Path
 from rock_lens_broker.contracts import CATEGORIES
 from rock_lens_broker.instance import InstanceStore
 from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.profiles import ProfileError, ProfileStore
+from rock_lens_broker.profiles import (
+    PROFILE_STORE_VERSION,
+    ProfileError,
+    ProfileStore,
+)
 
 
 class ProfileStoreTests(unittest.TestCase):
@@ -54,6 +58,7 @@ class ProfileStoreTests(unittest.TestCase):
         self.assertTrue(updated["closeAfterOpen"])
         self.assertFalse(updated["automaticUpdates"])
         self.assertFalse(updated["automaticUpdatesPrompted"])
+        self.assertFalse(updated["onboardingSetupCompleted"])
         self.assertTrue(updated["showMenuBar"])
         self.assertEqual(updated["enabledCategories"], ["People", "Groups"])
 
@@ -73,6 +78,41 @@ class ProfileStoreTests(unittest.TestCase):
             store.update_preferences({"rawCookie": True})
         with self.assertRaisesRegex(ProfileError, "invalid_profile_name"):
             store.add({"unexpected": "record"}, DEFAULT_ROCK_ORIGIN)
+
+    def test_version_one_preferences_gain_new_search_categories_once(self):
+        self.path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "activeProfileId": "",
+                    "profiles": [],
+                    "preferences": {
+                        "automaticUpdatesPrompted": True,
+                        "enabledCategories": ["People", "Groups"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.path.chmod(0o600)
+        store = ProfileStore(self.path, self.instance)
+
+        snapshot = store.snapshot()
+
+        self.assertTrue(snapshot["preferences"]["onboardingSetupCompleted"])
+        self.assertEqual(
+            snapshot["preferences"]["enabledCategories"],
+            ["People", "Groups", "Group Types", "Content Channel Types"],
+        )
+        store.update_preferences(
+            {"enabledCategories": ["People", "Content Channel Types"]}
+        )
+        persisted = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertEqual(persisted["version"], PROFILE_STORE_VERSION)
+        self.assertEqual(
+            store.preferences()["enabledCategories"],
+            ["People", "Content Channel Types"],
+        )
 
     def test_profile_name_can_be_changed_without_changing_its_identity(self):
         store = ProfileStore(self.path, self.instance)

@@ -30,9 +30,11 @@ class HealthState(StrEnum):
 CATEGORIES = (
     "People",
     "Groups",
+    "Group Types",
     "Workflows",
     "Jobs",
     "Pages",
+    "Content Channel Types",
     "Content Channel Items",
 )
 
@@ -43,6 +45,9 @@ SEARCH_SCOPE_ALIASES = {
     "g": "Groups",
     "group": "Groups",
     "groups": "Groups",
+    "gt": "Group Types",
+    "grouptype": "Group Types",
+    "grouptypes": "Group Types",
     "w": "Workflows",
     "wt": "Workflows",
     "workflow": "Workflows",
@@ -55,6 +60,11 @@ SEARCH_SCOPE_ALIASES = {
     "pg": "Pages",
     "page": "Pages",
     "pages": "Pages",
+    "ct": "Content Channel Types",
+    "contenttype": "Content Channel Types",
+    "contenttypes": "Content Channel Types",
+    "channeltype": "Content Channel Types",
+    "channeltypes": "Content Channel Types",
     "c": "Content Channel Items",
     "content": "Content Channel Items",
     "contents": "Content Channel Items",

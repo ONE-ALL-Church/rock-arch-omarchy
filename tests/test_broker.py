@@ -349,7 +349,7 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(started["update"]["state"], "updating")
         self.assertEqual(updates.start_calls, 1)
 
-    def test_onboarding_update_choice_is_explicit_and_persisted(self):
+    def test_onboarding_setup_choices_are_explicit_and_persisted(self):
         updates = FakeUpdates()
         broker = Broker(
             self.state,
@@ -359,21 +359,36 @@ class BrokerContractTests(unittest.TestCase):
         )
 
         declined = broker.handle(
-            {"op": "onboarding_updates_choice", "enabled": False}
+            {
+                "op": "onboarding_setup_complete",
+                "automaticUpdates": False,
+                "enabledCategories": ["People", "Group Types"],
+            }
         )
-        self.assertFalse(declined["onboardingUpdates"]["enabled"])
+        self.assertFalse(declined["onboardingSetup"]["automaticUpdates"])
+        self.assertEqual(
+            declined["onboardingSetup"]["enabledCategories"],
+            ["People", "Group Types"],
+        )
         self.assertFalse(
             declined["profiles"]["preferences"]["automaticUpdates"]
         )
         self.assertTrue(
             declined["profiles"]["preferences"]["automaticUpdatesPrompted"]
         )
+        self.assertTrue(
+            declined["profiles"]["preferences"]["onboardingSetupCompleted"]
+        )
         self.assertEqual(updates.status_calls[-1], (False, False))
 
         enabled = broker.handle(
-            {"op": "onboarding_updates_choice", "enabled": True}
+            {
+                "op": "onboarding_setup_complete",
+                "automaticUpdates": True,
+                "enabledCategories": list(CATEGORIES),
+            }
         )
-        self.assertTrue(enabled["onboardingUpdates"]["enabled"])
+        self.assertTrue(enabled["onboardingSetup"]["automaticUpdates"])
         self.assertTrue(enabled["profiles"]["preferences"]["automaticUpdates"])
         self.assertTrue(
             enabled["profiles"]["preferences"]["automaticUpdatesPrompted"]
@@ -382,9 +397,23 @@ class BrokerContractTests(unittest.TestCase):
 
         self.assertEqual(
             broker.handle(
-                {"op": "onboarding_updates_choice", "enabled": "yes"}
+                {
+                    "op": "onboarding_setup_complete",
+                    "automaticUpdates": "yes",
+                    "enabledCategories": [],
+                }
             ),
-            {"ok": False, "error": "invalid_update_preference"},
+            {"ok": False, "error": "invalid_onboarding_preferences"},
+        )
+        self.assertEqual(
+            broker.handle(
+                {
+                    "op": "onboarding_setup_complete",
+                    "automaticUpdates": False,
+                    "enabledCategories": ["Unknown"],
+                }
+            ),
+            {"ok": False, "error": "invalid_onboarding_preferences"},
         )
 
     def test_normal_mode_forces_prod_and_rejects_dev_context(self):

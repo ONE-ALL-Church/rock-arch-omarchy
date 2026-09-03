@@ -111,9 +111,10 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 ## Panel-specific decisions
 
 - **Onboarding:** one focused connection task with four labeled fields and one
-  primary Connect action, followed by a one-time automatic-update choice when
-  the install supports it. Either choice continues to Search; no application
-  navigation competes with the active onboarding step.
+  primary Connect action, followed by one Finish setup screen for search
+  categories and the optional automatic-update choice when the install supports
+  it. The primary action continues to Search; no application navigation
+  competes with the active onboarding step.
 - **Search:** search input first, then either Recent Links or results. Person
   context stays attached to the person result instead of becoming a competing
   card.

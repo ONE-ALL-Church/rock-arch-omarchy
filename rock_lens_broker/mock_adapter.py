@@ -25,6 +25,14 @@ _RECORDS = (
         "canOpen": False,
     },
     {
+        "category": "Group Types",
+        "safeId": "mock-group-type-small-group",
+        "title": "Small Group",
+        "subtitle": "Group type",
+        "status": "Live",
+        "canOpen": False,
+    },
+    {
         "category": "Workflows",
         "safeId": "mock-workflow-welcome",
         "title": "New Guest Follow-up",
@@ -46,6 +54,14 @@ _RECORDS = (
         "title": "Operations Dashboard",
         "subtitle": "Internal Page",
         "status": "Published",
+        "canOpen": False,
+    },
+    {
+        "category": "Content Channel Types",
+        "safeId": "mock-content-type-blog",
+        "title": "Blog",
+        "subtitle": "Content channel type",
+        "status": "Live",
         "canOpen": False,
     },
     {

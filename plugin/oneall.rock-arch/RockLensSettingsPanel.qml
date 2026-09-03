@@ -600,14 +600,7 @@ Column {
       rowSpacing: Style.spacing.sm
 
       Repeater {
-        model: [
-          {key: "People", label: "People"},
-          {key: "Groups", label: "Groups"},
-          {key: "Workflows", label: "Workflow Types"},
-          {key: "Jobs", label: "Jobs"},
-          {key: "Pages", label: "Pages"},
-          {key: "Content Channel Items", label: "Content Items"}
-        ]
+        model: settingsPanel.controller.searchCategories
 
         delegate: Button {
           id: categoryCheckBox

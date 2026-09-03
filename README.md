@@ -1,9 +1,9 @@
 # Rock Arch — Bridging Rock RMS and Omarchy
 
 Rock Arch is a keyboard-first Omarchy launcher for Rock RMS. Search People,
-Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel Items; open
-Rock Personal Links; and return to recently opened records without navigating
-the full admin UI.
+Groups, Group Types, Workflow Types, Scheduled Jobs, Pages, Content Channel
+Types, and Content Channel Items; open Rock Personal Links; and return to
+recently opened records without navigating the full admin UI.
 
 Every user signs directly into their own Rock instance. Rock Arch uses Rock's
 native `.ROCK` session for Search, Personal Links, and optional Magnus features.
@@ -33,10 +33,11 @@ asks for four values:
 
 Select **Connect**. The broker verifies the login before saving it to the
 desktop password manager. No Rock administrator setup or client secret is
-required. After the first successful connection, Git-managed installations
-offer a one-time choice to enable automatic updates. **Not now** keeps them
-off; either choice continues directly to Search and can be changed later in
-Settings.
+required. After the first successful connection, **Finish setup** lets the user
+choose which Rock entities Search includes and whether a Git-managed install
+should update automatically. Every search category is enabled and automatic
+updates are off by default; pressing Enter accepts those defaults. Both choices
+remain editable in Settings.
 
 Credentials cross the owner-only local socket only in an explicit login
 request and are never returned. The launcher clears its password field
@@ -49,8 +50,9 @@ Git-managed installs check for updates once a day. Open **Settings** to see the
 current version, check immediately, or install an available update. Automatic
 installation is optional and off by default. Enable **Install updates
 automatically** only if you want Rock Arch to apply a newly detected update
-without another click. The same opt-in is offered once after initial login;
-Escape is equivalent to **Not now**.
+without another click. The same opt-in appears in the one-time **Finish setup**
+screen after initial login; Escape continues with the currently displayed
+choices.
 
 Rock Arch delegates installation to Omarchy. Omarchy fetches the repository,
 fast-forwards only, validates the updated plugin, rolls back a failed
@@ -133,10 +135,10 @@ first match. Unscoped searches include matching **Personal Links** by title or
 section; an entity prefix keeps the search limited to that Rock category.
 Personal Links are refreshed when the panel opens, then held briefly in memory
 so searching them adds no request per keystroke. **Open** is offered for every
-search category:
-People, Groups, Workflow Types, Scheduled Jobs, Pages, and Content Channel
-Items. Each target uses a fixed Rock route and must resolve to the exact
-configured Rock origin; Personal Links have the same origin restriction.
+search category: People, Groups, Group Types, Workflow Types, Scheduled Jobs,
+Pages, Content Channel Types, and Content Channel Items. Each target uses a
+fixed Rock route and must resolve to the exact configured Rock origin; Personal
+Links have the same origin restriction.
 
 All searches use fixed Rock REST v1 endpoints; Rock Arch does not use the v2
 API or accept arbitrary endpoint paths. Start a query with an entity prefix to
@@ -147,9 +149,11 @@ prefix such as `g:` lists the first three items in that category.
 |---|---|---|---|
 | People | `p:` | `person:`, `people:` | `Alt+P` |
 | Groups | `g:` | `group:`, `groups:` | `Alt+G` |
+| Group Types | `gt:` | `grouptype:`, `grouptypes:` | `Alt+Shift+G` |
 | Workflow Types | `w:` or `wt:` | `workflow:`, `workflowtype:`, `workflowtypes:` | `Alt+W` |
 | Jobs | `j:` | `job:`, `jobs:` | `Alt+J` |
 | Pages | `pg:` | `page:`, `pages:` | `Alt+Shift+P` |
+| Content Channel Types | `ct:` | `contenttype:`, `channeltype:`, `channeltypes:` | `Alt+Shift+C` |
 | Content Channel Items | `c:` | `content:`, `item:`, `items:` | `Alt+C` |
 
 For example, `g: youth` calls only the Groups endpoint. Every scope also accepts

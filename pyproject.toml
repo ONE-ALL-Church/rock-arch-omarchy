@@ -1,6 +1,6 @@
 [project]
 name = "rock-arch"
-version = "0.18.0"
+version = "0.19.0"
 requires-python = ">=3.11"
 description = "Native Rock RMS search and optional Magnus browser for Omarchy"
 

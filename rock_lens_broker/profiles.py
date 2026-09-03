@@ -18,6 +18,8 @@ from .origin import OriginError, validate_rock_origin
 MAX_PROFILE_STORE_BYTES = 64 * 1024
 MAX_PROFILES = 20
 PROFILE_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+PROFILE_STORE_VERSION = 2
+VERSION_2_CATEGORIES = ("Group Types", "Content Channel Types")
 DEFAULT_PREFERENCES: dict[str, Any] = {
     "showPersonContext": True,
     "recentLinks": True,
@@ -25,6 +27,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "showMenuBar": True,
     "automaticUpdates": False,
     "automaticUpdatesPrompted": False,
+    "onboardingSetupCompleted": False,
     "enabledCategories": list(CATEGORIES),
 }
 
@@ -175,6 +178,7 @@ class ProfileStore:
             "showMenuBar",
             "automaticUpdates",
             "automaticUpdatesPrompted",
+            "onboardingSetupCompleted",
         ):
             if name in updates:
                 if not isinstance(updates[name], bool):
@@ -257,7 +261,7 @@ class ProfileStore:
     @classmethod
     def _new_state(cls, profile: RockProfile | None = None) -> dict[str, Any]:
         return {
-            "version": 1,
+            "version": PROFILE_STORE_VERSION,
             "activeProfileId": profile.profile_id if profile else "",
             "profiles": [cls._record(profile)] if profile else [],
             "preferences": dict(DEFAULT_PREFERENCES),
@@ -265,8 +269,12 @@ class ProfileStore:
 
     @classmethod
     def _validated_state(cls, value: object) -> dict[str, Any]:
-        if not isinstance(value, dict) or value.get("version") != 1:
+        if (
+            not isinstance(value, dict)
+            or value.get("version") not in (1, PROFILE_STORE_VERSION)
+        ):
             raise ProfileError("profile_store_unavailable")
+        source_version = value["version"]
         rows = value.get("profiles")
         active = value.get("activeProfileId")
         preferences = value.get("preferences")
@@ -306,8 +314,14 @@ class ProfileStore:
             "showMenuBar",
             "automaticUpdates",
             "automaticUpdatesPrompted",
+            "onboardingSetupCompleted",
         ):
-            candidate = preferences.get(name, clean_preferences[name])
+            if name in preferences:
+                candidate = preferences[name]
+            elif name == "onboardingSetupCompleted":
+                candidate = clean_preferences["automaticUpdatesPrompted"]
+            else:
+                candidate = clean_preferences[name]
             if not isinstance(candidate, bool):
                 raise ProfileError("profile_store_unavailable")
             clean_preferences[name] = candidate
@@ -321,11 +335,17 @@ class ProfileStore:
             or not set(categories).issubset(CATEGORIES)
         ):
             raise ProfileError("profile_store_unavailable")
+        if source_version == 1:
+            categories = categories + [
+                category
+                for category in VERSION_2_CATEGORIES
+                if category not in categories
+            ]
         clean_preferences["enabledCategories"] = [
             category for category in CATEGORIES if category in categories
         ]
         return {
-            "version": 1,
+            "version": PROFILE_STORE_VERSION,
             "activeProfileId": active,
             "profiles": profiles,
             "preferences": clean_preferences,
