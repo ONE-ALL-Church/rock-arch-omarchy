@@ -5,6 +5,14 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.24.4] - 2026-09-03
+
+### Fixed
+
+- Keep contains-style matching for Workflow Types while restoring fast prefix
+  queries for the other seven entity categories, avoiding a multi-second
+  general-search regression on larger Rock instances.
+
 ## [0.24.3] - 2026-09-03
 
 ### Fixed

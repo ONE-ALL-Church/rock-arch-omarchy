@@ -1,6 +1,6 @@
 [project]
 name = "rock-arch"
-version = "0.24.3"
+version = "0.24.4"
 requires-python = ">=3.11"
 description = "Rock RMS search, public Rock knowledge, and optional Magnus for Omarchy"
 

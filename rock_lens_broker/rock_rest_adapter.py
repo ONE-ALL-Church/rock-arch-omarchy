@@ -153,6 +153,7 @@ class _SearchSpec:
     active_field: str | None = None
     status_field: str | None = None
     expand: str | None = None
+    match_anywhere: bool = False
 
 
 @dataclass(frozen=True)
@@ -235,6 +236,7 @@ SEARCH_SPECS = (
         30,
         "/admin/general/workflows?WorkflowTypeId={id}",
         active_field="IsActive",
+        match_anywhere=True,
     ),
     _SearchSpec(
         "Jobs",
@@ -571,7 +573,11 @@ class RockRestReadOnlyAdapter:
             for token in tokens:
                 escaped = token.replace("'", "''")
                 alternatives = [
-                    f"substringof('{escaped}',{field})"
+                    (
+                        f"substringof('{escaped}',{field})"
+                        if spec.match_anywhere
+                        else f"startswith({field},'{escaped}')"
+                    )
                     for field in spec.search_fields
                 ]
                 clauses.append(
