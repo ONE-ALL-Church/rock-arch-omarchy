@@ -349,6 +349,44 @@ class BrokerContractTests(unittest.TestCase):
         self.assertEqual(started["update"]["state"], "updating")
         self.assertEqual(updates.start_calls, 1)
 
+    def test_onboarding_update_choice_is_explicit_and_persisted(self):
+        updates = FakeUpdates()
+        broker = Broker(
+            self.state,
+            instance_file=self.instance,
+            developer_mode=True,
+            updates=updates,
+        )
+
+        declined = broker.handle(
+            {"op": "onboarding_updates_choice", "enabled": False}
+        )
+        self.assertFalse(declined["onboardingUpdates"]["enabled"])
+        self.assertFalse(
+            declined["profiles"]["preferences"]["automaticUpdates"]
+        )
+        self.assertTrue(
+            declined["profiles"]["preferences"]["automaticUpdatesPrompted"]
+        )
+        self.assertEqual(updates.status_calls[-1], (False, False))
+
+        enabled = broker.handle(
+            {"op": "onboarding_updates_choice", "enabled": True}
+        )
+        self.assertTrue(enabled["onboardingUpdates"]["enabled"])
+        self.assertTrue(enabled["profiles"]["preferences"]["automaticUpdates"])
+        self.assertTrue(
+            enabled["profiles"]["preferences"]["automaticUpdatesPrompted"]
+        )
+        self.assertEqual(updates.status_calls[-1], (False, True))
+
+        self.assertEqual(
+            broker.handle(
+                {"op": "onboarding_updates_choice", "enabled": "yes"}
+            ),
+            {"ok": False, "error": "invalid_update_preference"},
+        )
+
     def test_normal_mode_forces_prod_and_rejects_dev_context(self):
         self.state.write_text("DEV\n", encoding="utf-8")
         broker = Broker(

@@ -13,7 +13,7 @@ RowLayout {
   spacing: Style.spacing.xs
 
   Repeater {
-    model: navigation.controller.onboardingRequired ? [] :
+    model: navigation.controller.onboardingFlowActive ? [] :
       (navigation.controller.showMagnus
         ? [
             { key: "search", label: "Search", shortcut: "Ctrl+1" },
@@ -49,7 +49,7 @@ RowLayout {
   Item { Layout.fillWidth: true }
 
   Button {
-    visible: !navigation.controller.onboardingRequired
+    visible: !navigation.controller.onboardingFlowActive
     text: "Settings" + (navigation.controller.updateAvailable ? "  •" : "")
     tooltipText: "Settings · Ctrl+4"
     selected: navigation.controller.viewMode === "settings"

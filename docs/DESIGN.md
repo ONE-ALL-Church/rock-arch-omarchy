@@ -111,7 +111,9 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 ## Panel-specific decisions
 
 - **Onboarding:** one focused connection task with four labeled fields and one
-  primary Connect action; no application navigation until setup succeeds.
+  primary Connect action, followed by a one-time automatic-update choice when
+  the install supports it. Either choice continues to Search; no application
+  navigation competes with the active onboarding step.
 - **Search:** search input first, then either Recent Links or results. Person
   context stays attached to the person result instead of becoming a competing
   card.
@@ -123,4 +125,3 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 - **Settings:** profiles, preferences, categories, and updates are four visibly
   separate groups. The active profile includes Magnus availability so there is
   no redundant Connection section.
-

@@ -32,9 +32,11 @@ Panel {
   property bool preferenceCloseAfterOpen: true
   property bool preferenceShowMenuBar: true
   property bool preferenceAutomaticUpdates: false
+  property bool preferenceAutomaticUpdatesPrompted: false
+  property bool automaticUpdatesChoicePending: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.17.0"
+  property string currentVersion: "0.18.0"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -95,13 +97,19 @@ Panel {
     magnusPreview !== null && !magnusBusy && !magnusActionBusy && pendingMagnusBuildId === ""
   readonly property bool onboardingRequired: contextName === "PROD" &&
     statusLoaded && profilesLoaded && !rockConfigured
+  readonly property bool automaticUpdatesOnboardingRequired: contextName === "PROD" &&
+    statusLoaded && profilesLoaded && rockConfigured && updateManaged &&
+    !preferenceAutomaticUpdates && !preferenceAutomaticUpdatesPrompted
+  readonly property bool onboardingFlowActive: onboardingRequired ||
+    automaticUpdatesOnboardingRequired
   readonly property bool queryIsEmpty: query.trim().length === 0
   readonly property bool showRecentLinks: viewMode === "search" && queryIsEmpty
   readonly property int activeSearchCount: queryIsEmpty ? quickReturns.length : results.length
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
-    !onboardingForm.inputActive && !settingsPanel.inputActive
+    !onboardingFlowActive && !onboardingForm.inputActive &&
+    !updateOnboardingPanel.inputActive && !settingsPanel.inputActive
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
     rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
     rockAvailable ? (activeProfileId ? activeProfileName() + " · login required" : "Rock profile required") : "Secure password storage unavailable"
@@ -224,6 +232,8 @@ Panel {
       return "Recent Links couldn't be cleared from this computer. Try again."
     if (code === "no_update_available")
       return "Rock Arch is already up to date."
+    if (code === "invalid_update_preference")
+      return "Rock Arch couldn't save that update choice. Try again."
     if (code === "local_changes_prevent_update")
       return "Local plugin changes must be committed or removed before updating."
     if (code === "update_history_diverged")
@@ -320,6 +330,11 @@ Panel {
   }
 
   function escapePanel() {
+    if (automaticUpdatesOnboardingRequired) {
+      if (!automaticUpdatesChoicePending)
+        completeAutomaticUpdatesOnboarding(false)
+      return
+    }
     if (onboardingRequired) {
       close()
       return
@@ -362,6 +377,8 @@ Panel {
       return
     }
     if (!response || response.ok !== true) {
+      var updateChoiceFailed = automaticUpdatesChoicePending
+      automaticUpdatesChoicePending = false
       finishSetup()
       onboardingInProgress = false
       searchInFlight = false
@@ -373,6 +390,8 @@ Panel {
       if (magnusState === "checking") magnusState = "error"
       pendingSuccessText = ""
       feedbackText = friendlyError(response && response.error ? response.error : "")
+      if (updateChoiceFailed)
+        Qt.callLater(function() { updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason) })
       return
     }
     var isStatusResponse = response.categories !== undefined && response.rock !== undefined
@@ -466,6 +485,7 @@ Panel {
       preferenceCloseAfterOpen = preferences.closeAfterOpen === true
       preferenceShowMenuBar = preferences.showMenuBar !== false
       preferenceAutomaticUpdates = preferences.automaticUpdates === true
+      preferenceAutomaticUpdatesPrompted = preferences.automaticUpdatesPrompted === true
       if (Array.isArray(preferences.enabledCategories))
         enabledCategories = preferences.enabledCategories
       if (profiles.length === 0 && opened) {
@@ -481,6 +501,11 @@ Panel {
         if (activeProfileId && newProfileName.trim().length === 0)
           newProfileName = activeProfileName()
         Qt.callLater(function() { onboardingForm.profileNameField.forceActiveFocus() })
+      } else if (automaticUpdatesOnboardingRequired && opened) {
+        Qt.callLater(function() {
+          updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)
+          root.revealFocusedControl(updateOnboardingPanel.primaryButton)
+        })
       }
     }
     if (isStatusResponse) {
@@ -495,6 +520,11 @@ Panel {
       if (contextName === "PROD" && rockConfigured &&
           (magnusState === "unknown" || magnusState === "error"))
         Qt.callLater(function() { root.probeMagnus() })
+      if (automaticUpdatesOnboardingRequired && opened)
+        Qt.callLater(function() {
+          updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)
+          root.revealFocusedControl(updateOnboardingPanel.primaryButton)
+        })
     }
     if (isSearchResponse && !staleSearch) {
       results = response.results
@@ -538,13 +568,27 @@ Panel {
       feedbackText = pendingSuccessText || "Rock connection updated"
       pendingSuccessText = ""
       Qt.callLater(function() {
-        if (completedOnboarding) root.focusSearch()
+        if (completedOnboarding && root.automaticUpdatesOnboardingRequired) {
+          root.feedbackText = ""
+          updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)
+          root.revealFocusedControl(updateOnboardingPanel.primaryButton)
+        } else if (completedOnboarding) {
+          root.focusSearch()
+        }
         root.refreshSearch()
         root.refreshQuickReturns()
         root.refreshPersonalLinks()
-        if (root.viewMode === "search") searchField.forceActiveFocus()
+        if (root.viewMode === "search" && !root.onboardingFlowActive)
+          searchField.forceActiveFocus()
         root.request({op: "status", probeMagnus: true})
       })
+    }
+    if (response.onboardingUpdates) {
+      automaticUpdatesChoicePending = false
+      feedbackText = response.onboardingUpdates.enabled === true
+        ? "Automatic updates enabled"
+        : "Automatic updates remain off"
+      Qt.callLater(function() { root.focusSearch() })
     }
     if (response.connection === "connected") {
       finishSetup()
@@ -671,6 +715,12 @@ Panel {
   function toggleAutomaticUpdatesPreference() {
     preferenceAutomaticUpdates = !preferenceAutomaticUpdates
     updatePreference("automaticUpdates", preferenceAutomaticUpdates)
+  }
+  function completeAutomaticUpdatesOnboarding(enabled) {
+    if (!automaticUpdatesOnboardingRequired || automaticUpdatesChoicePending) return
+    automaticUpdatesChoicePending = true
+    feedbackText = "Saving update preference…"
+    request({op: "onboarding_updates_choice", enabled: enabled === true})
   }
   function checkForUpdates() {
     if (!updateManaged || updateBusy) return
@@ -1131,7 +1181,10 @@ Panel {
   }
   function resetPanel() {
     query = ""
-    focusSearch()
+    if (automaticUpdatesOnboardingRequired)
+      Qt.callLater(function() { updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason) })
+    else
+      focusSearch()
     recentCursor = quickReturns.length ? 0 : -1
     quickLook = null
     feedbackText = ""
@@ -1242,11 +1295,11 @@ Panel {
   Shortcut { sequence: "Alt+Shift+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("page") }
   Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
-  Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openSettings(false) }
-  Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.focusSearch() }
-  Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.selectPersonalLink(0) }
-  Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired && root.showMagnus; onActivated: root.openMagnus() }
-  Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingRequired; onActivated: root.openSettings(false) }
+  Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
+  Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.focusSearch() }
+  Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.selectPersonalLink(0) }
+  Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.showMagnus; onActivated: root.openMagnus() }
+  Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
 
   RockArchBarButton {
     id: button
@@ -1261,17 +1314,20 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: root.onboardingRequired ? onboardingForm.profileNameField : searchField
+    focusTarget: root.automaticUpdatesOnboardingRequired
+      ? updateOnboardingPanel.primaryButton
+      : (root.onboardingRequired ? onboardingForm.profileNameField : searchField)
     contentWidth: panel.fittedContentWidth(Style.space(430))
     contentHeight: panel.fittedContentHeight(content.implicitHeight, Style.space(600))
 
     RockLensKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      formMode: root.onboardingRequired || root.viewMode === "settings" ||
+      formMode: root.onboardingFlowActive || root.viewMode === "settings" ||
         root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null
       commandMode: root.magnusPreviewCommandsEnabled
-      blocked: searchField.activeFocus || onboardingForm.inputActive || settingsPanel.inputActive || magnusPanel.inputActive
+      blocked: searchField.activeFocus || onboardingForm.inputActive ||
+        updateOnboardingPanel.inputActive || settingsPanel.inputActive || magnusPanel.inputActive
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
@@ -1302,7 +1358,7 @@ Panel {
         }
 
         RowLayout {
-          visible: root.viewMode === "search" && !root.onboardingRequired
+          visible: root.viewMode === "search" && !root.onboardingFlowActive
           width: parent.width
           spacing: Style.spacing.sm
 
@@ -1361,7 +1417,7 @@ Panel {
         }
 
         Column {
-          visible: !root.onboardingRequired && root.viewMode !== "settings" && root.contextName === "PROD" && !root.rockConfigured
+          visible: !root.onboardingFlowActive && root.viewMode !== "settings" && root.contextName === "PROD" && !root.rockConfigured
           width: content.width
           height: visible ? implicitHeight : 0
           topPadding: Style.spacing.xxxl
@@ -1403,9 +1459,11 @@ Panel {
           id: panelFlick
           readonly property real maximumHeight: Style.space(root.onboardingRequired
             ? 420
+            : (root.automaticUpdatesOnboardingRequired
+              ? 240
             : (root.viewMode === "settings"
               ? 440
-              : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 400)))
+              : (root.contextName === "PROD" && !root.rockConfigured ? 180 : 400))))
           width: content.width
           height: Math.min(maximumHeight, Math.max(Style.space(72), body.implicitHeight))
           contentWidth: width
@@ -1427,9 +1485,16 @@ Panel {
               controller: root
             }
 
+            RockLensUpdateOnboardingPanel {
+              id: updateOnboardingPanel
+              visible: root.automaticUpdatesOnboardingRequired
+              width: body.width
+              controller: root
+            }
+
             RockLensSearchPanel {
               id: searchPanel
-              visible: !root.onboardingRequired && root.viewMode === "search"
+              visible: !root.onboardingFlowActive && root.viewMode === "search"
               width: body.width
               controller: root
               searchField: searchField
@@ -1437,21 +1502,21 @@ Panel {
 
             RockLensPersonalPanel {
               id: personalPanel
-              visible: !root.onboardingRequired && root.viewMode === "personal"
+              visible: !root.onboardingFlowActive && root.viewMode === "personal"
               width: body.width
               controller: root
             }
 
             RockLensMagnusPanel {
               id: magnusPanel
-              visible: !root.onboardingRequired && root.viewMode === "magnus"
+              visible: !root.onboardingFlowActive && root.viewMode === "magnus"
               width: body.width
               controller: root
             }
 
             RockLensSettingsPanel {
               id: settingsPanel
-              visible: !root.onboardingRequired && root.viewMode === "settings"
+              visible: !root.onboardingFlowActive && root.viewMode === "settings"
               width: body.width
               controller: root
             }
@@ -1461,7 +1526,7 @@ Panel {
         Text {
           visible: text.length > 0
           width: parent.width
-          text: root.feedbackText || (root.onboardingRequired ? "" : root.guidanceText())
+          text: root.feedbackText || (root.onboardingFlowActive ? "" : root.guidanceText())
           color: root.feedbackText && root.feedbackText.indexOf("couldn't") >= 0
             ? Color.urgent
             : Qt.darker(Color.foreground, 1.4)

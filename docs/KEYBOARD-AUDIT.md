@@ -1,7 +1,7 @@
 # Keyboard and panel audit
 
 Audited 2026-09-02 against the installed Omarchy shell. The review covered
-every Rock Arch surface: onboarding, header navigation, Search and Recent
+every Rock Arch surface: login and update onboarding, header navigation, Search and Recent
 Links, Personal Links, Magnus browsing and file actions, build confirmation,
 and Settings.
 

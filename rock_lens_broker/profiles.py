@@ -24,6 +24,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "closeAfterOpen": True,
     "showMenuBar": True,
     "automaticUpdates": False,
+    "automaticUpdatesPrompted": False,
     "enabledCategories": list(CATEGORIES),
 }
 
@@ -173,11 +174,14 @@ class ProfileStore:
             "closeAfterOpen",
             "showMenuBar",
             "automaticUpdates",
+            "automaticUpdatesPrompted",
         ):
             if name in updates:
                 if not isinstance(updates[name], bool):
                     raise ProfileError("invalid_preferences")
                 preferences[name] = updates[name]
+        if preferences["automaticUpdates"]:
+            preferences["automaticUpdatesPrompted"] = True
         if "enabledCategories" in updates:
             categories = updates["enabledCategories"]
             if (
@@ -301,11 +305,14 @@ class ProfileStore:
             "closeAfterOpen",
             "showMenuBar",
             "automaticUpdates",
+            "automaticUpdatesPrompted",
         ):
             candidate = preferences.get(name, clean_preferences[name])
             if not isinstance(candidate, bool):
                 raise ProfileError("profile_store_unavailable")
             clean_preferences[name] = candidate
+        if clean_preferences["automaticUpdates"]:
+            clean_preferences["automaticUpdatesPrompted"] = True
         categories = preferences.get("enabledCategories", list(CATEGORIES))
         if (
             not isinstance(categories, list)

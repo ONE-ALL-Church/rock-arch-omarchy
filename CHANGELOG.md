@@ -5,6 +5,16 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-03
+
+### Added
+
+- Added a one-time post-login choice to enable automatic Rock Arch updates on
+  Git-managed Omarchy installations. The prompt is keyboard-complete, Escape
+  selects `Not now`, and either choice continues directly to Search.
+- Persist the completed choice so it is not shown repeatedly. Existing users
+  who already enabled automatic updates are treated as having completed it.
+
 ## [0.17.0] - 2026-09-03
 
 ### Changed
@@ -144,6 +154,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.18.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.18.0
 [0.17.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.17.0
 [0.16.2]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.2
 [0.16.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.1

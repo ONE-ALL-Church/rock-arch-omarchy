@@ -53,8 +53,22 @@ class ProfileStoreTests(unittest.TestCase):
         self.assertFalse(updated["showPersonContext"])
         self.assertTrue(updated["closeAfterOpen"])
         self.assertFalse(updated["automaticUpdates"])
+        self.assertFalse(updated["automaticUpdatesPrompted"])
         self.assertTrue(updated["showMenuBar"])
         self.assertEqual(updated["enabledCategories"], ["People", "Groups"])
+
+        enabled = store.update_preferences({"automaticUpdates": True})
+        self.assertTrue(enabled["automaticUpdates"])
+        self.assertTrue(enabled["automaticUpdatesPrompted"])
+
+        declined = store.update_preferences(
+            {
+                "automaticUpdates": False,
+                "automaticUpdatesPrompted": True,
+            }
+        )
+        self.assertFalse(declined["automaticUpdates"])
+        self.assertTrue(declined["automaticUpdatesPrompted"])
         with self.assertRaisesRegex(ProfileError, "invalid_preferences"):
             store.update_preferences({"rawCookie": True})
         with self.assertRaisesRegex(ProfileError, "invalid_profile_name"):

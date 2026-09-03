@@ -33,7 +33,10 @@ asks for four values:
 
 Select **Connect**. The broker verifies the login before saving it to the
 desktop password manager. No Rock administrator setup or client secret is
-required.
+required. After the first successful connection, Git-managed installations
+offer a one-time choice to enable automatic updates. **Not now** keeps them
+off; either choice continues directly to Search and can be changed later in
+Settings.
 
 Credentials cross the owner-only local socket only in an explicit login
 request and are never returned. The launcher clears its password field
@@ -46,7 +49,8 @@ Git-managed installs check for updates once a day. Open **Settings** to see the
 current version, check immediately, or install an available update. Automatic
 installation is optional and off by default. Enable **Install updates
 automatically** only if you want Rock Arch to apply a newly detected update
-without another click.
+without another click. The same opt-in is offered once after initial login;
+Escape is equivalent to **Not now**.
 
 Rock Arch delegates installation to Omarchy. Omarchy fetches the repository,
 fast-forwards only, validates the updated plugin, rolls back a failed

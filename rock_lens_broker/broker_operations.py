@@ -37,6 +37,7 @@ class BrokerOperations:
             "profile_sign_out": self._profile_sign_out,
             "profile_remove": self._profile_remove,
             "preferences_update": self._preferences_update,
+            "onboarding_updates_choice": self._onboarding_updates_choice,
             "update_status": self._update_status,
             "update_check": self._update_check,
             "update_start": self._update_start,
@@ -231,6 +232,27 @@ class BrokerOperations:
         response["update"] = broker._updates.status(
             automatic_install=preferences["automaticUpdates"]
         )
+        return response
+
+    def _onboarding_updates_choice(self, raw: dict[str, Any]) -> dict[str, Any]:
+        broker = self.broker
+        enabled = raw.get("enabled")
+        if not isinstance(enabled, bool):
+            return broker._error("invalid_update_preference")
+        try:
+            preferences = broker._profile_store.update_preferences(
+                {
+                    "automaticUpdates": enabled,
+                    "automaticUpdatesPrompted": True,
+                }
+            )
+        except ProfileError as error:
+            return broker._error(str(error))
+        response = broker._profile_response()
+        response["update"] = broker._updates.status(
+            automatic_install=preferences["automaticUpdates"]
+        )
+        response["onboardingUpdates"] = {"enabled": enabled}
         return response
 
     def _update_status(self, _raw: dict[str, Any]) -> dict[str, Any]:

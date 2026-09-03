@@ -13,6 +13,7 @@ ICON_PATH = QML_PATH.with_name("RockArchIcon.qml")
 HERO_PATH = QML_PATH.with_name("RockLensHero.qml")
 KEY_CATCHER_PATH = QML_PATH.with_name("RockLensKeyCatcher.qml")
 LOGIN_PATH = QML_PATH.with_name("RockLensLoginPanel.qml")
+UPDATE_ONBOARDING_PATH = QML_PATH.with_name("RockLensUpdateOnboardingPanel.qml")
 MAGNUS_PATH = QML_PATH.with_name("RockLensMagnusPanel.qml")
 NAVIGATION_PATH = QML_PATH.with_name("RockLensNavigationTabs.qml")
 PERSONAL_PATH = QML_PATH.with_name("RockLensPersonalPanel.qml")
@@ -23,6 +24,7 @@ PANEL_PATHS = (
     ICON_PATH,
     HERO_PATH,
     LOGIN_PATH,
+    UPDATE_ONBOARDING_PATH,
     MAGNUS_PATH,
     NAVIGATION_PATH,
     PERSONAL_PATH,
@@ -106,9 +108,9 @@ class QmlNavigationTests(unittest.TestCase):
             source,
         )
         navigation = NAVIGATION_PATH.read_text(encoding="utf-8")
-        self.assertIn("model: navigation.controller.onboardingRequired ? [] :", navigation)
+        self.assertIn("model: navigation.controller.onboardingFlowActive ? [] :", navigation)
         self.assertIn(
-            'visible: !root.onboardingRequired && root.viewMode === "settings"',
+            'visible: !root.onboardingFlowActive && root.viewMode === "settings"',
             source,
         )
         self.assertEqual(form.count("TextField {"), 4)
@@ -121,9 +123,39 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("property alias profileNameField", form)
         self.assertIn("KeyNavigation.backtab: onboardingProfileNameField", form)
         self.assertIn("KeyNavigation.tab: onboardingProfileNameField", form)
-        self.assertIn("focusTarget: root.onboardingRequired ? onboardingForm.profileNameField", source)
+        self.assertIn("focusTarget: root.automaticUpdatesOnboardingRequired", source)
+        self.assertIn(
+            ": (root.onboardingRequired ? onboardingForm.profileNameField : searchField)",
+            source,
+        )
         self.assertIn("function completeOnboarding()", source)
         self.assertIn('"profile_add" : "rock_configure"', source)
+
+    def test_one_time_update_choice_follows_successful_login(self):
+        source = all_qml_source()
+        prompt = UPDATE_ONBOARDING_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'readonly property bool automaticUpdatesOnboardingRequired: contextName === "PROD"',
+            source,
+        )
+        self.assertIn("rockConfigured && updateManaged", source)
+        self.assertIn(
+            "!preferenceAutomaticUpdates && !preferenceAutomaticUpdatesPrompted",
+            source,
+        )
+        self.assertIn('text: "Keep Rock Arch up to date?"', prompt)
+        self.assertIn('text: "Not now"', prompt)
+        self.assertIn('"Enable automatic updates"', prompt)
+        self.assertEqual(prompt.count("Keys.onEscapePressed:"), 2)
+        self.assertIn(
+            'request({op: "onboarding_updates_choice", enabled: enabled === true})',
+            source,
+        )
+        self.assertIn(
+            "updateOnboardingPanel.primaryButton.forceActiveFocus(Qt.TabFocusReason)",
+            source,
+        )
 
     def test_existing_profiles_have_a_keyboard_accessible_rename_form(self):
         source = all_qml_source()
@@ -201,7 +233,7 @@ class QmlNavigationTests(unittest.TestCase):
             key_catcher.index("if (blocked || formMode) return"),
         )
         self.assertIn(
-            'formMode: root.onboardingRequired || root.viewMode === "settings"',
+            'formMode: root.onboardingFlowActive || root.viewMode === "settings"',
             source,
         )
         self.assertIn(
@@ -351,7 +383,7 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
 
         self.assertIn(
-            'text: root.feedbackText || (root.onboardingRequired ? "" : root.guidanceText())',
+            'text: root.feedbackText || (root.onboardingFlowActive ? "" : root.guidanceText())',
             source,
         )
         self.assertIn('"Getting your Rock workspace ready…"', source)
@@ -385,6 +417,7 @@ class QmlNavigationTests(unittest.TestCase):
 
         for component in (
             "RockLensLoginPanel",
+            "RockLensUpdateOnboardingPanel",
             "RockLensSearchPanel",
             "RockLensPersonalPanel",
             "RockLensMagnusPanel",
@@ -394,7 +427,7 @@ class QmlNavigationTests(unittest.TestCase):
             "RockArchBarButton",
         ):
             self.assertIn(f"{component} {{", source)
-        self.assertLess(len(source.splitlines()), 1_500)
+        self.assertLess(len(source.splitlines()), 1_600)
 
 
 if __name__ == "__main__":
