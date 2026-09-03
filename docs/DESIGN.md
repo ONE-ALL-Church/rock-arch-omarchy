@@ -118,9 +118,9 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 - **Search:** search input first, then either Recent Links or Rock results. It
   contains no public-KB control or tutorial copy. Person context stays attached
   to the person result instead of becoming a competing card.
-- **Knowledge:** a dedicated top-level workspace visibly explains that its query
-  goes to a public service. Its empty state teaches the supported area prefixes
-  without crowding Search. Results reuse the standard selected-row treatment;
+- **Knowledge:** a dedicated top-level workspace whose empty state teaches the
+  supported area prefixes without crowding Search. Results reuse the standard
+  selected-row treatment;
   Enter opens a plain-text detail with trust/version context, Back, and Open
   source. Typed related items continue within the panel, and Back unwinds that
   detail history before returning to results.

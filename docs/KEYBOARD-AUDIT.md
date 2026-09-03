@@ -34,9 +34,8 @@ only in PROD and only when the active Rock profile reports access.
    the public workspace; typing `kb:` in Search transfers there without adding
    controls to the Search UI. Up/Down selects results, Enter opens the selected
    detail, Tab moves through Back, Open source, and related items, and Esc walks
-   the nested detail history. The workspace visibly warns that its query goes
-   to a public service and teaches `mm:`, `is:`, `idea:`, `lava:`, `recipe:`,
-   and `guide:` search areas.
+   the nested detail history. The empty state teaches `mm:`, `is:`, `idea:`,
+   `lava:`, `recipe:`, and `guide:` search areas.
 5. **Personal Links — healthy.** The first item is selected on entry, Up/Down
    moves, Enter opens, and the view resets and reveals its selection instead of
    inheriting a stale scroll offset from another panel.

@@ -19,29 +19,6 @@ Column {
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.panelGap
 
-  BorderSurface {
-    width: parent.width
-    implicitHeight: privacyText.implicitHeight + Style.spacing.lg * 2
-    color: Style.normalFillFor(Color.accent, Color.accent)
-    borderSpec: Border.controlSpec("normal", Color.accent, Color.accent)
-    radius: Style.cornerRadius
-
-    Text {
-      id: privacyText
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.spacing.rowPaddingX
-      anchors.rightMargin: Style.spacing.rowPaddingX
-      text: "Public search · Your query is sent to Rock Agent KB. Don't include names or private church data."
-      textFormat: Text.PlainText
-      color: Color.foreground
-      font.family: Style.font.family
-      font.pixelSize: Style.font.caption
-      wrapMode: Text.WordWrap
-    }
-  }
-
   TextField {
     id: knowledgeField
     visible: knowledgePanel.controller.knowledgeDetail === null

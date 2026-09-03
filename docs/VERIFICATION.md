@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.24.4` release boundary. Historical feature
+This record describes the current `0.24.5` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks

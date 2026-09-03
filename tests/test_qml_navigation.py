@@ -192,10 +192,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('{ key: "knowledge", label: "Knowledge", shortcut: "Alt+K" }', source)
         self.assertIn('root.scopeKeyForQuery(text) === "kb"', source)
         self.assertNotIn("Knowledge", search)
-        self.assertIn(
-            "Your query is sent to Rock Agent KB. Don't include names or private church data.",
-            knowledge,
-        )
+        self.assertNotIn("Your query is sent to Rock Agent KB", knowledge)
         for hint in ("mm:", "is:", "idea:", "lava:", "recipe:", "guide:"):
             self.assertIn(hint, knowledge)
         self.assertIn('request({op: "knowledge_search", query: knowledgeQuery})', source)

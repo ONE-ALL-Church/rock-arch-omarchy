@@ -5,10 +5,16 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.24.5] - 2026-09-03
+
 ### Changed
 
 - Move the canonical repository and install links to the ONE&ALL Church
   GitHub organization.
+
+### Removed
+
+- Remove the public-search disclaimer card from the Knowledge workspace.
 
 ## [0.24.4] - 2026-09-03
 
