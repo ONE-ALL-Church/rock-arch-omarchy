@@ -64,7 +64,7 @@ choices.
 
 Rock Arch delegates installation to Omarchy. Omarchy fetches the repository,
 fast-forwards only, validates the updated plugin, rolls back a failed
-validation, and reloads the shell. Local tracked changes or a diverged Git
+validation, and restarts the shell. Local tracked changes or a diverged Git
 history prevent automatic installation and leave the checkout untouched. The
 equivalent terminal command is:
 

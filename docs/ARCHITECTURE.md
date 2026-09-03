@@ -38,7 +38,7 @@
 13. `http_security`: shared redirect refusal, authenticated cookie-header
     validation, and bounded JSON decoding used by every Rock HTTP client.
 14. `UpdateManager`: daily public-Git revision checks plus a fixed detached
-    worker that delegates installation, validation, rollback, and plugin reload
+    worker that delegates installation, validation, rollback, and shell restart
     to Omarchy. Automatic installation is an explicit preference and defaults
     to off.
 
@@ -94,8 +94,9 @@ compares revisions, and validates the remote root manifest's plugin ID and
 semantic version. It will not install over tracked changes or diverged history.
 Both the manual and optional automatic path launch a detached fixed module that
 accepts only the canonical install directory and calls Omarchy's plugin updater.
-Omarchy remains responsible for the fast-forward merge, plugin validation,
-rollback, and shell rescan. Updater state is bounded, owner-only JSON and
+Omarchy remains responsible for the fast-forward merge, plugin validation, and
+rollback; Rock Arch then requests a full shell restart so new IPC methods are
+registered. Updater state is bounded, owner-only JSON and
 contains no Git output, credentials, cookies, or Rock data.
 
 Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and an

@@ -143,6 +143,36 @@ def run_update(state_file: Path, plugin_root: Path, parent_pid: int) -> int:
         _notify("The update did not finish. Open Settings to try again.")
         return 1
 
+    try:
+        restarted = subprocess.run(
+            [str(OMARCHY), "restart", "shell"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+            env=environment,
+        )
+    except (OSError, subprocess.SubprocessError):
+        restarted = None
+    if restarted is None or restarted.returncode != 0:
+        write_update_state(
+            state_file,
+            {
+                "state": "error",
+                "availableVersion": "",
+                "currentRevision": "",
+                "availableRevision": "",
+                "lastCheckedAt": completed_at,
+                "lastUpdatedAt": "",
+                "operationStartedAt": "",
+                "updateAvailable": False,
+                "error": "update_failed",
+            },
+        )
+        _notify("The update installed, but the shell did not restart.")
+        _terminate_broker(parent_pid)
+        return 1
+
     version = _validated_version(plugin_root)
     revision = _revision(plugin_root)
     state: dict[str, Any] = {

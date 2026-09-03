@@ -5,6 +5,13 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-09-03
+
+### Fixed
+
+- Restart the Omarchy shell after an in-plugin update so newly added IPC
+  methods are registered immediately instead of requiring a manual restart.
+
 ## [0.24.0] - 2026-09-03
 
 ### Added
