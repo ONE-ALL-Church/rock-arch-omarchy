@@ -209,10 +209,11 @@ class RockSessionTests(unittest.TestCase):
         self.assertEqual(self.session.status()["state"], "ready")
         self.assertTrue(self.session.status()["configured"])
 
-    def test_secret_tool_reports_clear_failure(self):
+    def test_secret_tool_reports_unconfirmed_clear_failure(self):
         store = SecretToolStore("/usr/bin/secret-tool")
         with patch("subprocess.run") as run:
             run.return_value.returncode = 1
+            run.return_value.stderr = b"keyring unavailable"
             self.assertFalse(store.clear(self.session.context, "rock_password"))
 
 

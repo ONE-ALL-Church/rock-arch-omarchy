@@ -80,14 +80,36 @@ class SecretToolStore:
     def clear(self, context: Context, kind: str) -> bool:
         if not self.available():
             return False
+        attributes = self._attributes(context, kind)
         try:
             result = subprocess.run(
-                [self.executable, "clear", *self._attributes(context, kind)],
+                [self.executable, "clear", *attributes],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 timeout=SECRET_TOOL_TIMEOUT_SECONDS,
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired):
             return False
-        return result.returncode == 0
+        if result.returncode == 0:
+            return True
+
+        # `secret-tool clear` exits 1 without diagnostic output when no item
+        # matched. Confirm that absence with an independent lookup so cleanup
+        # remains idempotent without masking a locked or failing keyring.
+        if result.returncode != 1 or result.stderr:
+            return False
+        try:
+            lookup = subprocess.run(
+                [self.executable, "lookup", *attributes],
+                capture_output=True,
+                timeout=SECRET_TOOL_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return (
+            lookup.returncode == 1
+            and not lookup.stdout
+            and not lookup.stderr
+        )

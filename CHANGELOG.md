@@ -5,6 +5,15 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-09-03
+
+### Fixed
+
+- Allow a first login to complete when legacy credentials are already absent
+  from Secret Service. Rock Arch now confirms the item is missing before
+  treating the cleanup as successful, while genuine keyring errors still fail
+  closed.
+
 ## [0.15.0] - 2026-09-02
 
 ### Added
@@ -90,6 +99,7 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
+[0.15.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.1
 [0.15.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.0
 [0.14.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.14.0
 [0.13.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.13.0
