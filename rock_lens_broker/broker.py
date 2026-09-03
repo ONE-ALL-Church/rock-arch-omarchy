@@ -25,6 +25,12 @@ from .navigation import NavigationTarget, open_rock_url
 from .origin import DEFAULT_ROCK_ORIGIN
 from .profiles import ProfileError, ProfileStore, RockProfile
 from .quick_return import QuickReturnStore
+from .rock_kb_adapter import (
+    RockKbError,
+    RockKbReadOnlyAdapter,
+    open_public_source_url,
+    validate_public_source_url,
+)
 from .rock_rest_adapter import (
     RockRestError,
     RockRestReadOnlyAdapter,
@@ -111,6 +117,14 @@ class LiveReadAdapter(Protocol):
     def set_origin(self, origin: str) -> None: ...
 
 
+class KnowledgeProvider(Protocol):
+    def search(self, query: str) -> list[dict[str, Any]]: ...
+
+    def detail(self, safe_id: str) -> dict[str, Any]: ...
+
+    def source_url(self, safe_id: str) -> str | None: ...
+
+
 class UpdateStatusProvider(Protocol):
     def status(
         self, *, refresh: bool = False, automatic_install: bool = False
@@ -126,6 +140,7 @@ class Broker:
         session: RockSessionStatusProvider | None = None,
         magnus: MagnusStatusProvider | None = None,
         live: LiveReadAdapter | None = None,
+        knowledge: KnowledgeProvider | None = None,
         quick_returns: QuickReturnStore | None = None,
         url_opener: Callable[[str], bool] | None = None,
         clipboard_writer: Callable[[str], bool] | None = None,
@@ -172,6 +187,7 @@ class Broker:
         )
         if live and self._origin:
             self._live.set_origin(self._origin)
+        self._knowledge = knowledge or RockKbReadOnlyAdapter()
         self._quick_root = (
             state_file.parent
             if state_file
@@ -347,6 +363,30 @@ class Broker:
         if target.kind == "Magnus Build":
             return self._error("build_confirmation_required")
         return self._open_target(target)
+
+    def _knowledge_detail(self, safe_id: str) -> dict[str, Any]:
+        try:
+            detail = self._knowledge.detail(safe_id)
+        except RockKbError as error:
+            return self._error(str(error))
+        return self._ok(knowledgeDetail=detail)
+
+    def _open_knowledge_source(self, safe_id: str) -> dict[str, Any]:
+        source_url = self._knowledge.source_url(safe_id)
+        if not source_url:
+            return self._error("knowledge_source_not_found")
+        try:
+            source_url = validate_public_source_url(source_url)
+        except RockKbError:
+            return self._error("knowledge_source_not_found")
+        opened = (
+            self._url_opener(source_url)
+            if self._url_opener
+            else open_public_source_url(source_url)
+        )
+        if not opened:
+            return self._error("open_failed")
+        return self._ok(knowledgeOpened=True)
 
     def _open_target(self, target: NavigationTarget) -> dict[str, Any]:
         opened = (

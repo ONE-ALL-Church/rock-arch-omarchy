@@ -12,6 +12,7 @@ from rock_lens_broker.contracts import (
     ALLOWED_RESULT_KEYS,
     CATEGORIES,
     DEVELOPER_MODE_ENV,
+    KNOWLEDGE_CATEGORY,
     SEARCH_SCOPE_ALIASES,
     developer_mode_enabled,
     parse_search_query,
@@ -303,6 +304,53 @@ class FakeUpdates:
         }
 
 
+class FakeKnowledge:
+    def __init__(self):
+        self.search_calls = []
+        self.detail_calls = []
+        self.source_calls = []
+
+    def search(self, query):
+        self.search_calls.append(query)
+        return [
+            {
+                "category": "Knowledge",
+                "safeId": "kb-safe-result",
+                "title": "Diagnose labels",
+                "subtitle": "Check the printer route.",
+                "status": "Community reviewed",
+                "canOpen": True,
+            }
+        ]
+
+    def detail(self, safe_id):
+        self.detail_calls.append(safe_id)
+        if safe_id != "kb-safe-result":
+            from rock_lens_broker.rock_kb_adapter import RockKbError
+
+            raise RockKbError("knowledge_result_not_found")
+        return {
+            "safeId": safe_id,
+            "title": "Diagnose labels",
+            "kind": "Task card",
+            "body": "Check the printer route.",
+            "trust": "Community reviewed",
+            "claimTier": "Source backed",
+            "version": "Version not specified",
+            "sourceHost": "community.rockrms.com",
+            "canOpenSource": True,
+            "attribution": "Rock Agent Knowledge Base · ONE&ALL Church",
+        }
+
+    def source_url(self, safe_id):
+        self.source_calls.append(safe_id)
+        return (
+            "https://community.rockrms.com/documentation"
+            if safe_id == "kb-safe-result"
+            else None
+        )
+
+
 class BrokerContractTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -492,7 +540,61 @@ class BrokerContractTests(unittest.TestCase):
                 )
 
         self.assertEqual(parse_search_query("g: youth"), ("youth", "Groups"))
+        self.assertEqual(
+            parse_search_query("kb: label printing"),
+            ("label printing", KNOWLEDGE_CATEGORY),
+        )
+        self.assertEqual(
+            parse_search_query("knowledge: Lava fields"),
+            ("Lava fields", KNOWLEDGE_CATEGORY),
+        )
         self.assertEqual(parse_search_query("unknown: youth"), ("unknown: youth", None))
+
+    def test_knowledge_scope_is_explicit_credentialless_and_opens_only_opaque_sources(self):
+        live = FakeLive()
+        knowledge = FakeKnowledge()
+        opened = []
+        broker = Broker(
+            self.state,
+            session=FakeSession(False),
+            magnus=FakeMagnus(False),
+            live=live,
+            knowledge=knowledge,
+            url_opener=lambda url: opened.append(url) is None,
+            instance_file=self.instance,
+        )
+
+        too_short = broker.handle({"op": "search", "query": "kb: ab"})
+        response = broker.handle(
+            {"op": "search", "query": "kb: labels not printing"}
+        )
+
+        self.assertEqual(too_short["results"], [])
+        self.assertEqual(response["source"], "knowledge")
+        self.assertEqual(response["results"][0]["safeId"], "kb-safe-result")
+        self.assertEqual(knowledge.search_calls, ["labels not printing"])
+        self.assertEqual(live.search_calls, [])
+
+        detail = broker.handle(
+            {"op": "knowledge_result", "safeId": "kb-safe-result"}
+        )
+        self.assertEqual(detail["knowledgeDetail"]["kind"], "Task card")
+        opened_response = broker.handle(
+            {"op": "knowledge_open_source", "safeId": "kb-safe-result"}
+        )
+        self.assertTrue(opened_response["knowledgeOpened"])
+        self.assertEqual(
+            opened, ["https://community.rockrms.com/documentation"]
+        )
+        self.assertEqual(
+            broker.handle(
+                {
+                    "op": "knowledge_open_source",
+                    "safeId": "https://attacker.example/",
+                }
+            ),
+            {"ok": False, "error": "knowledge_source_not_found"},
+        )
 
     def test_person_quick_look_is_privacy_minimal(self):
         person = self.broker.handle(

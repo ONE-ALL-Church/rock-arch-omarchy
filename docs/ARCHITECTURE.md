@@ -21,15 +21,18 @@
    origin. It reuses `RockSessionProvider`; no external CLI is launched.
 7. `RockRestReadOnlyAdapter`: eight fixed Rock REST v1 entity GETs plus the fixed
    current-user Personal Links action, authenticated by the native Rock session.
-8. `QuickReturnStore`: same-origin launcher and successful-build history,
+8. `RockKbReadOnlyAdapter`: explicit public Knowledge search and exact-result
+   reads through a fixed, credentialless HTTPS origin, with bounded response
+   transformation, short in-memory caches, and opaque result/source IDs.
+9. `QuickReturnStore`: same-origin launcher and successful-build history,
    deduplicated and capped at 20 in an owner-only JSON file. Build entries are
    executed only through the Magnus validator and require confirmation again.
-9. `BrokerOperations`: the explicit operation-name router and request handlers;
+10. `BrokerOperations`: the explicit operation-name router and request handlers;
    broker construction, state ownership, and lifecycle transitions remain in
    `Broker`.
-10. `http_security`: shared redirect refusal, authenticated cookie-header
+11. `http_security`: shared redirect refusal, authenticated cookie-header
     validation, and bounded JSON decoding used by every Rock HTTP client.
-11. `UpdateManager`: daily public-Git revision checks plus a fixed detached
+12. `UpdateManager`: daily public-Git revision checks plus a fixed detached
     worker that delegates installation, validation, rollback, and plugin reload
     to Omarchy. Automatic installation is an explicit preference and defaults
     to off.
@@ -41,9 +44,10 @@ request. It clears the password field immediately; if the broker remains
 unavailable, it purges the queued credential request on panel close or after the
 18-second connection timeout. Credentials are never returned from the broker.
 QML never receives cookies, SQL, raw entity response bodies, raw URLs/record
-IDs, internal exception text, or fields outside the typed display contract. The
-sole content exception is a bounded UTF-8 Magnus file preview explicitly
-selected by the user.
+IDs, internal exception text, or fields outside the typed display contract.
+The content exceptions are a bounded UTF-8 Magnus file preview explicitly
+selected by the user and the bounded public body of an explicitly selected
+Rock Knowledge result. Both cross typed, size-limited contracts.
 Requests and responses are newline-delimited JSON with a 16 KiB request limit.
 Search text is sent through the socket, not argv. The broker emits no request or
 response logging.
@@ -157,6 +161,39 @@ capabilities before every search. QML receives only the category names, hides
 unavailable choices and shortcuts, and cannot make a scoped or unscoped request
 reach an unavailable endpoint. Rock controller/action permissions remain the
 authoritative server-side boundary.
+
+## Public Rock Knowledge boundary
+
+Public Knowledge search is a separate trust path from live Rock search. The
+broker recognizes only the leading `kb:` and `knowledge:` scopes. Normal,
+unscoped, and entity-prefixed text can never reach the external service. QML
+also exposes the same explicit transition through the visible Knowledge button
+and `Alt+K` shortcut, and shows that the resulting query leaves the computer.
+
+`RockKbHttpClient` performs only redirect-free GET requests to the exact
+`https://rock-agent-kb.oneandall.church` origin. It attaches the Rock Arch user
+agent and JSON accept header only. The client has no reference to the Rock
+session or profile stores, so it cannot attach a cookie, credential, instance
+domain, profile identifier, Personal Link, Recent Link, or Rock entity result.
+Search requires at least three characters, asks for at most ten compact results
+at `source_backed` or stronger, and caps responses at 512 KiB. Exact details are
+capped at 2 MiB; only 20,000 characters of plain body text cross QML.
+
+Both service schemas are checked before use. Result IDs and source URLs remain
+inside an in-process HMAC registry; QML receives only `kb-` opaque IDs, bounded
+titles/snippets, trust labels, version status, public body text, attribution,
+and a source hostname. Opening a source requires a separately selected detail,
+an explicit action, and an HTTPS URL with no credentials, custom port, local
+hostname, IP literal, control character, or redirect. Knowledge results never
+enter profile-scoped Recent Links. Search and exact details are cached only in
+broker memory for five minutes.
+
+The hosted KB may return official, reviewed-community, or unreviewed routing
+material. Rock Arch preserves authority labels and marks community issue and
+idea reports as unreviewed rather than presenting them as established Rock
+behavior. Displayed material is attributed to Rock Agent Knowledge Base,
+ONE&ALL Church. The integration uses the service's plain HTTPS projection and
+does not install or invoke Rock KB MCP or CLI tooling.
 
 ## Optional Magnus boundary
 

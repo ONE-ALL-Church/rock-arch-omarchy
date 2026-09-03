@@ -14,16 +14,63 @@ Column {
   property alias quickReturnRepeater: quickReturnRepeater
   property alias clearButton: clearRecentButton
   property alias buildConfirmButton: recentBuildConfirmButton
+  property alias knowledgeBackButton: knowledgeBackButton
+  property alias knowledgeSourceButton: knowledgeSourceButton
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
 
+  function closeKnowledgeDetail() {
+    var selected = searchPanel.controller.resultCursor
+    searchPanel.controller.knowledgeDetail = null
+    searchPanel.controller.knowledgeBusy = false
+    searchPanel.controller.feedbackText = ""
+    if (selected >= 0)
+      Qt.callLater(function() { searchPanel.controller.selectResult(selected) })
+    else
+      searchPanel.controller.focusSearch()
+  }
+
+  function openKnowledgeSource() {
+    var detail = searchPanel.controller.knowledgeDetail
+    if (!detail || detail.canOpenSource !== true || searchPanel.controller.knowledgeBusy)
+      return
+    searchPanel.controller.knowledgeBusy = true
+    searchPanel.controller.feedbackText = "Opening source…"
+    searchPanel.controller.request({op: "knowledge_open_source", safeId: detail.safeId})
+  }
+
   Column {
-    visible: !searchPanel.controller.showRecentLinks
+    visible: !searchPanel.controller.showRecentLinks &&
+      searchPanel.controller.knowledgeDetail === null
     width: searchPanel.width
     height: visible ? implicitHeight : 0
     spacing: Style.spacing.rowGap
+
+    BorderSurface {
+      visible: searchPanel.controller.knowledgeScope
+      width: parent.width
+      implicitHeight: knowledgePrivacyText.implicitHeight + Style.spacing.lg * 2
+      color: Style.normalFillFor(Color.accent, Color.accent)
+      borderSpec: Border.controlSpec("normal", Color.accent, Color.accent)
+      radius: Style.cornerRadius
+
+      Text {
+        id: knowledgePrivacyText
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: Style.spacing.rowPaddingX
+        anchors.rightMargin: Style.spacing.rowPaddingX
+        text: "Public search · Your query is sent to Rock Agent KB. Don't include names or private church data."
+        textFormat: Text.PlainText
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+        wrapMode: Text.WordWrap
+      }
+    }
 
     Repeater {
       id: resultRepeater
@@ -96,19 +143,22 @@ Column {
         Button {
           id: openButton
           visible: resultRow.modelData.canOpen === true &&
-            searchPanel.controller.contextName === "PROD" && resultRow.rowSelected
+            (searchPanel.controller.contextName === "PROD" ||
+              resultRow.modelData.category === "Knowledge") && resultRow.rowSelected
           anchors.right: parent.right
           anchors.rightMargin: Style.spacing.sm
           anchors.verticalCenter: parent.verticalCenter
-          text: "Open"
-          tooltipText: "Open in Rock · Enter"
+          text: resultRow.modelData.category === "Knowledge" ? "Read" : "Open"
+          tooltipText: resultRow.modelData.category === "Knowledge"
+            ? "Read in Rock Arch · Enter"
+            : "Open in Rock · Enter"
           fontSize: Style.font.caption
           bordered: true
           focusable: false
           z: 2
           onClicked: {
             searchPanel.controller.resultCursor = resultRow.index
-            searchPanel.controller.request({op: "open_navigation", safeId: resultRow.modelData.safeId})
+            searchPanel.controller.activateResult(resultRow.index)
           }
         }
       }
@@ -124,8 +174,14 @@ Column {
       Text {
         width: parent.width
         text: searchPanel.controller.contextName === "PROD" && !searchPanel.controller.rockConfigured
+          && !searchPanel.controller.knowledgeScope
           ? "Rock login required"
-          : "No matching results"
+          : searchPanel.controller.knowledgeScope &&
+            searchPanel.controller.queryWithoutScope(searchPanel.controller.query).length < 3
+            ? "Search Rock Knowledge"
+            : searchPanel.controller.knowledgeScope
+              ? "No knowledge matches"
+              : "No matching results"
         textFormat: Text.PlainText
         color: Color.foreground
         font.family: Style.font.family
@@ -137,8 +193,14 @@ Column {
       Text {
         width: parent.width
         text: searchPanel.controller.contextName === "PROD" && !searchPanel.controller.rockConfigured
+          && !searchPanel.controller.knowledgeScope
           ? "Open Settings to sign in."
-          : "Try a name, ID, GUID, or category prefix."
+          : searchPanel.controller.knowledgeScope &&
+            searchPanel.controller.queryWithoutScope(searchPanel.controller.query).length < 3
+            ? "Ask a Rock question using at least three characters."
+            : searchPanel.controller.knowledgeScope
+              ? "Try different words or a more specific Rock question."
+              : "Try a name, ID, GUID, or category prefix."
         textFormat: Text.PlainText
         color: searchPanel.dim
         font.family: Style.font.family
@@ -197,6 +259,120 @@ Column {
           elide: Text.ElideRight
         }
       }
+    }
+  }
+
+  Column {
+    visible: searchPanel.controller.knowledgeDetail !== null
+    width: searchPanel.width
+    height: visible ? implicitHeight : 0
+    spacing: Style.spacing.panelGap
+
+    RowLayout {
+      width: parent.width
+      spacing: Style.spacing.sm
+
+      Button {
+        id: knowledgeBackButton
+        text: "Back"
+        tooltipText: "Back to Knowledge results · Esc"
+        bordered: true
+        focusable: true
+        enabled: !searchPanel.controller.knowledgeBusy
+        KeyNavigation.right: knowledgeSourceButton.visible
+          ? knowledgeSourceButton : knowledgeBackButton
+        KeyNavigation.tab: knowledgeSourceButton.visible
+          ? knowledgeSourceButton : knowledgeBackButton
+        KeyNavigation.backtab: knowledgeSourceButton.visible
+          ? knowledgeSourceButton : knowledgeBackButton
+        Keys.onEscapePressed: searchPanel.closeKnowledgeDetail()
+        onActiveFocusChanged: searchPanel.controller.revealFocusedControl(knowledgeBackButton)
+        onClicked: searchPanel.closeKnowledgeDetail()
+      }
+
+      Item { Layout.fillWidth: true }
+
+      Button {
+        id: knowledgeSourceButton
+        visible: searchPanel.controller.knowledgeDetail &&
+          searchPanel.controller.knowledgeDetail.canOpenSource === true
+        text: searchPanel.controller.knowledgeBusy ? "Opening…" : "Open source"
+        tooltipText: "Open the cited public source"
+        bordered: true
+        focusable: true
+        enabled: !searchPanel.controller.knowledgeBusy
+        KeyNavigation.left: knowledgeBackButton
+        KeyNavigation.tab: knowledgeBackButton
+        KeyNavigation.backtab: knowledgeBackButton
+        Keys.onEscapePressed: searchPanel.closeKnowledgeDetail()
+        onActiveFocusChanged: searchPanel.controller.revealFocusedControl(knowledgeSourceButton)
+        onClicked: searchPanel.openKnowledgeSource()
+      }
+    }
+
+    Column {
+      width: parent.width
+      spacing: Style.spacing.labelGap
+
+      PanelSectionHeader {
+        text: searchPanel.controller.knowledgeDetail
+          ? String(searchPanel.controller.knowledgeDetail.kind || "KNOWLEDGE").toUpperCase()
+          : "KNOWLEDGE"
+      }
+
+      Text {
+        width: parent.width
+        text: searchPanel.controller.knowledgeDetail
+          ? searchPanel.controller.knowledgeDetail.title : ""
+        textFormat: Text.PlainText
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.heading
+        font.weight: Font.DemiBold
+        wrapMode: Text.WordWrap
+      }
+
+      Text {
+        width: parent.width
+        text: searchPanel.controller.knowledgeDetail
+          ? searchPanel.controller.knowledgeDetail.trust + " · " +
+            searchPanel.controller.knowledgeDetail.claimTier + " · " +
+            searchPanel.controller.knowledgeDetail.version
+          : ""
+        textFormat: Text.PlainText
+        color: searchPanel.dim
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+        wrapMode: Text.WordWrap
+      }
+    }
+
+    PanelSeparator {}
+
+    Text {
+      width: parent.width
+      text: searchPanel.controller.knowledgeDetail
+        ? searchPanel.controller.knowledgeDetail.body : ""
+      textFormat: Text.PlainText
+      color: Color.foreground
+      font.family: Style.font.family
+      font.pixelSize: Style.font.bodySmall
+      lineHeight: 1.25
+      wrapMode: Text.WordWrap
+    }
+
+    Text {
+      width: parent.width
+      text: searchPanel.controller.knowledgeDetail
+        ? searchPanel.controller.knowledgeDetail.attribution +
+          (searchPanel.controller.knowledgeDetail.sourceHost
+            ? " · " + searchPanel.controller.knowledgeDetail.sourceHost : "")
+        : ""
+      textFormat: Text.PlainText
+      color: searchPanel.dim
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.WordWrap
     }
   }
 
