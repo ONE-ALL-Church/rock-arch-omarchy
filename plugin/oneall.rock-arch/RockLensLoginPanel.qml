@@ -62,7 +62,7 @@ Column {
   Button {
     id: onboardingConnectButton
     text: loginPanel.controller.setupBusy ? (loginPanel.controller.setupSlow ? "Still connecting…" : "Connecting…") : "Connect"
-    focusable: true
+    activeFocusOnTab: true
     enabled: loginPanel.controller.newProfileDomain.trim().length > 0 &&
       loginPanel.controller.setupUsername.trim().length > 0 &&
       loginPanel.controller.setupPassword.length > 0 && !loginPanel.controller.setupBusy

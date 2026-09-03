@@ -22,7 +22,7 @@ Column {
       id: magnusBackButton
       visible: magnusPanel.controller.magnusPreview !== null || magnusPanel.controller.magnusHistory.length > 0
       text: "Back"
-      focusable: true
+      activeFocusOnTab: true
       enabled: !magnusPanel.controller.magnusBusy
       onActiveFocusChanged: magnusPanel.controller.revealFocusedControl(magnusBackButton)
       onClicked: magnusPanel.controller.magnusBack()
@@ -45,7 +45,7 @@ Column {
     Button {
       id: magnusRefreshButton
       text: "R · Refresh"
-      focusable: true
+      activeFocusOnTab: true
       enabled: !magnusPanel.controller.magnusBusy && !magnusPanel.controller.magnusActionBusy
       onActiveFocusChanged: magnusPanel.controller.revealFocusedControl(magnusRefreshButton)
       onClicked: magnusPanel.controller.refreshMagnus()
@@ -71,7 +71,7 @@ Column {
         Button {
           id: magnusBuildCancelButton
           text: "Cancel"
-          focusable: true
+          activeFocusOnTab: true
           enabled: !magnusPanel.controller.magnusActionBusy
           KeyNavigation.right: magnusBuildConfirmButton
           KeyNavigation.tab: magnusBuildConfirmButton
@@ -82,7 +82,7 @@ Column {
         Button {
           id: magnusBuildConfirmButton
           text: magnusPanel.controller.magnusActionBusy ? "Deploying…" : "Deploy now"
-          focusable: true
+          activeFocusOnTab: true
           enabled: !magnusPanel.controller.magnusActionBusy
           KeyNavigation.left: magnusBuildCancelButton
           KeyNavigation.tab: magnusBuildCancelButton
@@ -123,7 +123,7 @@ Column {
       Button {
         id: magnusDownloadButton
         text: magnusPanel.controller.magnusActionBusy ? "Working…" : "D · Download"
-        focusable: true
+        activeFocusOnTab: true
         enabled: !magnusPanel.controller.magnusActionBusy
         onActiveFocusChanged: magnusPanel.controller.revealFocusedControl(magnusDownloadButton)
         onClicked: magnusPanel.controller.runMagnusAction("magnus_download", "")
@@ -132,7 +132,7 @@ Column {
         id: magnusCopyButton
         visible: magnusPanel.controller.hasMagnusAction("copy")
         text: "C · Copy"
-        focusable: true
+        activeFocusOnTab: true
         enabled: !magnusPanel.controller.magnusActionBusy
         onActiveFocusChanged: magnusPanel.controller.revealFocusedControl(magnusCopyButton)
         onClicked: magnusPanel.controller.runMagnusAction("magnus_copy", "content")
@@ -140,7 +140,7 @@ Column {
       Button {
         id: magnusHashButton
         text: "H · Copy hash"
-        focusable: true
+        activeFocusOnTab: true
         enabled: !magnusPanel.controller.magnusActionBusy
         onActiveFocusChanged: magnusPanel.controller.revealFocusedControl(magnusHashButton)
         onClicked: magnusPanel.controller.runMagnusAction("magnus_copy", "hash")
@@ -149,7 +149,7 @@ Column {
         id: magnusOpenButton
         visible: magnusPanel.controller.hasMagnusAction("view")
         text: "O · Open in Rock"
-        focusable: true
+        activeFocusOnTab: true
         enabled: !magnusPanel.controller.magnusActionBusy
         onActiveFocusChanged: magnusPanel.controller.revealFocusedControl(magnusOpenButton)
         onClicked: magnusPanel.controller.runMagnusAction("magnus_open", "")

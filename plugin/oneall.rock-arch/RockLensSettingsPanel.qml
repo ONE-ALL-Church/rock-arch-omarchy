@@ -28,7 +28,7 @@ Column {
     Button {
       id: settingsAddProfileButton
       text: settingsPanel.controller.addProfileMode ? "Cancel" : "Add profile"
-      focusable: true
+      activeFocusOnTab: true
       enabled: !settingsPanel.controller.setupBusy
       onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(settingsAddProfileButton)
       onClicked: {
@@ -83,7 +83,7 @@ Column {
             id: useProfileButton
             visible: !profileRow.modelData.isActive
             text: "Use"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !settingsPanel.controller.setupBusy
             onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(useProfileButton)
             onClicked: settingsPanel.controller.switchProfile(profileRow.modelData.id)
@@ -91,7 +91,7 @@ Column {
           Button {
             id: removeProfileButton
             text: settingsPanel.controller.pendingRemoveProfileId === profileRow.modelData.id ? "Confirm remove" : "Remove"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !settingsPanel.controller.setupBusy
             onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(removeProfileButton)
             onClicked: settingsPanel.controller.removeProfile(profileRow.modelData.id)
@@ -125,7 +125,7 @@ Column {
             id: changeLoginButton
             visible: settingsPanel.controller.rockConfigured
             text: settingsPanel.controller.editLoginMode ? "Cancel" : "Change login"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !settingsPanel.controller.setupBusy
             onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(changeLoginButton)
             onClicked: {
@@ -140,7 +140,7 @@ Column {
             id: testProfileButton
             visible: settingsPanel.controller.rockConfigured
             text: "Test"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !settingsPanel.controller.setupBusy
             onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(testProfileButton)
             onClicked: {
@@ -153,7 +153,7 @@ Column {
             id: signOutButton
             visible: settingsPanel.controller.rockConfigured
             text: settingsPanel.controller.pendingSignOut ? "Confirm sign out" : "Sign out"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !settingsPanel.controller.setupBusy
             onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(signOutButton)
             onClicked: settingsPanel.controller.signOut()
@@ -225,7 +225,7 @@ Column {
       Button {
         id: addProfileButton
         text: settingsPanel.controller.setupBusy ? (settingsPanel.controller.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
-        focusable: true
+        activeFocusOnTab: true
         enabled: settingsPanel.controller.newProfileDomain.trim().length > 0 && settingsPanel.controller.setupUsername.trim().length > 0 && settingsPanel.controller.setupPassword.length > 0 && !settingsPanel.controller.setupBusy
         onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(addProfileButton)
         onClicked: settingsPanel.controller.addProfile()
@@ -277,7 +277,7 @@ Column {
       Button {
         id: saveLoginButton
         text: settingsPanel.controller.setupBusy ? (settingsPanel.controller.setupSlow ? "Still signing in…" : "Signing in…") : "Save login"
-        focusable: true
+        activeFocusOnTab: true
         enabled: settingsPanel.controller.setupUsername.trim().length > 0 && settingsPanel.controller.setupPassword.length > 0 && !settingsPanel.controller.setupBusy
         onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(saveLoginButton)
         onClicked: settingsPanel.controller.saveRockCredentials()
@@ -387,7 +387,7 @@ Column {
     Button {
       id: checkUpdateButton
       text: settingsPanel.controller.updateState === "checking" ? "Checking…" : "Check now"
-      focusable: true
+      activeFocusOnTab: true
       enabled: settingsPanel.controller.updateManaged && !settingsPanel.controller.updateBusy
       onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(checkUpdateButton)
       onClicked: settingsPanel.controller.checkForUpdates()
@@ -396,7 +396,7 @@ Column {
       id: installUpdateButton
       visible: settingsPanel.controller.updateAvailable || settingsPanel.controller.updateState === "updating"
       text: settingsPanel.controller.updateState === "updating" ? "Updating…" : "Update now"
-      focusable: true
+      activeFocusOnTab: true
       enabled: settingsPanel.controller.updateAvailable && !settingsPanel.controller.updateBusy
       onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(installUpdateButton)
       onClicked: settingsPanel.controller.startPluginUpdate()

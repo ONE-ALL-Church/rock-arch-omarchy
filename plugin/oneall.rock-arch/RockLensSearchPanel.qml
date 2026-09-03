@@ -163,7 +163,7 @@ Column {
           Button {
             id: recentBuildCancelButton
             text: "Cancel"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !searchPanel.controller.magnusActionBusy
             KeyNavigation.right: recentBuildConfirmButton
             KeyNavigation.tab: recentBuildConfirmButton
@@ -174,7 +174,7 @@ Column {
           Button {
             id: recentBuildConfirmButton
             text: searchPanel.controller.magnusActionBusy ? "Deploying…" : "Deploy again"
-            focusable: true
+            activeFocusOnTab: true
             enabled: !searchPanel.controller.magnusActionBusy
             KeyNavigation.left: recentBuildCancelButton
             KeyNavigation.tab: recentBuildCancelButton

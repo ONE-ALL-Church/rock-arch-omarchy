@@ -179,7 +179,7 @@ class QmlNavigationTests(unittest.TestCase):
             "saveLoginButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("focusable: true", source[start : start + 350])
+            self.assertIn("activeFocusOnTab: true", source[start : start + 350])
         self.assertGreaterEqual(
             source.count("onActiveFocusChanged:"),
             16,
@@ -252,7 +252,7 @@ class QmlNavigationTests(unittest.TestCase):
             "magnusOpenButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("focusable: true", source[start : start + 350])
+            self.assertIn("activeFocusOnTab: true", source[start : start + 350])
         self.assertIn("commandMode: root.magnusPreviewCommandsEnabled", source)
         self.assertIn('"dchor".indexOf(event.text.toLowerCase())', key_catcher)
         for key in ("d", "c", "h", "o", "r"):
@@ -295,7 +295,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn(
             "searchPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
-        self.assertGreaterEqual(source.count("focusable: true"), 4)
+        self.assertGreaterEqual(source.count("activeFocusOnTab: true"), 4)
         self.assertGreaterEqual(
             source.count("Keys.onEscapePressed:"), 4
         )
