@@ -19,8 +19,8 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Changed
 
-- Remove the visible DEV/PROD context badge from the panel and expose preview
-  context switching through the developer CLI/socket boundary instead.
+- Remove the visible DEV/PROD context badge from the panel and keep preview
+  context switching behind the local developer socket boundary instead.
 - Refresh the documentation with current live Demo Church and privacy-safe
   preview screenshots, a full feature tour, and updated keyboard guidance.
 

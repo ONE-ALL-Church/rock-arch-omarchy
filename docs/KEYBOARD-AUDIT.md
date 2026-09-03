@@ -1,17 +1,19 @@
 # Keyboard and panel audit
 
 Audited 2026-09-02 against the installed Omarchy shell. The review covered
-every Rock Arch surface: login and Finish setup onboarding, header navigation, Search and Recent
-Links, Personal Links, Magnus browsing and file actions, build confirmation,
-Settings, and the dedicated public Knowledge workspace.
+every Rock Arch surface: login and Finish setup onboarding, header navigation,
+Search and Recent Links, Personal Links, Magnus browsing and file actions,
+build confirmation, Settings, and the dedicated public Knowledge workspace.
 
 ## Outcome
 
 The primary workflows are keyboard-complete and use a consistent focus model.
 List views keep the shared selected-row treatment; form and action views use
 the shell's native focused-button treatment. Moving between views resets stale
-scroll position, so the selected first item is not clipped. Magnus is shown
-only in PROD and only when the active Rock profile reports access.
+scroll position, so the selected first item is not clipped. Magnus is shown in
+normal use only when the active Rock profile reports access. The gated preview
+workspace also supplies a complete, side-effect-free Magnus experience for UI
+development and documentation.
 
 ## Audit steps and health
 
@@ -41,12 +43,13 @@ only in PROD and only when the active Rock profile reports access.
    inheriting a stale scroll offset from another panel.
 6. **Magnus browser — healthy.** The first item is selected, Up/Down and Enter
    browse, Backspace or Esc returns, `R` refreshes, and `B` opens the selected
-   mobile-app build confirmation. DEV no longer exposes an unusable Magnus tab.
-7. **Magnus file preview — healthy with a privacy-bounded live check.** The
+   mobile-app build confirmation. Preview context supplies deterministic
+   folders and files while suppressing every side effect.
+7. **Magnus file preview — healthy with a bounded preview check.** The
    Download action receives focus when a preview opens. Tab walks every visible
    action; `D`, `C`, `H`, `O`, and `R` remain direct shortcuts. Code structure,
-   lint parsing, and navigation tests cover the preview without retaining a
-   screenshot of private file content.
+   lint parsing, navigation tests, and the retained deterministic file capture
+   cover the preview without reading or retaining private file content.
 8. **Build confirmation — healthy.** Deploy now receives focus on entry, Tab
    moves to Cancel, Enter activates the focused action, and Esc cancels. No
    production build was started during this audit.
@@ -58,13 +61,16 @@ only in PROD and only when the active Rock profile reports access.
 ## Privacy-safe visual evidence
 
 The retained captures are cropped to Rock Arch and contain no credentials,
-tenant domain, raw Rock identifiers, Personal Link targets, or Magnus file
-contents. Search uses deterministic synthetic data; the Settings crop contains
-only the update controls.
+production tenant, raw Rock identifiers, Personal Link targets, or private
+Magnus file contents. Search uses the intentionally public Demo Church;
+Knowledge uses the fixed public service; Personal Links, Recent Links, and
+Magnus use deterministic preview fixtures.
 
-![Selected search result](../outputs/keyboard-audit/02-search-results.png)
+![Live Demo Church search](../outputs/screenshots/search-demo-decker.png)
 
-![Settings update controls](../outputs/keyboard-audit/03-settings-updates.png)
+![Live public Knowledge detail](../outputs/screenshots/knowledge-model-map-detail.png)
+
+![Deterministic Magnus file preview](../outputs/screenshots/magnus-preview-file.png)
 
 ## Keyboard map
 

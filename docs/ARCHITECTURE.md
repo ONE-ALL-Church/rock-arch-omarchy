@@ -134,10 +134,12 @@ PROD, including migration of a previously persisted DEV value. The QML omits
 the context control, and the broker rejects requests to enter DEV. Synthetic
 DEV data is available only when the broker process starts with the exact
 `ROCK_ARCH_DEVELOPER_MODE=1` flag; values such as `true` or `yes` fail closed.
-When enabled, the UI restores the visibly labeled context control and explicit
-`set_context` requests may select either context. DEV remains synthetic, PROD
-never falls back to synthetic data, and only PROD can perform the narrowly
-gated Magnus mobile app build action.
+When enabled, an authorized local developer request may select either context;
+the panel still renders no context badge or end-user switch. DEV provides
+deterministic fixtures across Search, Personal Links, Recent Links, Knowledge,
+and Magnus. Its open, download, clipboard, source-open, history-clear, and build
+operations are explicit no-ops. PROD never falls back to fixture data, and only
+PROD can perform the narrowly gated Magnus mobile app build action.
 
 ## Live REST boundary
 
@@ -277,8 +279,9 @@ directory is `0700`, its file is `0600`, writes are atomic, entries are
 validated on every read, and the oldest entries are removed beyond 20. The
 public list is sorted globally by its last-used timestamp, newest first, rather
 than grouping items by entity type. Each origin receives a separate store, and
-Recent Links are omitted from DEV responses. A Magnus Build entry cannot be
-opened as a URL; activation routes it
+DEV returns a separate, deterministic and non-persistent Recent Links fixture;
+its clear and activation operations are no-ops. PROD never receives those
+fixtures. A Magnus Build entry cannot be opened as a URL; activation routes it
 back through the build-path validator after another UI confirmation. The broker
 serves this local list independently from Personal Links,
 so showing the empty Search state never performs a Rock network request. This

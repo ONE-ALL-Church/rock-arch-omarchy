@@ -17,7 +17,7 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 180 passing tests. Release-contract coverage keeps
+The suite contains 181 passing tests. Release-contract coverage keeps
 the manifest, package, network user-agent, and displayed version synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
@@ -154,16 +154,26 @@ push to `main` and on pull requests.
 
 ## UI evidence
 
-The README uses current, panel-only Search and Settings UI:
+The README uses current, panel-only captures from two explicit sources:
 
-- [`02-search-results.png`](../outputs/keyboard-audit/02-search-results.png)
-  contains only deterministic DEV search data.
-- [`03-settings-updates.png`](../outputs/keyboard-audit/03-settings-updates.png)
-  shows only the installed update status and opt-in automatic-update control.
+- [`search-demo-decker.png`](../outputs/screenshots/search-demo-decker.png) is a
+  live search of the intentionally public Rock Solid Church Demo.
+- [`knowledge-model-map.png`](../outputs/screenshots/knowledge-model-map.png) and
+  [`knowledge-model-map-detail.png`](../outputs/screenshots/knowledge-model-map-detail.png)
+  use the credentialless public Rock Agent Knowledge Base.
+- [`personal-links-preview.png`](../outputs/screenshots/personal-links-preview.png),
+  [`recent-links-preview.png`](../outputs/screenshots/recent-links-preview.png),
+  [`magnus-preview-browser.png`](../outputs/screenshots/magnus-preview-browser.png),
+  [`magnus-preview-file.png`](../outputs/screenshots/magnus-preview-file.png), and
+  [`magnus-build-confirmation.png`](../outputs/screenshots/magnus-build-confirmation.png)
+  contain deterministic, side-effect-free preview content because the public
+  demo account has neither private Personal Links nor Magnus.
 
-Both images contain no desktop, tenant, credential, or live record data. See
-[KEYBOARD-AUDIT.md](KEYBOARD-AUDIT.md) for the interaction coverage represented
-by these captures.
+Every image is cropped to the Rock Arch panel. No production tenant, private
+record, credential, raw identifier, Personal Link target, or private Magnus
+file appears. The preview captures show no DEV/PROD badge and do not execute
+browser, clipboard, download, history-clear, source-open, or build actions. See
+[KEYBOARD-AUDIT.md](KEYBOARD-AUDIT.md) for the represented interaction coverage.
 
 ## Local acceptance
 
@@ -177,5 +187,7 @@ by these captures.
 - Full OS logout/login and a live Magnus deployment are intentionally outside
   this release check.
 
-No telemetry, live search, profile change, credential change, file mutation,
-or production build is performed by these verification steps.
+Automated verification performs no telemetry, live search, profile change,
+credential change, file mutation, or production build. The documentation
+captures intentionally use only the public Demo Church, the public Knowledge
+service, and deterministic preview fixtures.
