@@ -42,21 +42,19 @@ only in PROD and only when the active Rock profile reports access.
    moves to Cancel, Enter activates the focused action, and Esc cancels. No
    production build was started during this audit.
 8. **Settings — healthy.** Tab/Shift+Tab walk profile controls, login fields,
-   preferences, and categories; focused controls are scrolled into view.
+   preferences, categories, update actions, and the automatic-update toggle;
+   focused controls are scrolled into view.
 
 ## Privacy-safe visual evidence
 
-The retained captures are cropped to Rock Arch and use synthetic content where
-possible. No credentials, tenant domain, raw Rock identifiers, Personal Link
-targets, or Magnus file contents are present.
-
-![Empty Search and Recent Links](../outputs/keyboard-audit/01-search-start.png)
+The retained captures are cropped to Rock Arch and contain no credentials,
+tenant domain, raw Rock identifiers, Personal Link targets, or Magnus file
+contents. Search uses deterministic synthetic data; the Settings crop contains
+only the update controls.
 
 ![Selected search result](../outputs/keyboard-audit/02-search-results.png)
 
-![Personal Links state](../outputs/keyboard-audit/03-personal-links.png)
-
-![Magnus deployment confirmation](../outputs/keyboard-audit/05-magnus-confirmation.png)
+![Settings update controls](../outputs/keyboard-audit/03-settings-updates.png)
 
 ## Keyboard map
 

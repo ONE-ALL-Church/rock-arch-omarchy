@@ -89,16 +89,16 @@ push to `main` and on pull requests.
 
 ## UI evidence
 
-The README uses the current selection and deployment-confirmation UI:
+The README uses current, panel-only Search and Settings UI:
 
 - [`02-search-results.png`](../outputs/keyboard-audit/02-search-results.png)
   contains only deterministic DEV search data.
-- [`05-magnus-confirmation.png`](../outputs/keyboard-audit/05-magnus-confirmation.png)
-  shows the bounded `Test` confirmation and does not trigger a deployment.
+- [`03-settings-updates.png`](../outputs/keyboard-audit/03-settings-updates.png)
+  shows only the installed update status and opt-in automatic-update control.
 
-Both images are cropped to the Rock Arch panel and contain no desktop, tenant,
-credential, or live record data. See [KEYBOARD-AUDIT.md](KEYBOARD-AUDIT.md) for
-the interaction coverage represented by these captures.
+Both images contain no desktop, tenant, credential, or live record data. See
+[KEYBOARD-AUDIT.md](KEYBOARD-AUDIT.md) for the interaction coverage represented
+by these captures.
 
 ## Local acceptance
 

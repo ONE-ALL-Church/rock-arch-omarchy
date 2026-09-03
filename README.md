@@ -15,8 +15,6 @@ Accounts with Magnus access automatically receive the Magnus tab, including
 folder browsing, bounded previews, downloads, clipboard actions, hashes, and
 explicitly confirmed mobile-app builds.
 
-![Current Magnus deployment confirmation with keyboard focus](outputs/keyboard-audit/05-magnus-confirmation.png)
-
 ## Install
 
 Rock Arch supports Omarchy 4.0.2 or newer. Install the Git repository directly:
@@ -64,6 +62,8 @@ Update checks use the public Git remote and do not need GitHub credentials or a
 token. Non-Git and development checkouts remain manually managed. Release notes
 and publisher steps live in [CHANGELOG.md](CHANGELOG.md) and
 [docs/RELEASING.md](docs/RELEASING.md).
+
+![Rock Arch update controls in Settings](outputs/keyboard-audit/03-settings-updates.png)
 
 The installed Omarchy integration uses `$XDG_RUNTIME_DIR/rock-arch/broker.sock`
 and starts the broker without passing queries or credentials as arguments.

@@ -45,6 +45,13 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Pin CI actions and lint/type-check tool versions to immutable revisions.
 - Launch the broker with the absolute system Python path.
 
+### Fixed
+
+- Use native Qt tab-focus properties in every split panel and retry the initial
+  status request until the local broker is ready, preventing an empty or frozen
+  startup after an Omarchy shell reload.
+- Use a valid Qt item for the Recent Links clear-button background.
+
 ## [0.14.0] - 2026-09-02
 
 ### Changed
