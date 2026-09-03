@@ -24,6 +24,8 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Added a documented Rock Arch design system grounded in the official Omarchy
   shell, Basecamp-owned plugins, desktop HIG guidance, and visible-focus
   requirements.
+- Replaced the public screenshots with privacy-safe captures of the redesigned
+  Search result and Updates surfaces.
 
 ## [0.16.2] - 2026-09-03
 
