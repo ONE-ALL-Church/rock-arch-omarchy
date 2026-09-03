@@ -15,8 +15,27 @@ class QmlNavigationTests(unittest.TestCase):
 
         self.assertIn("resultCursor = results.length ? 0 : -1", source)
         self.assertIn("recentCursor = quickReturns.length ? 0 : -1", source)
-        self.assertIn("border.width: index === root.resultCursor ? 1 : 0", source)
-        self.assertIn("border.width: index === root.recentCursor ? 1 : 0", source)
+        self.assertIn(
+            "readonly property bool rowSelected: index === root.resultCursor ||\n"
+            "                    (root.resultCursor < 0 && index === 0 && searchField.activeFocus && root.results.length > 0)",
+            source,
+        )
+        self.assertIn(
+            "readonly property bool rowSelected: index === root.recentCursor ||\n"
+            "                    (root.recentCursor < 0 && index === 0 && searchField.activeFocus && root.quickReturns.length > 0)",
+            source,
+        )
+        self.assertEqual(source.count("border.width: rowSelected ? 2 : 0"), 2)
+        self.assertEqual(source.count("border.color: Color.accent"), 2)
+
+    def test_settings_fold_connection_and_magnus_into_active_profile(self):
+        source = QML_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn('text: "Connection"', source)
+        self.assertIn('"Login saved · Magnus available"', source)
+        self.assertIn('"Login saved · No Magnus access"', source)
+        self.assertIn('text: "Sign in to " + root.activeProfileName()', source)
+        self.assertIn('text: root.addProfileMode ? "Cancel" : "Add profile"', source)
         self.assertIn(
             'request({op: "status"})\n'
             "    refreshQuickReturns()\n"

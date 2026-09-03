@@ -1288,17 +1288,29 @@ Panel {
                 delegate: Rectangle {
                   required property var modelData
                   required property int index
+                  readonly property bool rowSelected: index === root.resultCursor ||
+                    (root.resultCursor < 0 && index === 0 && searchField.activeFocus && root.results.length > 0)
                   width: body.width
                   height: Style.space(50)
                   radius: 7
-                  color: index === root.resultCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-                  border.width: index === root.resultCursor ? 1 : 0
-                  border.color: Style.selectedBorderFor(Color.foreground, Color.accent)
+                  color: rowSelected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18) : "transparent"
+                  border.width: rowSelected ? 2 : 0
+                  border.color: Color.accent
+                  Rectangle {
+                    visible: parent.rowSelected
+                    width: 4
+                    height: parent.height - 12
+                    anchors.left: parent.left
+                    anchors.leftMargin: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    radius: 2
+                    color: Color.accent
+                  }
                   Column {
                     anchors.left: parent.left
                     anchors.right: openButton.visible ? openButton.left : parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 8
+                    anchors.leftMargin: 15
                     anchors.rightMargin: 8
                     Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
                     Text { width: parent.width; text: root.displayCategory(modelData.category) + " · " + modelData.subtitle + " · " + modelData.status; color: Color.foreground; opacity: 0.65; textFormat: Text.PlainText; elide: Text.ElideRight }
@@ -1454,15 +1466,30 @@ Panel {
                 delegate: Rectangle {
                   required property var modelData
                   required property int index
+                  readonly property bool rowSelected: index === root.recentCursor ||
+                    (root.recentCursor < 0 && index === 0 && searchField.activeFocus && root.quickReturns.length > 0)
                   width: body.width
                   height: Style.space(42)
                   radius: 7
-                  color: index === root.recentCursor ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-                  border.width: index === root.recentCursor ? 1 : 0
-                  border.color: Style.selectedBorderFor(Color.foreground, Color.accent)
+                  color: rowSelected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18) : "transparent"
+                  border.width: rowSelected ? 2 : 0
+                  border.color: Color.accent
+                  Rectangle {
+                    visible: parent.rowSelected
+                    width: 4
+                    height: parent.height - 12
+                    anchors.left: parent.left
+                    anchors.leftMargin: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    radius: 2
+                    color: Color.accent
+                  }
                   Column {
                     anchors.fill: parent
-                    anchors.margins: 7
+                    anchors.leftMargin: 15
+                    anchors.rightMargin: 7
+                    anchors.topMargin: 7
+                    anchors.bottomMargin: 7
                     Text { width: parent.width; text: modelData.title; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
                     Text {
                       width: parent.width
@@ -1748,16 +1775,30 @@ Panel {
               height: visible ? implicitHeight : 0
               spacing: Style.spacing.md
 
-              Text {
+              RowLayout {
                 width: parent.width
-                text: "Rock profiles"
-                color: Color.foreground
-                font.pixelSize: Style.font.heading
-                font.bold: true
+                Text {
+                  text: "Rock profiles"
+                  color: Color.foreground
+                  font.pixelSize: Style.font.heading
+                  font.bold: true
+                }
+                Item { Layout.fillWidth: true }
+                Button {
+                  text: root.addProfileMode ? "Cancel" : "Add profile"
+                  enabled: !root.setupBusy
+                  onClicked: {
+                    root.addProfileMode = !root.addProfileMode
+                    root.setupUsername = ""
+                    root.setupPassword = ""
+                    root.feedbackText = ""
+                    if (root.addProfileMode) Qt.callLater(function() { profileNameField.forceActiveFocus() })
+                  }
+                }
               }
               Text {
                 width: parent.width
-                text: "Each profile keeps its own secure login and Recent Links. Passwords stay in your desktop password manager."
+                text: "Each Rock site or account keeps its own login and Recent Links."
                 color: Color.foreground
                 opacity: 0.62
                 wrapMode: Text.WordWrap
@@ -1769,162 +1810,173 @@ Panel {
                 delegate: Rectangle {
                   required property var modelData
                   width: body.width
-                  height: Style.space(64)
+                  height: Style.space(modelData.isActive ? 94 : 58)
                   radius: 8
                   color: modelData.isActive ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
-                  border.width: modelData.isActive ? 0 : 1
-                  border.color: Qt.rgba(1, 1, 1, 0.12)
-                  RowLayout {
+                  border.width: 1
+                  border.color: modelData.isActive ? Color.accent : Qt.rgba(1, 1, 1, 0.12)
+                  ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 8
-                    spacing: Style.spacing.sm
-                    Column {
+                    spacing: 4
+                    RowLayout {
                       Layout.fillWidth: true
-                      Text { width: parent.width; text: modelData.name; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
-                      Text { width: parent.width; text: String(modelData.origin).replace("https://", ""); color: Color.foreground; opacity: 0.58; textFormat: Text.PlainText; elide: Text.ElideRight }
+                      Column {
+                        Layout.fillWidth: true
+                        Text { width: parent.width; text: modelData.name; color: Color.foreground; font.bold: true; textFormat: Text.PlainText; elide: Text.ElideRight }
+                        Text { width: parent.width; text: String(modelData.origin).replace("https://", ""); color: Color.foreground; opacity: 0.58; textFormat: Text.PlainText; elide: Text.ElideRight }
+                      }
+                      Text {
+                        visible: modelData.isActive
+                        text: "Active"
+                        color: Color.accent
+                        font.bold: true
+                        font.pixelSize: Style.font.bodySmall
+                      }
+                      Button {
+                        visible: !modelData.isActive
+                        text: "Use"
+                        enabled: !root.setupBusy
+                        onClicked: root.switchProfile(modelData.id)
+                      }
+                      Button {
+                        text: root.pendingRemoveProfileId === modelData.id ? "Confirm remove" : "Remove"
+                        enabled: !root.setupBusy
+                        onClicked: root.removeProfile(modelData.id)
+                      }
                     }
-                    Button {
-                      text: modelData.isActive ? "Active" : "Use"
-                      enabled: !modelData.isActive && !root.setupBusy
-                      onClicked: root.switchProfile(modelData.id)
-                    }
-                    Button {
-                      text: root.pendingRemoveProfileId === modelData.id ? "Confirm" : "Remove"
-                      enabled: !root.setupBusy
-                      onClicked: root.removeProfile(modelData.id)
+                    RowLayout {
+                      visible: modelData.isActive
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: visible ? Style.space(32) : 0
+                      spacing: Style.spacing.sm
+                      Rectangle {
+                        Layout.preferredWidth: 8
+                        Layout.preferredHeight: 8
+                        radius: 4
+                        color: root.rockConfigured ? "#86efac" : "#fbbf24"
+                      }
+                      Text {
+                        Layout.fillWidth: true
+                        text: !root.rockConfigured ? "Login required" :
+                          root.magnusState === "available" ? "Login saved · Magnus available" :
+                          root.magnusState === "unavailable" ? "Login saved · No Magnus access" :
+                          root.magnusState === "error" ? "Login saved · Magnus check failed" :
+                          "Login saved · Checking Magnus…"
+                        color: Color.foreground
+                        opacity: 0.72
+                        font.pixelSize: Style.font.bodySmall
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                      }
+                      Button {
+                        visible: root.rockConfigured
+                        text: root.editLoginMode ? "Cancel" : "Change login"
+                        enabled: !root.setupBusy
+                        onClicked: {
+                          root.editLoginMode = !root.editLoginMode
+                          root.setupUsername = ""
+                          root.setupPassword = ""
+                          if (root.editLoginMode) Qt.callLater(function() { activeUsernameField.forceActiveFocus() })
+                        }
+                      }
+                      Button {
+                        visible: root.rockConfigured
+                        text: "Test"
+                        enabled: !root.setupBusy
+                        onClicked: {
+                          root.beginSetup("Testing connection…")
+                          root.feedbackText = "Testing connection…"
+                          root.request({op: "profile_test"})
+                        }
+                      }
+                      Button {
+                        visible: root.rockConfigured
+                        text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
+                        enabled: !root.setupBusy
+                        onClicked: root.signOut()
+                      }
                     }
                   }
                 }
               }
 
-              Button {
-                text: root.addProfileMode ? "Cancel adding profile" : "Add profile"
-                enabled: !root.setupBusy
-                onClicked: {
-                  root.addProfileMode = !root.addProfileMode
-                  root.setupUsername = ""
-                  root.setupPassword = ""
-                  root.feedbackText = ""
-                  if (root.addProfileMode) Qt.callLater(function() { profileNameField.forceActiveFocus() })
-                }
-              }
-
-              Column {
+              Rectangle {
                 visible: root.addProfileMode
                 width: parent.width
-                height: visible ? implicitHeight : 0
-                spacing: Style.spacing.sm
-                Text { text: "Add a Rock profile"; color: Color.foreground; font.bold: true }
-                TextField {
-                  id: profileNameField
-                  width: parent.width
-                  maximumLength: 80
-                  placeholderText: "Profile name (for example Main Campus)"
-                  text: root.newProfileName
-                  selectByMouse: true
-                  onTextChanged: root.newProfileName = text
-                }
-                TextField {
-                  id: domainField
-                  width: parent.width
-                  maximumLength: 250
-                  placeholderText: "Rock domain (for example rock.example.org)"
-                  text: root.newProfileDomain
-                  selectByMouse: true
-                  inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
-                  onTextChanged: root.newProfileDomain = text
-                }
-                TextField {
-                  id: usernameField
-                  width: parent.width
-                  maximumLength: 200
-                  placeholderText: "Rock username"
-                  text: root.setupUsername
-                  selectByMouse: true
-                  onTextChanged: root.setupUsername = text
-                }
-                TextField {
-                  id: passwordField
-                  width: parent.width
-                  placeholderText: "Rock password"
-                  text: root.setupPassword
-                  echoMode: TextInput.Password
-                  selectByMouse: true
-                  inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                  onTextChanged: root.setupPassword = text
-                  onAccepted: root.addProfile()
-                }
-                Button {
-                  text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
-                  enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
-                  onClicked: root.addProfile()
+                height: visible ? addProfileForm.implicitHeight + 24 : 0
+                radius: 8
+                color: Style.selectedFillFor(Color.foreground, Color.accent)
+                Column {
+                  id: addProfileForm
+                  anchors.fill: parent
+                  anchors.margins: 12
+                  spacing: Style.spacing.sm
+                  Text { text: "Add a Rock profile"; color: Color.foreground; font.bold: true }
+                  TextField {
+                    id: profileNameField
+                    width: parent.width
+                    maximumLength: 80
+                    placeholderText: "Profile name (for example Main Campus)"
+                    text: root.newProfileName
+                    selectByMouse: true
+                    onTextChanged: root.newProfileName = text
+                  }
+                  TextField {
+                    id: domainField
+                    width: parent.width
+                    maximumLength: 250
+                    placeholderText: "Rock domain (for example rock.example.org)"
+                    text: root.newProfileDomain
+                    selectByMouse: true
+                    inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoPredictiveText
+                    onTextChanged: root.newProfileDomain = text
+                  }
+                  TextField {
+                    id: usernameField
+                    width: parent.width
+                    maximumLength: 200
+                    placeholderText: "Rock username"
+                    text: root.setupUsername
+                    selectByMouse: true
+                    onTextChanged: root.setupUsername = text
+                  }
+                  TextField {
+                    id: passwordField
+                    width: parent.width
+                    placeholderText: "Rock password"
+                    text: root.setupPassword
+                    echoMode: TextInput.Password
+                    selectByMouse: true
+                    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
+                    onTextChanged: root.setupPassword = text
+                    onAccepted: root.addProfile()
+                  }
+                  Button {
+                    text: root.setupBusy ? (root.setupSlow ? "Still signing in…" : "Signing in…") : "Add and connect"
+                    enabled: root.newProfileDomain.trim().length > 0 && root.setupUsername.trim().length > 0 && root.setupPassword.length > 0 && !root.setupBusy
+                    onClicked: root.addProfile()
+                  }
                 }
               }
 
-              Column {
-                visible: root.activeProfileId !== "" && !root.addProfileMode
+              Rectangle {
+                visible: root.activeProfileId !== "" && !root.addProfileMode && (root.editLoginMode || !root.rockConfigured)
                 width: parent.width
-                height: visible ? implicitHeight : 0
-                spacing: Style.spacing.sm
-                RowLayout {
-                  width: parent.width
-                  Text { text: "Connection"; color: Color.foreground; font.bold: true }
-                  Item { Layout.fillWidth: true }
-                  Text {
-                    text: root.rockConfigured ? "Connected" : "Login required"
-                    color: root.rockConfigured ? "#86efac" : Color.foreground
-                    opacity: root.rockConfigured ? 0.9 : 0.62
-                    font.pixelSize: Style.font.bodySmall
-                  }
-                }
-                Text {
-                  visible: root.rockConfigured
-                  width: parent.width
-                  text: root.magnusState === "available" ? "Magnus · browse, preview, and hash available" :
-                    root.magnusState === "unavailable" ? "Magnus · not installed or not authorized for this account" :
-                    root.magnusState === "error" ? "Magnus · access check could not complete" :
-                    "Magnus · checking access"
-                  color: root.magnusAvailable ? "#86efac" : Color.foreground
-                  opacity: root.magnusAvailable ? 0.88 : 0.58
-                  font.pixelSize: Style.font.bodySmall
-                  wrapMode: Text.WordWrap
-                  textFormat: Text.PlainText
-                }
-                Row {
-                  spacing: Style.spacing.sm
-                  Button {
-                    visible: root.rockConfigured
-                    text: root.editLoginMode ? "Cancel" : (root.rockConfigured ? "Change login" : "Enter login")
-                    enabled: !root.setupBusy
-                    onClicked: {
-                      root.editLoginMode = !root.editLoginMode
-                      root.setupUsername = ""
-                      root.setupPassword = ""
-                      if (root.editLoginMode) Qt.callLater(function() { activeUsernameField.forceActiveFocus() })
-                    }
-                  }
-                  Button {
-                    visible: root.rockConfigured
-                    text: "Test"
-                    enabled: root.rockConfigured && !root.setupBusy
-                    onClicked: {
-                      root.beginSetup("Testing connection…")
-                      root.feedbackText = "Testing connection…"
-                      root.request({op: "profile_test"})
-                    }
-                  }
-                  Button {
-                    visible: root.rockConfigured
-                    text: root.pendingSignOut ? "Confirm sign out" : "Sign out"
-                    enabled: root.rockConfigured && !root.setupBusy
-                    onClicked: root.signOut()
-                  }
-                }
+                height: visible ? activeLoginForm.implicitHeight + 24 : 0
+                radius: 8
+                color: Style.selectedFillFor(Color.foreground, Color.accent)
                 Column {
-                  visible: root.editLoginMode || !root.rockConfigured
-                  width: parent.width
-                  height: visible ? implicitHeight : 0
+                  id: activeLoginForm
+                  anchors.fill: parent
+                  anchors.margins: 12
                   spacing: Style.spacing.sm
+                  Text {
+                    text: "Sign in to " + root.activeProfileName()
+                    color: Color.foreground
+                    font.bold: true
+                    textFormat: Text.PlainText
+                  }
                   TextField {
                     id: activeUsernameField
                     width: parent.width
@@ -2004,7 +2056,7 @@ Panel {
               }
               Text {
                 width: parent.width
-                    text: "Rock Lens 0.12.0 · Credentials stay in your desktop password manager"
+                text: "Rock Lens 0.12.0 · Credentials stay in your desktop password manager"
                 color: Color.foreground
                 opacity: 0.48
                 font.pixelSize: Style.font.bodySmall

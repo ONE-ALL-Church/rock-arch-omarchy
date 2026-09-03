@@ -267,8 +267,10 @@
   Hyprland bindings.
 - Opening Search selects the first Recent Link without taking typing focus from
   the search field. A completed search similarly selects its first result. Both
-  selected rows use the themed fill plus a full-opacity one-pixel outline, so
-  selection remains visible while the search field keeps keyboard focus.
+  selected rows use an accent tint, two-pixel accent outline, and solid accent
+  marker, so selection remains visible while the search field keeps keyboard
+  focus. The first row also paints this state directly from search-field focus,
+  independent of asynchronous cursor updates.
   Unscoped search also ranks matching Personal Links by allowlisted title and
   section before entity results; explicit entity scopes exclude those links. An
   installed PROD socket check refreshed 15 links, searched one title, and
@@ -277,6 +279,10 @@
   without grouping by entity type. Reopening an existing item refreshes its
   timestamp and returns it to the top while preserving deduplication and the
   20-item cap.
+- Settings no longer repeats the active profile in a separate Connection
+  section. The active Rock profile card now owns its login state, Magnus access
+  indicator, and login/test/sign-out actions; add-profile and sign-in forms use
+  distinct inset cards, while search preferences remain a separate section.
 - Backspace on a highlighted search or link item is handled by the Rock
   Lens-local key catcher while the item owns focus. It returns focus to the
   search field, deletes the selection or character before the preserved cursor,
