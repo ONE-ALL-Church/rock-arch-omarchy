@@ -28,7 +28,7 @@ explicitly confirmed mobile-app builds.
 Rock Arch supports Omarchy 4.0.2 or newer. Install the Git repository directly:
 
 ```bash
-omarchy plugin add https://github.com/bscottdavis/rock-arch-omarchy.git --enable
+omarchy plugin add https://github.com/ONE-ALL-Church/rock-arch-omarchy.git --enable
 ```
 
 Open it with `Super+R` or the rock-arch icon in the Omarchy bar. First launch

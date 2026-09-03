@@ -5,6 +5,11 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+### Changed
+
+- Move the canonical repository and install links to the ONE&ALL Church
+  GitHub organization.
+
 ## [0.24.4] - 2026-09-03
 
 ### Fixed
@@ -331,14 +336,14 @@ repository's default branch is the source used by Omarchy plugin updates.
 - Replaced the development tenant fallback with a reserved example origin; each
   real connection always uses the selected user's Rock profile domain.
 
-[0.20.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.20.0
-[0.19.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.19.0
-[0.18.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.18.0
-[0.17.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.17.0
-[0.16.2]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.2
-[0.16.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.1
-[0.16.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.16.0
-[0.15.1]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.1
-[0.15.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.15.0
-[0.14.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.14.0
-[0.13.0]: https://github.com/bscottdavis/rock-arch-omarchy/releases/tag/v0.13.0
+[0.20.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.20.0
+[0.19.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.19.0
+[0.18.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.18.0
+[0.17.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.17.0
+[0.16.2]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.16.2
+[0.16.1]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.16.1
+[0.16.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.16.0
+[0.15.1]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.15.1
+[0.15.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.15.0
+[0.14.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.14.0
+[0.13.0]: https://github.com/ONE-ALL-Church/rock-arch-omarchy/releases/tag/v0.13.0

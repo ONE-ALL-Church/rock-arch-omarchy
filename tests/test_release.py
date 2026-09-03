@@ -57,7 +57,7 @@ class ReleaseContractTests(unittest.TestCase):
     def test_public_install_url_is_not_a_placeholder(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn(
-            "https://github.com/bscottdavis/rock-arch-omarchy.git",
+            "https://github.com/ONE-ALL-Church/rock-arch-omarchy.git",
             readme,
         )
         self.assertNotIn("github.com/OWNER/", readme)
