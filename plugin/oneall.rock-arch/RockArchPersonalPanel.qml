@@ -11,7 +11,9 @@ Column {
   required property var controller
   property alias repeater: personalLinkRepeater
   property alias addButton: addLinkButton
+  readonly property bool inputActive: viewDropdown.popupOpen
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
+  function openViewMenu() { viewDropdown.open() }
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
@@ -19,6 +21,16 @@ Column {
   RowLayout {
     width: parent.width
     PanelSectionHeader { text: "PERSONAL LINKS"; Layout.fillWidth: true }
+    Dropdown {
+      id: viewDropdown
+      Layout.preferredWidth: Style.space(132)
+      label: "Links view"
+      showLabel: false
+      value: personalPanel.controller.preferencePersonalLinksView
+      options: [{value: "groups", label: "Groups"}, {value: "alpha", label: "Alphabetical"}]
+      Accessible.name: "Links view"
+      onChanged: function(value) { personalPanel.controller.setLinkView(value) }
+    }
     Button {
       id: addLinkButton
       text: "Add link"
@@ -69,7 +81,7 @@ Column {
 
   Repeater {
     id: personalLinkRepeater
-    model: personalPanel.controller.personalLinks
+    model: personalPanel.controller.linkView.rows
 
     delegate: Item {
       id: row
@@ -77,13 +89,39 @@ Column {
       required property var modelData
       required property int index
       readonly property bool rowSelected: row.index === personalPanel.controller.linkCursor
+      readonly property bool nested: personalPanel.controller.preferencePersonalLinksView === "groups" && !modelData.group
+      readonly property real inset: nested ? Style.spacing.lg : 0
 
       width: personalPanel.width
-      height: Style.space(54)
+      height: Style.space(modelData.group ? 44 : (nested ? 40 : 54))
       clip: true
+      Accessible.role: Accessible.Button
+      Accessible.name: modelData.title
+      Accessible.description: modelData.group
+        ? (modelData.expanded ? "Expanded" : "Collapsed") + ", " + modelData.count + " links"
+        : "Open Personal Link"
+      Accessible.onPressAction: personalPanel.controller.linkView.activate(row.index)
+
+      Rectangle {
+        visible: row.nested
+        x: row.inset
+        width: parent.width - row.inset
+        height: parent.height
+        color: Color.foreground
+        opacity: 0.025
+      }
+      Rectangle {
+        visible: row.nested
+        x: row.inset
+        width: 1
+        height: parent.height
+        color: Color.foreground
+        opacity: 0.12
+      }
 
       RockArchSelectionChrome {
         anchors.fill: parent
+        anchors.leftMargin: row.inset
         selected: row.rowSelected
       }
 
@@ -91,13 +129,13 @@ Column {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        anchors.leftMargin: Style.spacing.rowPaddingX
-        anchors.rightMargin: Style.spacing.rowPaddingX
+        anchors.leftMargin: Style.spacing.rowPaddingX + row.inset
+        anchors.rightMargin: Style.spacing.rowPaddingX + (row.modelData.group ? Style.space(row.modelData.isShared ? 98 : 52) : 0)
         spacing: Style.spacing.xxs
 
         Text {
           width: parent.width
-          text: row.modelData.title
+          text: row.modelData.group ? (row.modelData.expanded ? "▾  " : "▸  ") + row.modelData.title : row.modelData.title
           textFormat: Text.PlainText
           color: Color.foreground
           font.family: Style.font.family
@@ -107,6 +145,7 @@ Column {
         }
 
         Text {
+          visible: !row.modelData.group && !row.nested
           width: parent.width
           text: row.modelData.section + (row.modelData.isShared ? " · Shared" : "")
           textFormat: Text.PlainText
@@ -117,12 +156,24 @@ Column {
         }
       }
 
+      Text {
+        visible: row.modelData.group
+        anchors.right: parent.right
+        anchors.rightMargin: Style.spacing.rowPaddingX
+        anchors.verticalCenter: parent.verticalCenter
+        text: String(row.modelData.count) + (row.modelData.isShared ? " · Shared" : "")
+        textFormat: Text.PlainText
+        color: personalPanel.dim
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+      }
+
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: {
           personalPanel.controller.selectPersonalLink(row.index)
-          personalPanel.controller.request({op: "open_navigation", safeId: row.modelData.safeId})
+          personalPanel.controller.linkView.activate(row.index)
         }
       }
     }

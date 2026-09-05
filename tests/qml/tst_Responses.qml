@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import "../../plugin/oneall.rock-arch" as RockArch
 import "../../plugin/oneall.rock-arch/RockArchResponses.js" as Responses
 
 TestCase {
@@ -7,8 +8,11 @@ TestCase {
   property var state
   property var ui
   property var calls
+  RockArch.RockArchLinkView { id: linkView }
 
   function init() {
+    linkView.links = []
+    linkView.configure("alpha", [])
     calls = []
     state = {
       contextName: "PROD", viewMode: "search", opened: true,
@@ -48,6 +52,12 @@ TestCase {
       friendlyError: function() { return "Safe error" },
       applyUiHandoff: function() { calls.push("handoff") }
     }
+    state.linkView = linkView
+    state.configureLinkView = function() {
+      linkView.configure(this.preferencePersonalLinksView, (this.preferenceExpandedLinkGroups || {})[this.activeProfileId] || [])
+    }
+    Object.defineProperty(state, "linkCursor", {get: function() { return linkView.cursor }, set: function(value) { linkView.cursor = value }})
+    Object.defineProperty(state, "navigationCount", {get: function() { return linkView.rows.length }})
     function focusable(name) {
       return {forceActiveFocus: function() { calls.push("focus:" + name) }}
     }
@@ -114,11 +124,10 @@ TestCase {
   function test_saved_link_is_selected_after_refresh_instead_of_first_row() {
     state.viewMode = "personal"
     state.linkCursor = 0
-    state.navigationCount = 2
     state.pendingPersonalLinkSelection = {name: "Saved page", section: "Work"}
     accept({ok: true, personalLinks: [
-      {title: "Another page", section: "Work", isShared: false},
-      {title: "Saved page", section: "Work", isShared: false}
+      {safeId: "other", title: "Another page", section: "Work", isShared: false},
+      {safeId: "saved", title: "Saved page", section: "Work", isShared: false}
     ]})
     compare(state.linkCursor, 1)
     compare(state.pendingPersonalLinkSelection, null)

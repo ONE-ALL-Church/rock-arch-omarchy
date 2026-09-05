@@ -127,6 +127,8 @@ class LiveReadAdapter(Protocol):
 
     def set_origin(self, origin: str) -> None: ...
 
+    def set_profile_scope(self, profile_id: str) -> None: ...
+
 
 class KnowledgeProvider(Protocol):
     def search(self, query: str) -> list[dict[str, Any]]: ...
@@ -211,6 +213,7 @@ class Broker:
         )
         if live and self._origin:
             self._live.set_origin(self._origin)
+        self._live.set_profile_scope(self._active_profile_id)
         self._personal_links = personal_links or PersonalLinkManager(self._session)
         self._personal_links.set_origin(self._origin)
         self._knowledge = knowledge or RockKbReadOnlyAdapter()
@@ -511,6 +514,7 @@ class Broker:
 
     def _activate_profile(self, profile: RockProfile | None) -> None:
         self._personal_links.set_origin(profile.origin if profile else None)
+        self._live.set_profile_scope(profile.profile_id if profile else "")
         if profile is None:
             self._active_profile_id = ""
             self._origin = None

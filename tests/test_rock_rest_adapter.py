@@ -570,6 +570,29 @@ class RockRestAdapterTests(unittest.TestCase):
             RockRestReadOnlyAdapter(cookie_provider, http).search("Ada")
         self.assertTrue(cookie_provider.invalidated)
 
+    def test_link_group_ids_are_stable_scoped_and_not_navigation_targets(self):
+        payload = {"PersonLinksSectionList": [
+            {"Id": 11, "Name": "Work", "Order": 0, "IsShared": False,
+             "PersonalLinks": [{"Name": "A", "Url": "/page/12", "Order": 0}]},
+            {"Id": 22, "Name": "Work", "Order": 1, "IsShared": True,
+             "PersonalLinks": [{"Name": "B", "Url": "/page/12", "Order": 0}]},
+        ]}
+        def adapter(scope):
+            return RockRestReadOnlyAdapter(FakeCookieProvider(), FakeHttp({
+                "/api/PersonalLinks/GetPersonalLinksData": payload,
+            }), profile_scope=scope)
+        first = adapter("profile-one")
+        groups = [link["groupId"] for link in first.personal_links()]
+        self.assertNotEqual(groups[0], groups[1])
+        self.assertTrue(all(group.startswith("link-group-") for group in groups))
+        self.assertIsNone(first.resolve(groups[0]))
+        self.assertEqual(groups, [link["groupId"] for link in adapter("profile-one").personal_links()])
+        self.assertNotEqual(groups, [link["groupId"] for link in adapter("profile-two").personal_links()])
+        payload["PersonLinksSectionList"][0]["Name"] = "Renamed section"
+        self.assertEqual(first.personal_links(force_refresh=True)[0]["groupId"], groups[0])
+        first.set_profile_scope("profile-two")
+        self.assertNotEqual(first.personal_links()[0]["groupId"], groups[0])
+
     def test_url_validation_is_exact_origin_https(self):
         self.assertEqual(
             validate_rock_url("/Person/7", DEFAULT_ROCK_ORIGIN),

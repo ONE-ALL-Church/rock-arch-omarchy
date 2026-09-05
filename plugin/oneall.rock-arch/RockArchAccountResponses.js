@@ -46,6 +46,9 @@ function profiles(root, ui, response, frame) {
       root.preferenceTerminalAccess = preferences.terminalAccess !== false
       root.preferenceAutomaticUpdates = preferences.automaticUpdates === true
       root.preferenceOnboardingSetupCompleted = preferences.onboardingSetupCompleted === true
+      root.preferencePersonalLinksView = preferences.personalLinksView === "alpha" ? "alpha" : "groups"
+      root.preferenceExpandedLinkGroups = preferences.personalLinksExpandedGroups || {}
+      root.configureLinkView()
       if (Array.isArray(preferences.enabledCategories))
         root.enabledCategories = preferences.enabledCategories
       if (previousProfileId !== root.activeProfileId) root.resetSearchCapabilities()

@@ -99,10 +99,43 @@ class ProfileStoreTests(unittest.TestCase):
         store.update_preferences({"recentLinks": False})
         saved = json.loads(self.path.read_text())
         saved["preferences"].pop("tabOrder")
+        saved["preferences"].pop("personalLinksView")
+        saved["preferences"].pop("personalLinksExpandedGroups")
         self.path.write_text(json.dumps(saved))
         preferences = ProfileStore(self.path, self.instance).preferences()
         self.assertEqual(preferences["tabOrder"], ["search", "personal", "knowledge", "magnus"])
         self.assertFalse(preferences["recentLinks"])
+        self.assertEqual(preferences["personalLinksView"], "groups")
+        self.assertEqual(preferences["personalLinksExpandedGroups"], {})
+
+    def test_link_views_and_account_expansion_survive_restart_and_profile_removal(self):
+        store = ProfileStore(self.path, self.instance)
+        first = store.add("First", DEFAULT_ROCK_ORIGIN)
+        second = store.add("Second", DEFAULT_ROCK_ORIGIN)
+        groups = {first.profile_id: ["link-group-" + "a" * 32], second.profile_id: ["link-group-" + "b" * 32]}
+        store.update_preferences({"personalLinksView": "alpha", "personalLinksExpandedGroups": groups})
+        reloaded = ProfileStore(self.path, self.instance)
+        self.assertEqual(reloaded.preferences()["personalLinksView"], "alpha")
+        self.assertEqual(reloaded.preferences()["personalLinksExpandedGroups"], groups)
+        reloaded.remove(first.profile_id)
+        self.assertEqual(reloaded.preferences()["personalLinksExpandedGroups"], {second.profile_id: groups[second.profile_id]})
+
+    def test_invalid_link_view_or_expansion_batch_preserves_preferences(self):
+        store = ProfileStore(self.path, self.instance)
+        profile = store.add("Primary", DEFAULT_ROCK_ORIGIN)
+        before = self.path.read_bytes()
+        group = "link-group-" + "a" * 32
+        updates = [{"personalLinksView": value} for value in ("newest", "", [], {}, None, True)]
+        updates += [{"personalLinksExpandedGroups": value} for value in (
+            [], {"unknown-profile": [group]}, {profile.profile_id: "all"},
+            {profile.profile_id: [group, group]}, {profile.profile_id: [42]},
+            {profile.profile_id: ["raw-section-id"]},
+            {profile.profile_id: ["link-group-" + f"{number:032x}" for number in range(51)]},
+        )]
+        for update in updates:
+            with self.subTest(update=update), self.assertRaisesRegex(ProfileError, "invalid_preferences"):
+                store.update_preferences({"recentLinks": False, **update})
+            self.assertEqual(self.path.read_bytes(), before)
 
     def test_version_one_preferences_gain_new_search_categories_once(self):
         self.path.write_text(

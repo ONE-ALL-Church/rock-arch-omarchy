@@ -79,7 +79,7 @@ ALLOWED_RESULT_KEYS = frozenset(
     {"category", "safeId", "title", "subtitle", "status", "canOpen"}
 )
 ALLOWED_PERSON_KEYS = frozenset({"safeId", "displayName", "subtitle", "campus"})
-ALLOWED_LINK_KEYS = frozenset({"safeId", "title", "section", "isShared"})
+ALLOWED_LINK_KEYS = frozenset({"safeId", "title", "section", "groupId", "isShared"})
 ALLOWED_QUICK_RETURN_KEYS = frozenset(
     {"safeId", "title", "kind", "lastUsedAt"}
 )

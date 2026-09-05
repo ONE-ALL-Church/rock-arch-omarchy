@@ -21,6 +21,8 @@ PROFILE_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 PROFILE_STORE_VERSION = 2
 VERSION_2_CATEGORIES = ("Group Types", "Content Channel Types")
 DEFAULT_TAB_ORDER = ("search", "personal", "knowledge", "magnus")
+PERSONAL_LINK_VIEWS = ("groups", "alpha")
+LINK_GROUP_PATTERN = re.compile(r"^link-group-[a-f0-9]{32}$")
 DEFAULT_PREFERENCES: dict[str, Any] = {
     "showPersonContext": True,
     "recentLinks": True,
@@ -32,10 +34,13 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "onboardingSetupCompleted": False,
     "enabledCategories": list(CATEGORIES),
     "tabOrder": list(DEFAULT_TAB_ORDER),
+    "personalLinksView": "groups",
+    "personalLinksExpandedGroups": {},
 }
 EDITABLE_PREFERENCES = (
     "showPersonContext", "recentLinks", "closeAfterOpen", "showMenuBar",
     "terminalAccess", "automaticUpdates", "enabledCategories", "tabOrder",
+    "personalLinksView", "personalLinksExpandedGroups",
 )
 
 
@@ -158,6 +163,7 @@ class ProfileStore:
         state["profiles"] = [
             row for row in state["profiles"] if row["id"] != profile.profile_id
         ]
+        state["preferences"]["personalLinksExpandedGroups"].pop(profile.profile_id, None)
         if state["activeProfileId"] == profile.profile_id:
             state["activeProfileId"] = (
                 state["profiles"][0]["id"] if state["profiles"] else ""
@@ -209,6 +215,14 @@ class ProfileStore:
         if "tabOrder" in updates:
             preferences["tabOrder"] = self._validated_tab_order(
                 updates["tabOrder"], "invalid_preferences"
+            )
+        if "personalLinksView" in updates:
+            if updates["personalLinksView"] not in PERSONAL_LINK_VIEWS:
+                raise ProfileError("invalid_preferences")
+            preferences["personalLinksView"] = updates["personalLinksView"]
+        if "personalLinksExpandedGroups" in updates:
+            preferences["personalLinksExpandedGroups"] = self._validated_link_groups(
+                updates["personalLinksExpandedGroups"], state["profiles"], "invalid_preferences"
             )
         state["preferences"] = preferences
         self._write(state)
@@ -360,12 +374,36 @@ class ProfileStore:
             preferences.get("tabOrder", list(DEFAULT_TAB_ORDER)),
             "profile_store_unavailable",
         )
+        link_view = preferences.get("personalLinksView", "groups")
+        if link_view not in PERSONAL_LINK_VIEWS:
+            raise ProfileError("profile_store_unavailable")
+        clean_preferences["personalLinksView"] = link_view
+        clean_preferences["personalLinksExpandedGroups"] = cls._validated_link_groups(
+            preferences.get("personalLinksExpandedGroups", {}), profiles, "profile_store_unavailable"
+        )
         return {
             "version": PROFILE_STORE_VERSION,
             "activeProfileId": active,
             "profiles": profiles,
             "preferences": clean_preferences,
         }
+
+    @staticmethod
+    def _validated_link_groups(value: object, profiles: list[dict[str, Any]], error: str) -> dict[str, list[str]]:
+        if not isinstance(value, dict) or not set(value).issubset({row["id"] for row in profiles}):
+            raise ProfileError(error)
+        result = {}
+        for profile, groups in value.items():
+            if (
+                not isinstance(groups, list) or len(groups) > 50
+                or any(not isinstance(group, str) or not LINK_GROUP_PATTERN.fullmatch(group) for group in groups)
+                or len(set(groups)) != len(groups)
+            ):
+                raise ProfileError(error)
+            result[profile] = list(groups)
+        if sum(len(groups) for groups in result.values()) > 200:
+            raise ProfileError(error)
+        return result
 
     @staticmethod
     def _validated_tab_order(value: object, error: str) -> list[str]:

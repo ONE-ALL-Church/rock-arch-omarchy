@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from .contracts import CATEGORIES
-from .profiles import DEFAULT_PREFERENCES, DEFAULT_TAB_ORDER, EDITABLE_PREFERENCES
+from .profiles import (
+    DEFAULT_PREFERENCES,
+    DEFAULT_TAB_ORDER,
+    EDITABLE_PREFERENCES,
+    PERSONAL_LINK_VIEWS,
+)
 
 PROTOCOL_VERSION = 1
 
@@ -22,6 +27,16 @@ def settings_schema() -> dict[str, Any]:
         "type": "array", "items": list(DEFAULT_TAB_ORDER),
         "rule": "Include each tab ID exactly once, in the desired order.",
         "default": list(DEFAULT_TAB_ORDER),
+    }
+    fields["personalLinksView"] = {
+        "type": "string", "enum": list(PERSONAL_LINK_VIEWS), "default": "groups",
+        "description": "Links panel: collapsible sections or a flat alphabetical list.",
+    }
+    fields["personalLinksExpandedGroups"] = {
+        "type": "object", "default": {},
+        "description": "Map profile IDs to arrays of expanded groupId values from links personal. Omitted groups start collapsed. Replaces the complete map.",
+        "maxGroupsPerProfile": 50,
+        "maxTotalGroups": 200,
     }
     return {
         "fields": fields,

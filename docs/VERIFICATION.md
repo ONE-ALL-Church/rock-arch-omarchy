@@ -6,8 +6,8 @@ Personal Link creation acceptance below. Historical feature changes belong in
 
 ## Unreleased Personal Link creation
 
-On 2026-09-05, the feature branch passed 255 Python tests and 45 Qt behavioral
-tests (55 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
+On 2026-09-05, the feature branch passed 259 Python tests and 52 Qt behavioral
+tests (64 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
 compilation, Omarchy manifest validation, and `git diff --check`. Standalone
 `qmllint` exited successfully with expected warnings for shell-provided imports.
 
@@ -31,6 +31,24 @@ IDs, and confirmed absent from the plugin's refreshed Personal Links. The review
 plugin was removed, the shell restarted, and the original bar layout and profile
 metadata preserved. Private account data and screenshots are not included here.
 The submitted `main` branch and installed release were not changed.
+
+The grouped Links follow-up was checked in a temporary native review plugin
+using the account's real bookmark list and a private preference copy. Enter
+toggled sections; multiple sections stayed open; recessed children retained
+Rock's ordering. V opened the native view menu, and keyboard selection switched
+to the flat Alphabetical list without discarding expansion. A full shell and
+broker restart restored the view and expanded section. Existing group IDs stayed
+stable while a newly encountered group started collapsed. Actual CLI commands
+changed the view and reset expansion; the panel reflected the changes. The review
+installation was then removed and the original desktop layout preserved.
+No bookmarks were created, edited, or deleted during the view checks.
+
+Regression tests cover distinct same-named sections, case-insensitive sorting,
+multiple open groups, Left/Right navigation, selection during refresh and removal,
+save-and-reveal behavior, per-account state, stable non-action group references,
+legacy preference defaults, profile removal, and atomic rejection of invalid
+preferences. Groups and Alphabetical use the existing bookmark read only; there
+is no newest-first mode or creation-date request.
 
 ## Automated checks
 

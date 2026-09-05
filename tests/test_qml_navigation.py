@@ -76,7 +76,8 @@ class QmlNavigationTests(unittest.TestCase):
         selection = SELECTION_PATH.read_text(encoding="utf-8")
 
         self.assertEqual(source.count("readonly property bool rowSelected:"), 5)
-        self.assertEqual(source.count("height: Style.space(54)"), 5)
+        # Link sections now have compact headers and recessed child rows.
+        self.assertEqual(source.count("height: Style.space(54)"), 4)
         self.assertGreaterEqual(
             source.count("anchors.leftMargin: Style.spacing.rowPaddingX"), 4
         )

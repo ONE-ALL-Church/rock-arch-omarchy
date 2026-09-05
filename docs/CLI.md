@@ -142,6 +142,28 @@ rock-arch links activate SAFE_ID --confirm
 rock-arch links clear --confirm
 ```
 
+Choose the Links panel view:
+
+```bash
+rock-arch settings set personalLinksView '"groups"'
+rock-arch settings set personalLinksView '"alpha"'
+```
+
+`groups` is the default: collapsible Rock sections with the existing section and
+link order. `alpha` shows one case-insensitive alphabetical list. The setting
+changes the panel presentation; `links personal` continues to return all links
+as a flat machine-readable list, including section names and stable `groupId`s.
+
+`personalLinksExpandedGroups` is a map from profile IDs (from `profiles list`)
+to arrays of expanded `groupId`s (from `links personal`). Read the current map
+with `settings get`, edit it, and write it using `settings set --stdin`.
+The supplied map replaces the complete value; preserve other profiles' entries
+when editing one account. An empty array collapses that profile's groups; an
+empty map resets all groups. The map supports up to 50 groups per profile and
+200 in total. IDs survive restarts and section renames, and are scoped to the
+profile and Rock origin. These display IDs cannot open links or select a section
+for creating a bookmark; use `links sections` for creation targets.
+
 Save a Search result to your Rock Personal Links:
 
 ```bash

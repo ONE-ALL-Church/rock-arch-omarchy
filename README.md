@@ -157,6 +157,14 @@ shortcut returns to the confirmation flow—it never silently deploys. `X` or
 separate workspace, while unscoped Search can also match their title or section.
 Every target must resolve to the selected Rock instance.
 
+Links opens in **Groups** view. Click a section or press Enter to expand or
+collapse it; multiple sections can stay open. Links appear indented beneath
+their section, in Rock's existing order. Expansion is remembered separately for
+each profile, including after restarting the shell. New sections start collapsed.
+Use the view dropdown (or press `V`) to choose a flat **Alphabetical** list.
+Returning to Groups restores the expanded sections. Both preferences are
+editable through the CLI.
+
 Choose **Save** beside a Search result, or press `Ctrl+S`, to prefill its name and
 URL. In **Links**, choose **Add link** or press `Ctrl+N` to enter a bookmark
 manually. Review the name, Rock URL, and personal section, then select **Save
@@ -372,7 +380,7 @@ These are future directions under consideration, not committed release dates:
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
-| Personal Links | Up / Down | Enter or Space | Backspace returns to Search | `Ctrl+N` adds a link |
+| Personal Links | Up / Down; Left / Right collapses or expands groups | Enter or Space toggles a group or opens a link | Backspace returns to Search | `V` changes view; `Ctrl+N` adds a link |
 | Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | `D` download, `C` copy, `H` hash, `O` open, `R` refresh |

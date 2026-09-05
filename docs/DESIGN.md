@@ -130,10 +130,17 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   Enter opens a plain-text detail with trust/version context, Back, and Open
   source. Typed related items continue within the panel, and Back unwinds that
   detail history before returning to results.
-- **Personal Links:** a single bookmark list with section metadata and Add link
-  in its header. Save on a Search result opens the same focused form with name
+- **Personal Links:** collapsible section rows with counts, retaining Rock's
+  section and bookmark order. Expanded links sit on a subtly recessed, indented
+  surface. Multiple sections may be open; expansion persists per profile.
+  A compact native dropdown switches between Groups and a flat Alphabetical list.
+  Enter/Space toggles a section, Left/Right collapses or expands it, and V opens
+  the view selector. This follows the show/hide heading model in the
+  [WAI accordion pattern](https://www.w3.org/WAI/ARIA/apg/patterns/accordion/),
+  adapted to Omarchy's existing list and workspace keyboard navigation.
+  Add link remains in the header. Save on a Search result opens a focused form with name
   and URL prefilled. Use native text fields and a private-section dropdown;
-  Ctrl+S saves and Escape returns to the source view. Saving selects and reveals
+  Ctrl+S saves and Escape returns to the source view. Saving expands the section, selects and reveals
   the bookmark; success feedback clears after four seconds.
 - **Magnus:** breadcrumb/task title plus Refresh, a shared list treatment, and a
   bounded preview. Deploy keeps a

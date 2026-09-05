@@ -68,10 +68,23 @@ class RockArchCliTests(unittest.TestCase):
         schema = _request(_parser().parse_args(["settings", "schema"]), client)["schema"]
         self.assertIn("tabOrder", schema["fields"])
         self.assertNotIn("onboardingSetupCompleted", schema["fields"])
+        self.assertEqual(schema["fields"]["personalLinksView"]["enum"], ["groups", "alpha"])
+        self.assertIn("personalLinksExpandedGroups", schema["fields"])
         for raw in ("not json", "[]", "{}", '{"unknown":true}', "[" * 20000, "\udcff"):
             with self.subTest(raw=raw[:40]), patch("sys.stdin", io.StringIO(raw)), self.assertRaises(CliError):
                 _request(_parser().parse_args(["settings", "set", "--stdin"]), client)
         self.assertEqual(client.calls, [])
+
+    @patch("rock_arch_broker.cli._omarchy_shell")
+    def test_links_view_and_expansion_are_editable_with_cli_settings(self, refresh):
+        client = FakeClient()
+        _request(_parser().parse_args(["settings", "set", "personalLinksView", '"alpha"']), client)
+        groups = {"profile-id": ["link-group-" + "a" * 32]}
+        with patch("sys.stdin", io.StringIO(json.dumps({"personalLinksExpandedGroups": groups}))):
+            _request(_parser().parse_args(["settings", "set", "--stdin"]), client)
+        self.assertEqual(client.calls[0]["settings"], {"personalLinksView": "alpha"})
+        self.assertEqual(client.calls[1]["settings"], {"personalLinksExpandedGroups": groups})
+        self.assertEqual(refresh.call_count, 2)
 
     @patch("rock_arch_broker.cli._omarchy_shell")
     def test_shortcut_set_rechecks_revision_and_requires_confirmation(self, refresh):

@@ -27,7 +27,10 @@ Panel {
     searchCapabilitiesReady ? (contextName === "DEV" ? enabledCategories : availableSearchCategories) : [])
   property alias query: searchField.text
   property var results: []
-  property var personalLinks: []
+  property alias personalLinks: linkViewModel.links
+  property alias linkView: linkViewModel
+  property string preferencePersonalLinksView: "groups"
+  property var preferenceExpandedLinkGroups: ({})
   property var quickReturns: []
   property var profiles: []
   property bool profilesLoaded: false
@@ -131,9 +134,9 @@ Panel {
   property string resultsQuery: ""
   property int resultCursor: -1
   property int recentCursor: -1
-  property int linkCursor: -1
+  property alias linkCursor: linkViewModel.cursor
   property int relativeTimeTick: 0
-  readonly property int navigationCount: personalLinks.length
+  readonly property int navigationCount: linkViewModel.rows.length
   readonly property int magnusCount: magnusItems.length
   readonly property bool showMagnus: contextName === "DEV" || magnusAvailable
   readonly property bool updateBusy: updateState === "checking" || updateState === "updating"
@@ -522,6 +525,24 @@ Panel {
   }
   function refreshQuickReturns() { request({op: "navigation_status", section: "quick_returns"}) }
   function refreshPersonalLinks() { request({op: "navigation_status", section: "personal"}) }
+  function configureLinkView() {
+    linkViewModel.configure(preferencePersonalLinksView, preferenceExpandedLinkGroups[activeProfileId] || [])
+  }
+  function setLinkView(view) {
+    preferencePersonalLinksView = view
+    configureLinkView()
+    panelFlick.contentY = 0
+    updatePreference("personalLinksView", view)
+  }
+  function persistExpandedLinkGroups(groups) {
+    if (contextName !== "PROD" || !activeProfileId) return
+    var next = Object.assign({}, preferenceExpandedLinkGroups)
+    next[activeProfileId] = groups.filter(function(id) {
+      return linkViewModel.groups.some(function(group) { return group.sectionId === id })
+    })
+    preferenceExpandedLinkGroups = next
+    updatePreference("personalLinksExpandedGroups", next)
+  }
   function beginPersonalLink(safeId) {
     if (!rockConfigured || contextName !== "PROD" || personalLinkModel.saving) return
     personalLinkReturnView = viewMode
@@ -1001,6 +1022,7 @@ Panel {
   }
   function moveCursor(dx, dy) {
     if (dx !== 0) {
+      if (viewMode === "personal" && linkViewModel.horizontal(dx)) return
       moveTab(dx)
       return
     }
@@ -1103,7 +1125,7 @@ Panel {
       return
     }
     if (linkCursor < 0 || linkCursor >= navigationCount) return
-    request({op: "open_navigation", safeId: personalLinks[linkCursor].safeId})
+    linkViewModel.activate(linkCursor)
   }
   function activateFirstSearchItem() {
     if (showRecentLinks) {
@@ -1284,7 +1306,7 @@ Panel {
     }
   }
 
-  onActiveProfileIdChanged: { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onActiveProfileIdChanged: { personalLinkModel.closed(); personalLinks = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
   onRockConfiguredChanged: if (!rockConfigured) { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
   onViewModeChanged: if (viewMode !== "personal") { personalLinkModel.closed(); broker.dropPersonalLinkRequests() }
   onContextNameChanged: { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
@@ -1307,6 +1329,17 @@ Panel {
       root.feedbackText = alreadySaved ? "Already in Personal Links" : "Saved to Personal Links"
       personalLinkNoticeTimer.restart()
     }
+  }
+
+  RockArchLinkView {
+    id: linkViewModel
+    onExpandedChanged: function(groups) { root.persistExpandedLinkGroups(groups) }
+    onOpenRequested: function(safeId) { root.request({op: "open_navigation", safeId: safeId}) }
+    onFocusRequested: Qt.callLater(function() {
+      if (root.viewMode !== "personal" || personalLinkModel.editing) return
+      keyCatcher.forceActiveFocus()
+      root.revealItem(personalPanel.repeater.itemAt(root.linkCursor))
+    })
   }
 
   RockArchBroker {
@@ -1429,7 +1462,7 @@ Panel {
         root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null ||
         (root.viewMode === "knowledge" && root.knowledgeDetail !== null)
       commandMode: root.magnusPreviewCommandsEnabled
-      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive ||
+      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive || personalPanel.inputActive ||
         finishSetupPanel.inputActive || settingsPanel.inputActive || magnusPanel.inputActive ||
         knowledgePanel.queryField.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 ||
@@ -1440,7 +1473,10 @@ Panel {
       onTabRequested: function(direction) { root.moveTab(direction) }
       onActivateRequested: root.activateCursor()
       onDeleteRequested: root.deleteCurrentItem()
-      onTextKey: function(value) { root.handleMagnusKey(value) }
+      onTextKey: function(value) {
+        if (root.viewMode === "personal" && value.toLowerCase() === "v") personalPanel.openViewMenu()
+        else root.handleMagnusKey(value)
+      }
       onBackspaceRequested: {
         if (root.viewMode === "magnus") root.magnusBack()
         else if (root.viewMode === "knowledge") root.backspaceToKnowledge()

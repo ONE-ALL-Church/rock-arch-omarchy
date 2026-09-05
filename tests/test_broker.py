@@ -242,6 +242,9 @@ class FakeLive:
             "Ada Rivera", "Person", 10, origin + "/Person/17"
         )
 
+    def set_profile_scope(self, profile_id):
+        self.profile_scope = profile_id
+
     def clear(self):
         self.cleared = True
 

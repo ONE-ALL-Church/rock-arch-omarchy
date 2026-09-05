@@ -7,6 +7,9 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Default Links to collapsible sections with indented bookmarks and link counts.
+  Remember expanded sections per account, and offer a flat Alphabetical view.
+  Expose both view and expansion preferences through the CLI.
 - Add Personal Links directly from Links, or prefill a bookmark from Search.
   Use Ctrl+N in Links and Ctrl+S to prepare or save a bookmark. Select and reveal
   the saved link after refreshing.

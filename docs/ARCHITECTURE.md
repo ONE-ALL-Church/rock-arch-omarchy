@@ -248,6 +248,16 @@ name, and URL. The draft is consumed before a POST. An ambiguous response never
 causes a POST retry; a subsequent explicit attempt repeats the duplicate check.
 Successful saves invalidate the existing Personal Links cache.
 
+`RockArchLinkView.qml` derives section headers, expanded child rows, and a flat
+alphabetical list from that same allowlisted cache. It keeps the selected record
+through reordering and expands the containing section after a save. Group display
+IDs are deterministic HMAC references scoped to the profile's random local ID,
+the Rock origin, and the section ID; they do not enter the navigation registry
+and are not action tokens. Only these references and view preferences persist in
+the owner-only profile store, not section names or bookmark URLs. Same-named
+sections stay distinct. Expansion settings are removed when a profile is deleted.
+These views require no additional Rock requests or creation-date metadata.
+
 The contract was checked against the official Rock source at
 [`a51094b`](https://github.com/SparkDevNetwork/Rock/tree/a51094b052a501983dfb746c45d441b59b67d2bb):
 [`ApiController.Post`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/ApiController.cs),

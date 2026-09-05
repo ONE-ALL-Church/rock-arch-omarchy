@@ -51,13 +51,8 @@ function knowledgeResults(root, ui, response, frame) {
 }
 
 function links(root, ui, response, frame) {
-    if (Array.isArray(response.personalLinks)) root.personalLinks = response.personalLinks
-    if (Array.isArray(response.personalLinks) && root.pendingPersonalLinkSelection) {
-      var saved = root.pendingPersonalLinkSelection
-      var selected = root.personalLinks.findIndex(function(item) {
-        return item.title === saved.name && item.section === saved.section && !item.isShared
-      })
-      if (selected >= 0) root.linkCursor = selected
+    if (Array.isArray(response.personalLinks)) {
+      root.linkView.replace(response.personalLinks, root.pendingPersonalLinkSelection)
       root.pendingPersonalLinkSelection = null
     }
     if (Array.isArray(response.quickReturns)) {

@@ -301,11 +301,13 @@ class RockRestReadOnlyAdapter:
         cookie_provider: CookieProvider,
         http: JsonClient | None = None,
         origin: str = DEFAULT_ROCK_ORIGIN,
+        profile_scope: str = "",
     ) -> None:
         self._cookie_provider = cookie_provider
         self.origin = validate_rock_origin(origin)
         self._http = http or RockRestHttpClient(origin=self.origin)
         self._key = secrets.token_bytes(32)
+        self._group_key = profile_scope.encode() if profile_scope else self._key
         self._registry: OrderedDict[str, _RegistryEntry] = OrderedDict()
         self._family_contexts: OrderedDict[str, _FamilyContext] = OrderedDict()
         self._personal_links_cache: list[dict[str, Any]] = []
@@ -323,6 +325,10 @@ class RockRestReadOnlyAdapter:
         setter = getattr(self._http, "set_origin", None)
         if callable(setter):
             setter(self.origin)
+        self.clear()
+
+    def set_profile_scope(self, profile_id: str) -> None:
+        self._group_key = profile_id.encode() if profile_id else self._key
         self.clear()
 
     def clear(self) -> None:
@@ -503,7 +509,7 @@ class RockRestReadOnlyAdapter:
 
         flattened: list[tuple[int, int, dict[str, Any]]] = []
         seen = 0
-        for section in sections[:50]:
+        for section_index, section in enumerate(sections[:50]):
             if not isinstance(section, dict):
                 continue
             section_name = sanitize_text(self._field(section, "Name"), 120)
@@ -512,6 +518,10 @@ class RockRestReadOnlyAdapter:
             links = self._field(section, "PersonalLinks")
             if not section_name or not isinstance(links, list):
                 continue
+            section_identity = self._positive_id(self._field(section, "Id")) or f"{shared}:{section_name}:{section_index}"
+            section_id = "link-group-" + hmac.new(
+                self._group_key, f"{self.origin}:{section_identity}".encode(), hashlib.sha256
+            ).hexdigest()[:32]
             for link in links:
                 if seen >= MAX_PERSONAL_LINKS:
                     break
@@ -534,6 +544,7 @@ class RockRestReadOnlyAdapter:
                         "safeId": safe_id,
                         "title": title,
                         "section": section_name,
+                        "groupId": section_id,
                         "isShared": shared,
                     },
                     ALLOWED_LINK_KEYS,
