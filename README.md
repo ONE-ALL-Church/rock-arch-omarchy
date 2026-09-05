@@ -157,6 +157,23 @@ shortcut returns to the confirmation flow—it never silently deploys. `X` or
 separate workspace, while unscoped Search can also match their title or section.
 Every target must resolve to the selected Rock instance.
 
+Choose **Save** beside a Search result, or press `Ctrl+S`, to prefill its name and
+URL. In **Links**, choose **Add link** or press `Ctrl+N` to enter a bookmark
+manually. Review the name, Rock URL, and personal section, then select **Save
+link** or press `Ctrl+S`. Escape cancels the form. The saved bookmark is selected
+in Links and also appears in your Rock account.
+
+Only your own personal sections are offered. If you have none, Save creates a
+private **Links** section first. Shared sections are excluded. Names are limited
+to 100 characters and URLs must point to your active Rock instance. Saving an
+existing URL in the same section selects the existing bookmark. Rock's API
+permissions still apply; if an endpoint is denied, the form reports that your
+administrator needs to review access.
+
+If a connection fails while saving, Rock Arch asks you to check Links before
+trying again. It never automatically repeats the save. An explicit retry checks
+for an existing bookmark before creating another.
+
 ![Personal Links preview](outputs/screenshots/personal-links-preview.png)
 
 _Deterministic preview content demonstrates a useful Personal Links collection;
@@ -235,7 +252,8 @@ families into Mobile Applications, then through an application, page, blocks,
 and `content.lava`. Deploy appears only on the application row where Magnus
 advertises that capability. No build or local action runs._
 
-Deploy is the only Rock server mutation Rock Arch exposes. The build path must
+Alongside Personal Link creation, Rock Arch supports explicit Magnus deployment.
+The build path must
 be advertised by Magnus, contain a numeric mobile-app ID, and pass same-origin
 validation. Every initial or repeated build requires confirmation. Magnus does
 not expose a dependable completion endpoint, so Rock Arch reports the local
@@ -343,7 +361,6 @@ These are future directions under consideration, not committed release dates:
 
 - **People:** Send email or SMS and run permission-aware person actions, such
   as triggering a workflow.
-- **Links:** Add a Personal Link without leaving Rock Arch.
 - **Knowledge Base:** Improve the response reader and connect Model Map
   references to the full entity view.
 
@@ -352,10 +369,11 @@ These are future directions under consideration, not committed release dates:
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
 | Workspaces | Tab / Shift+Tab | — | `Esc` closes | `Ctrl+1`–`Ctrl+4` follow visible tab order; `Ctrl+,` Settings |
-| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `X` or Delete clears recents |
+| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
-| Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |
+| Personal Links | Up / Down | Enter or Space | Backspace returns to Search | `Ctrl+N` adds a link |
+| Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | `D` download, `C` copy, `H` hash, `O` open, `R` refresh |
 | Confirmations | Tab / Shift+Tab | Enter or Space | Esc | — |
@@ -395,7 +413,7 @@ prompt; there is no password argument. Results return process-local opaque
 `safeId` values. Inspect one with `rock-arch describe SAFE_ID`, then use it in a
 follow-up action.
 
-Opening, copying, downloading, clearing history, signing out, removing a
+Saving a Personal Link, opening, copying, downloading, clearing history, signing out, removing a
 profile, installing an update, and starting a build require `--confirm`.
 `--dry-run` validates the target and describes expected effects without running
 the action. There is no arbitrary endpoint, raw HTTP, SQL, generic mutation,
@@ -416,13 +434,15 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
 - Cookies are attached only to exact-origin HTTPS requests. Cross-origin
   redirects and malformed targets are rejected.
 - QML receives display fields and process-local opaque IDs, not raw Rock IDs,
-  cookies, credentials, or unrestricted URLs.
+  cookies, or credentials. The Personal Link form also receives its editable,
+  validated URL on the active Rock instance.
 - Public Knowledge is a separate credentialless client with a fixed public
   origin and bounded schemas.
 - The broker socket and local state are owner-only. The current Unix account is
   the terminal client's OS trust boundary.
-- Production never falls back to preview data. Magnus builds require explicit
-  confirmation and are the only supported server mutation.
+- Production never falls back to preview data. Personal Link creation and
+  Magnus builds require explicit confirmation. These are the only supported
+  server mutations, apart from creating a private first bookmark section.
 
 The experimental OpenID implementation was removed in version 0.14. Rock Arch
 does not read legacy OpenID metadata, client secrets, or tokens; user-owned old

@@ -11,6 +11,7 @@ QtObject {
 
   function request(payload) { connection.request(payload) }
   function dropCredentials() { connection.dropCredentials() }
+  function dropPersonalLinkRequests() { connection.dropPersonalLinkRequests() }
 
   property RockArchConnection connection: RockArchConnection {
     transport: brokerSocket

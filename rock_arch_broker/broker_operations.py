@@ -13,6 +13,7 @@ from .contracts import (
 )
 from .magnus_adapter import MagnusError
 from .origin import OriginError, validate_rock_origin
+from .personal_links import PersonalLinkError, prefill_name
 from .profiles import (
     EDITABLE_PREFERENCES,
     ProfileError,
@@ -84,6 +85,8 @@ class BrokerOperations:
             "navigation_status": self._navigation_status,
             "open_navigation": self._open_navigation,
             "activate_recent": self._activate_recent,
+            "personal_link_prepare": self._personal_link,
+            "personal_link_save": self._personal_link,
         }
 
     def handle(self, raw: dict[str, Any]) -> dict[str, Any]:
@@ -314,6 +317,7 @@ class BrokerOperations:
         broker._context = requested
         broker._store_context()
         broker._live.clear()
+        broker._personal_links.clear()
         return broker._ok(
             context=broker._context.value,
             developerMode=broker._developer_mode,
@@ -416,6 +420,7 @@ class BrokerOperations:
                 return broker._error("secure_storage_failed")
             return broker._error(str(error))
         broker._live.clear()
+        broker._personal_links.clear()
         return broker._ok(
             instance=broker._instance_status(),
             rock=broker._session.status(),
@@ -461,6 +466,7 @@ class BrokerOperations:
         except RockSessionError as error:
             return broker._error(str(error))
         broker._live.clear()
+        broker._personal_links.clear()
         return broker._profile_response(refreshLive=True)
 
     def _profile_test(self, _raw: dict[str, Any]) -> dict[str, Any]:
@@ -484,6 +490,7 @@ class BrokerOperations:
         except RockSessionError as error:
             return broker._error(str(error))
         broker._live.clear()
+        broker._personal_links.clear()
         return broker._profile_response(connection="signed_out")
 
     def _profile_remove(self, raw: dict[str, Any]) -> dict[str, Any]:
@@ -1013,6 +1020,39 @@ class BrokerOperations:
         }:
             return self.broker._error("invalid_navigation_section")
         return self.broker._navigation_status(section)
+
+    def _personal_link(self, raw: dict[str, Any]) -> dict[str, Any]:
+        broker = self.broker
+        request_id = sanitize_text(raw.get("requestId"), 80)
+        try:
+            if broker._context is not Context.PROD:
+                raise PersonalLinkError("personal_links_preview_only")
+            if not broker._origin or not broker._session.status()["configured"]:
+                raise PersonalLinkError("rock_login_required")
+            if raw["op"] == "personal_link_prepare":
+                name, url = raw.get("name", ""), raw.get("url", "")
+                if "safeId" in raw:
+                    safe_id = raw["safeId"]
+                    if not isinstance(safe_id, str) or "url" in raw:
+                        raise PersonalLinkError("personal_link_source_invalid")
+                    target = broker._live.resolve(safe_id)
+                    if target is None or target.kind == "Magnus Build":
+                        raise PersonalLinkError("personal_link_source_invalid")
+                    name, url = raw.get("name", prefill_name(target.title)), target.url
+                result = broker._personal_links.prepare(name, url)
+            else:
+                result = broker._personal_links.save(
+                    raw.get("draftId"), raw.get("name"), raw.get("url"),
+                    raw.get("sectionId"), confirmed=raw.get("confirmed") is True,
+                )
+                broker._live.invalidate_personal_links()
+            return broker._ok(personalLink={**result, "requestId": request_id})
+        except (PersonalLinkError, RockSessionError, RockRestError) as error:
+            if str(error) == "personal_links_not_authorized":
+                broker._session.invalidate_authenticated_cookie()
+            return {**broker._error(str(error)), "personalLink": {
+                "requestId": request_id, "error": str(error),
+            }}
 
     def _open_navigation(self, raw: dict[str, Any]) -> dict[str, Any]:
         return self.broker._open_navigation(sanitize_text(raw.get("safeId"), 100))

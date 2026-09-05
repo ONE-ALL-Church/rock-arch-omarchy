@@ -207,14 +207,52 @@ the remaining text; a scoped search runs only that category's existing fixed
 specification. Bare prefixes omit `$filter` but retain the fixed projection,
 ordering, and `$top=3`. Unknown prefixes stay in the search text and cannot
 select an API path.
-Personal Links use only `PersonalLinks/GetPersonalLinksData`. Responses are
+Personal Link listing uses `PersonalLinks/GetPersonalLinksData`. Responses are
 capped at 2 MiB, transformed immediately into display allowlists, and cached in
 memory for five minutes. Unscoped search matches the allowlisted title and
 section locally, ranks Personal Links before entity results, and never exposes
 their URLs. Opening the panel force-refreshes that cache; scoped entity searches
 do not include Personal Links. A failed category is reported as unavailable;
-PROD never falls back to mock data. There is no raw HTTP, generic entity, SQL,
-mutation, job execution, or Run Now operation.
+PROD never falls back to mock data. There is no raw HTTP, generic entity
+mutation, SQL, job execution, or Run Now operation.
+
+### Personal Link additions
+
+`PersonalLinkManager` owns in-memory, ten-minute, single-use drafts. The Search
+source is resolved through the existing opaque registry; the UI receives the
+validated same-origin URL only for this explicit editor. Profile switches,
+credential changes, sign-out, and context changes clear drafts. UI request IDs
+discard late responses, and closing or interrupting the form drops queued
+unsent preparations and saves.
+
+A separate `PersonalLinkHttpClient` leaves the search client's GET-only contract
+intact. It reads `People/GetCurrentPerson`, discards all fields except the
+person ID and primary alias ID, and projects `Id,Name,IsShared,PersonAliasId`
+from `PersonalLinkSections`. The section query uses the primary alias directly:
+some Rock versions do not expose the PersonAlias navigation field to OData.
+Only sections attached to that alias are offered; shared sections are rejected.
+Raw owner and section IDs never cross the UI/CLI boundary.
+
+Save rechecks the authenticated identity and section ownership. The fixed
+`POST /api/PersonalLinks` payload contains only Name, Url, PersonAliasId,
+SectionId, and Order. If no personal sections exist, the explicit Save can first
+create a non-shared Links section through `POST /api/PersonalLinkSections` with
+the authenticated owner. Each endpoint remains subject to Rock's REST action
+permissions. Names obey Rock's 100 UTF-16-unit limit; URLs are bounded,
+canonicalized HTTPS targets on the active origin. No shared-link writes, edits,
+deletes, or arbitrary entity writes are exposed.
+
+Before creating a link, an exact section/owner/URL query detects duplicates.
+After creation, a bounded read-back checks the returned ID, owner, section,
+name, and URL. The draft is consumed before a POST. An ambiguous response never
+causes a POST retry; a subsequent explicit attempt repeats the duplicate check.
+Successful saves invalidate the existing Personal Links cache.
+
+The contract was checked against the official Rock source at
+[`a51094b`](https://github.com/SparkDevNetwork/Rock/tree/a51094b052a501983dfb746c45d441b59b67d2bb):
+[`ApiController.Post`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/ApiController.cs),
+[`GetCurrentPerson`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/Controllers/PeopleController.Partial.cs),
+and the [Personal Link model](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock/Model/CMS/PersonalLink/PersonalLink.cs).
 
 The cookie authenticates the actor but does not override Rock authorization.
 The broker intersects saved category preferences with the detected account

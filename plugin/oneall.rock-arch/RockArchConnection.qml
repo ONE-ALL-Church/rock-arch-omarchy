@@ -29,6 +29,12 @@ QtObject {
     })
   }
 
+  function dropPersonalLinkRequests() {
+    requestQueue = requestQueue.filter(function(payload) {
+      return payload.op !== "personal_link_prepare" && payload.op !== "personal_link_save"
+    })
+  }
+
   function flushRequests() {
     if (!transport.connected || !requestQueue.length) return
     while (transport.connected && requestQueue.length) {

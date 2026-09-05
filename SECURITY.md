@@ -20,9 +20,9 @@ The plugin and broker run with the desktop user's authority. They do not claim
 to isolate against arbitrary code already executing as that same user, a
 compromised Quickshell process, a compromised Python runtime, or a malicious
 Rock server that returns semantically deceptive but structurally valid display
-text. Rock permissions remain the authorization boundary for tenant data and
-the mobile-app build action. Rock Arch probes only its eight fixed read
-endpoints after login, hides denied categories, and independently enforces the
+text. Rock permissions remain the authorization boundary for tenant data,
+Personal Link creation, and the mobile-app build action. Rock Arch probes only
+its eight fixed read endpoints after login, hides denied categories, and independently enforces the
 detected allowlist in the broker before search requests are issued.
 
 Update checks are limited to the canonical Git-managed Rock Arch installation.
@@ -44,6 +44,15 @@ Magnus build tracking records only that the action endpoint accepted a request.
 Receipts are profile-scoped, owner-only local files without endpoint URLs and
 never claim server-side completion. Rock Arch does not synthesize deployment
 status when Magnus does not expose a dependable status endpoint.
+
+Personal Link additions use a separate bounded client. It derives the person
+and primary alias from the authenticated session, offers only non-shared
+sections owned by that alias, and rechecks both account and section at Save.
+Clients cannot choose a raw owner or record ID. The URL must resolve to the
+active HTTPS Rock origin. Single-use drafts expire after ten minutes and are
+cleared on account/context changes and sign-out. Saves are read back before
+success is reported; ambiguous outcomes are not retried automatically. A first
+private Links section can be created only as part of an explicit bookmark save.
 
 ## Secret handling
 

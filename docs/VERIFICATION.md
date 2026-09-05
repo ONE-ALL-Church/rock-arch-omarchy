@@ -1,7 +1,36 @@
 # Verification record
 
-This record describes the prepared `0.26.0` release boundary. Historical feature
-changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
+This record describes the prepared `0.26.0` release boundary and the unreleased
+Personal Link creation acceptance below. Historical feature changes belong in
+[CHANGELOG.md](../CHANGELOG.md).
+
+## Unreleased Personal Link creation
+
+On 2026-09-05, the feature branch passed 255 Python tests and 45 Qt behavioral
+tests (55 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
+compilation, Omarchy manifest validation, and `git diff --check`. Standalone
+`qmllint` exited successfully with expected warnings for shell-provided imports.
+
+The new coverage checks account and section ownership, same-origin URLs, explicit
+confirmation, single-use drafts, expiration and profile changes, duplicate saves,
+uncertain POST outcomes, verified readback, bounded responses, and authorization
+denial without replay. Qt tests exercise stale replies, cancellation, interruption,
+field retention, queued-request removal, local form errors, and saved-row selection.
+
+With the account owner's permission, an isolated review plugin on the real Omarchy
+desktop created three temporary Personal Links in the active Rock account:
+one through Links, one prefilled from Search, and one through the JSON CLI.
+Readback verified each record's name, URL, owner, and section. Native keyboard
+checks covered Ctrl+N, Ctrl+S, section selection, and Escape. Saving an existing
+link selected and scrolled to its row, and success feedback cleared automatically.
+The CLI dry run made no write, and a repeated confirmed save returned the existing
+link without creating a duplicate.
+
+All three temporary records were then removed, verified absent by their exact
+IDs, and confirmed absent from the plugin's refreshed Personal Links. The review
+plugin was removed, the shell restarted, and the original bar layout and profile
+metadata preserved. Private account data and screenshots are not included here.
+The submitted `main` branch and installed release were not changed.
 
 ## Automated checks
 
@@ -18,7 +47,8 @@ omarchy plugin validate .
 git diff --check
 ```
 
-The suite contains 232 Python tests and 35 Qt behavioral tests. Release-contract
+At the `0.26.0` release boundary, the suite contained 232 Python tests and 35 Qt
+behavioral tests. Release-contract
 coverage keeps the manifest, package, network user-agent, and displayed version
 synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
@@ -179,8 +209,8 @@ plugin or assert that the interactive Omarchy shell lifecycle was tested.
 - Previews, downloads, and tree responses are size-bounded. Cross-origin URLs,
   redirects, traversal, query strings, fragments, and control characters are
   rejected.
-- Only a descriptor-advertised numeric mobile-app build endpoint can mutate the
-  server, and every first or repeated build requires an explicit confirmation.
+- Within Magnus, only a descriptor-advertised numeric mobile-app build endpoint
+  can mutate the server, and every first or repeated build requires an explicit confirmation.
   No build is triggered by the automated suite.
 - Accepted build requests create a profile-scoped mode-`0600` receipt and a
   privacy-minimized desktop notification. Status remains `accepted` with local

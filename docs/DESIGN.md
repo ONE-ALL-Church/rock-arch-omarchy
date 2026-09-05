@@ -130,10 +130,13 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   Enter opens a plain-text detail with trust/version context, Back, and Open
   source. Typed related items continue within the panel, and Back unwinds that
   detail history before returning to results.
-- **Personal Links:** a single bookmark list with section metadata; no repeated
-  keyboard tutorial below the list.
+- **Personal Links:** a single bookmark list with section metadata and Add link
+  in its header. Save on a Search result opens the same focused form with name
+  and URL prefilled. Use native text fields and a private-section dropdown;
+  Ctrl+S saves and Escape returns to the source view. Saving selects and reveals
+  the bookmark; success feedback clears after four seconds.
 - **Magnus:** breadcrumb/task title plus Refresh, a shared list treatment, and a
-  bounded preview. Deploy remains the only server-side action and keeps a
+  bounded preview. Deploy keeps a
   dedicated production confirmation.
 - **Settings:** profiles, preferences, categories, and updates are four visibly
   separate groups. Editing the active profile reveals Magnus availability, so there is

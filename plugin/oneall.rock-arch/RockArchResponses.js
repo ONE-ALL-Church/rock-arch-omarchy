@@ -7,6 +7,7 @@
 function accept(root, ui, line) {
     var response
     try { response = JSON.parse(line) } catch (e) {
+      if (root.personalLink) root.personalLink.interrupted()
       root.finishSetup()
       root.onboardingInProgress = false
       root.onboardingSetupPending = false
@@ -25,7 +26,12 @@ function accept(root, ui, line) {
       root.shortcut.accept(response.shortcut)
       return
     }
+    if (response && response.personalLink) {
+      root.personalLink.accept(response.personalLink)
+      return
+    }
     if (!response || response.ok !== true) {
+      if (root.personalLink) root.personalLink.interrupted()
       var onboardingSetupFailed = root.onboardingSetupPending
       root.onboardingSetupPending = false
       root.finishSetup()

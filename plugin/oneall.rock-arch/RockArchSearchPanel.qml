@@ -51,7 +51,7 @@ Column {
 
         Column {
           anchors.left: parent.left
-          anchors.right: openButton.visible ? openButton.left : parent.right
+          anchors.right: saveButton.visible ? saveButton.left : (openButton.visible ? openButton.left : parent.right)
           anchors.verticalCenter: parent.verticalCenter
           anchors.leftMargin: Style.spacing.rowPaddingX
           anchors.rightMargin: Style.spacing.rowPaddingX
@@ -93,6 +93,20 @@ Column {
             searchPanel.controller.resultCursor = resultRow.index
             searchPanel.controller.activateResult(resultRow.index)
           }
+        }
+
+        Button {
+          id: saveButton
+          visible: openButton.visible && searchPanel.controller.resultsAreCurrent
+          anchors.right: openButton.left
+          anchors.rightMargin: Style.spacing.xs
+          anchors.verticalCenter: parent.verticalCenter
+          text: "Save"
+          tooltipText: "Save to Personal Links · Ctrl+S"
+          fontSize: Style.font.caption
+          focusable: true
+          z: 2
+          onClicked: searchPanel.controller.beginPersonalLink(resultRow.modelData.safeId)
         }
 
         Button {

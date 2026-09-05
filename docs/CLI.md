@@ -136,10 +136,41 @@ rock-arch search GUID --entity people
 rock-arch person SAFE_ID
 rock-arch links personal
 rock-arch links recent
+rock-arch links sections
 rock-arch open SAFE_ID --confirm
 rock-arch links activate SAFE_ID --confirm
 rock-arch links clear --confirm
 ```
+
+Save a Search result to your Rock Personal Links:
+
+```bash
+rock-arch links add --from SAFE_ID --dry-run
+rock-arch links add --from SAFE_ID --section SECTION_SAFE_ID --confirm
+```
+
+For a manual link, send a JSON object privately through stdin:
+
+```bash
+rock-arch links add --stdin --confirm <<'JSON'
+{"name":"People directory","url":"/page/42"}
+JSON
+```
+
+The object accepts `name`, `url` **or** `safeId`, and optional `sectionId`.
+Using `safeId` prefills the result's name and URL; `name` can override the
+prefilled name. `links sections` returns opaque IDs for the active account's
+private sections. Omit the section to use Links if present, otherwise the first
+personal section. If none exist, Save creates a private Links section first.
+Section IDs expire on profile changes or broker restart; fetch them again then.
+
+`--dry-run` validates the input and reads account/section information but creates
+nothing. A save requires `--confirm`, checks for an existing URL in the section,
+and reads back a newly created record before reporting `saved: true`.
+`alreadySaved: true` means the existing bookmark was retained. An uncertain
+save returns `personal_link_save_uncertain`; check `links personal` before an
+explicit retry. The client never repeats a POST automatically. Shared sections,
+other owners, edits, and deletes are outside this command's scope.
 
 The first two search forms read at most 8 KiB from stdin. With no query, an
 interactive terminal prompts for it; redirected stdin is read automatically.

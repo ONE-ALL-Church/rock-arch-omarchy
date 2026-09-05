@@ -94,6 +94,16 @@ def protocol_schema() -> dict[str, Any]:
             "ui",
         ],
         "settings": settings_schema(),
+        "personalLinks": {
+            "sections": "rock-arch links sections",
+            "add": "rock-arch links add --stdin --confirm",
+            "saveResult": "rock-arch links add --from SAFE_ID --confirm",
+            "input": {"name": "bookmark name, at most 100 UTF-16 units", "url": "URL on the active Rock instance",
+                      "safeId": "alternative to URL; prefills a current Rock result", "sectionId": "optional section safeId"},
+            "preview": "Use --dry-run for validated details without saving.",
+            "scope": "Current user's private sections only; creates a private Links section when none exist.",
+            "retries": "Never automatically repeat a save after an uncertain result. Check links first.",
+        },
         "buildStatus": {
             "source": "local receipt",
             "terminalState": "accepted",

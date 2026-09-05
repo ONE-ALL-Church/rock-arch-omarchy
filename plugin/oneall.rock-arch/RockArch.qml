@@ -41,6 +41,9 @@ Panel {
   property bool preferenceAutomaticUpdates: false
   property bool preferenceOnboardingSetupCompleted: false
   property alias shortcut: shortcutModel
+  property alias personalLink: personalLinkModel
+  property string personalLinkReturnView: "personal"
+  property var pendingPersonalLinkSelection: null
   property bool onboardingSetupPending: false
   property bool onboardingSetupPrepared: false
   property bool onboardingAutomaticUpdates: false
@@ -391,6 +394,7 @@ Panel {
   }
 
   function escapePanel() {
+    if (personalLinkModel.editing) { personalLinkModel.cancel(); return }
     if (searchHints.visible && searchHints.inputActive) {
       if (searchHints.expanded) searchHints.expanded = false
       else searchField.forceActiveFocus(Qt.TabFocusReason)
@@ -518,6 +522,20 @@ Panel {
   }
   function refreshQuickReturns() { request({op: "navigation_status", section: "quick_returns"}) }
   function refreshPersonalLinks() { request({op: "navigation_status", section: "personal"}) }
+  function beginPersonalLink(safeId) {
+    if (!rockConfigured || contextName !== "PROD" || personalLinkModel.saving) return
+    personalLinkReturnView = viewMode
+    viewMode = "personal"
+    feedbackText = ""
+    broker.dropPersonalLinkRequests()
+    personalLinkModel.begin(safeId || "")
+    panelFlick.contentY = 0
+  }
+  function saveSearchLink() {
+    if (viewMode !== "search" || !resultsAreCurrent || !results.length) return
+    var result = results[resultCursor >= 0 ? resultCursor : 0]
+    if (result.canOpen === true) beginPersonalLink(result.safeId)
+  }
   function revealItem(item) {
     if (!item) return
     var point = item.mapToItem(body, 0, 0)
@@ -1250,6 +1268,9 @@ Panel {
     }
     else {
       shortcutModel.closed()
+      personalLinkModel.closed()
+      pendingPersonalLinkSelection = null
+      broker.dropPersonalLinkRequests()
       dropQueuedCredentialRequests()
       panelCleanupTimer.restart()
     }
@@ -1263,15 +1284,48 @@ Panel {
     }
   }
 
+  onActiveProfileIdChanged: { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onRockConfiguredChanged: if (!rockConfigured) { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onViewModeChanged: if (viewMode !== "personal") { personalLinkModel.closed(); broker.dropPersonalLinkRequests() }
+  onContextNameChanged: { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+
+  RockArchPersonalLinkState {
+    id: personalLinkModel
+    onRequested: function(payload) { root.request(payload) }
+    onFocusRequested: Qt.callLater(function() {
+      if (personalLinkModel.editing) personalLinkEditor.nameField.forceActiveFocus(Qt.TabFocusReason)
+    })
+    onCancelled: {
+      broker.dropPersonalLinkRequests()
+      if (root.personalLinkReturnView === "search") root.focusSearch()
+      else { root.selectPersonalLink(0); Qt.callLater(function() { personalPanel.addButton.forceActiveFocus(Qt.TabFocusReason) }) }
+    }
+    onSaved: function(alreadySaved, name, section) {
+      root.pendingPersonalLinkSelection = {name: name, section: section}
+      root.selectPersonalLink(0)
+      root.refreshPersonalLinks()
+      root.feedbackText = alreadySaved ? "Already in Personal Links" : "Saved to Personal Links"
+      personalLinkNoticeTimer.restart()
+    }
+  }
+
   RockArchBroker {
     id: broker
     packageRoot: root.packageRoot
     socketPath: root.socketPath
     onReceived: function(line) { root.accept(line) }
-    onInterrupted: { AccountResponses.interrupted(root); shortcutModel.interrupted() }
+    onInterrupted: {
+      AccountResponses.interrupted(root); shortcutModel.interrupted()
+      personalLinkModel.interrupted(); broker.dropPersonalLinkRequests()
+    }
   }
 
   Timer { id: searchTimer; interval: 160; onTriggered: root.refreshSearch() }
+  Timer {
+    id: personalLinkNoticeTimer
+    interval: 4000
+    onTriggered: if (root.feedbackText === "Saved to Personal Links" || root.feedbackText === "Already in Personal Links") root.feedbackText = ""
+  }
   Timer { id: knowledgeSearchTimer; interval: 400; onTriggered: root.refreshKnowledgeSearch() }
   Timer {
     interval: 60000
@@ -1341,6 +1395,8 @@ Panel {
   Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Items"); onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
+  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD"; onActivated: root.beginPersonalLink("") }
+  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && (personalLinkModel.editing || root.viewMode === "search"); onActivated: { if (personalLinkModel.editing) personalLinkModel.save(); else root.saveSearchLink() } }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(0) }
   Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(1) }
@@ -1369,11 +1425,11 @@ Panel {
     RockArchKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings" ||
+      formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings" || personalLinkModel.editing ||
         root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null ||
         (root.viewMode === "knowledge" && root.knowledgeDetail !== null)
       commandMode: root.magnusPreviewCommandsEnabled
-      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive ||
+      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive ||
         finishSetupPanel.inputActive || settingsPanel.inputActive || magnusPanel.inputActive ||
         knowledgePanel.queryField.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 ||
@@ -1584,9 +1640,18 @@ Panel {
 
             RockArchPersonalPanel {
               id: personalPanel
-              visible: !root.onboardingFlowActive && root.viewMode === "personal"
+              visible: !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing
               width: body.width
               controller: root
+            }
+
+            RockArchPersonalLinkEditor {
+              id: personalLinkEditor
+              width: body.width
+              visible: !root.onboardingFlowActive && root.viewMode === "personal" && personalLinkModel.editing
+              controller: root
+              model: personalLinkModel
+              Keys.onEscapePressed: personalLinkModel.cancel()
             }
 
             RockArchKnowledgePanel {

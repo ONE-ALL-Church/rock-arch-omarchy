@@ -5,6 +5,17 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+### Added
+
+- Add Personal Links directly from Links, or prefill a bookmark from Search.
+  Use Ctrl+N in Links and Ctrl+S to prepare or save a bookmark. Select and reveal
+  the saved link after refreshing.
+- Expose personal sections and confirmed additions through the JSON CLI, with
+  private stdin input, search-result prefilling, and a read-only dry run.
+- Scope saves to the signed-in account's private sections, recheck ownership,
+  validate the Rock URL, verify the saved record, and prevent automatic replay.
+  An explicit retry detects an existing URL in the selected section.
+
 ## [0.26.0] - 2026-09-05
 
 ### Security

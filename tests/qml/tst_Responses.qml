@@ -94,6 +94,37 @@ TestCase {
     compare(state.feedbackText, "")
   }
 
+  function test_personal_link_error_stays_in_editor_without_resetting_search() {
+    state.searchInFlight = true
+    state.personalLink = {accept: function(value) { calls.push(value.error) }}
+    accept({ok: false, error: "personal_link_save_uncertain", personalLink: {
+      requestId: "test", error: "personal_link_save_uncertain"
+    }})
+    verify(state.searchInFlight)
+    compare(state.feedbackText, "")
+    verify(calls.indexOf("personal_link_save_uncertain") >= 0)
+  }
+
+  function test_malformed_response_releases_pending_link_save() {
+    state.personalLink = {interrupted: function() { calls.push("linkInterrupted") }}
+    Responses.accept(state, ui, "not JSON")
+    verify(calls.indexOf("linkInterrupted") >= 0)
+  }
+
+  function test_saved_link_is_selected_after_refresh_instead_of_first_row() {
+    state.viewMode = "personal"
+    state.linkCursor = 0
+    state.navigationCount = 2
+    state.pendingPersonalLinkSelection = {name: "Saved page", section: "Work"}
+    accept({ok: true, personalLinks: [
+      {title: "Another page", section: "Work", isShared: false},
+      {title: "Saved page", section: "Work", isShared: false}
+    ]})
+    compare(state.linkCursor, 1)
+    compare(state.pendingPersonalLinkSelection, null)
+    verify(calls.indexOf("reveal:1") >= 0)
+  }
+
   function test_refresh_preserves_selected_record_after_reordering() {
     state.query = state.resultsQuery = state.searchInFlightQuery = "query"
     state.searchInFlight = true

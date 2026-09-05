@@ -335,6 +335,11 @@ class RockRestReadOnlyAdapter:
         self._search_capabilities_deadline = 0.0
         self._search_capabilities_loaded = False
 
+    def invalidate_personal_links(self) -> None:
+        self._personal_links_loaded = False
+        self._personal_links_cache = []
+        self._personal_links_cache_deadline = 0.0
+
     def searchable_categories(
         self, force_refresh: bool = False
     ) -> SearchCapabilities:

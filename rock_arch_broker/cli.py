@@ -300,10 +300,17 @@ def _parser() -> argparse.ArgumentParser:
     knowledge_open.add_argument("safe_id")
     _confirmation(knowledge_open)
 
-    links = commands.add_parser("links", help="list or activate Rock links")
+    links = commands.add_parser("links", help="list, save, or activate Rock links")
     link_commands = links.add_subparsers(dest="links_command", required=True)
     link_commands.add_parser("personal", help="list Personal Links")
     link_commands.add_parser("recent", help="list Recent Links")
+    link_commands.add_parser("sections", help="list your writable Personal Link sections")
+    link_add = link_commands.add_parser("add", help="save a Personal Link to your Rock account")
+    link_input = link_add.add_mutually_exclusive_group(required=True)
+    link_input.add_argument("--stdin", action="store_true", help="read name, URL or safeId, and optional sectionId as JSON")
+    link_input.add_argument("--from", dest="source_id", help="prefill from an opaque Rock search result")
+    link_add.add_argument("--section", help="a section safeId returned by links sections")
+    _confirmation(link_add)
     link_clear = link_commands.add_parser("clear", help="clear local Recent Links")
     _confirmation(link_clear)
     link_activate = link_commands.add_parser(
@@ -588,6 +595,12 @@ def _knowledge_request(
 
 
 def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
+    if args.links_command == "sections":
+        response = client.request({"op": "personal_link_prepare"})
+        draft = response["personalLink"]
+        return {"ok": True, "sections": draft["sections"], "defaultSectionId": draft["sectionId"]}
+    if args.links_command == "add":
+        return _add_personal_link(args, client)
     if args.links_command in {"personal", "recent"}:
         section = "personal" if args.links_command == "personal" else "quick_returns"
         return client.request({"op": "navigation_status", "section": section})
@@ -602,6 +615,47 @@ def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, 
     return client.request(
         {"op": "activate_recent", "safeId": args.safe_id, "confirmed": True}
     )
+
+
+def _add_personal_link(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
+    if not args.dry_run:
+        _require_confirmation(args)
+    if args.stdin:
+        try:
+            raw = sys.stdin.read(MAX_QUERY_INPUT_BYTES + 1).encode("utf-8")
+            if len(raw) > MAX_QUERY_INPUT_BYTES:
+                raise CliError("personal_link_input_too_large", 2)
+            value = decode_bounded_json(raw)
+        except (UnicodeError, HttpSecurityError):
+            raise CliError("personal_link_input_invalid", 2) from None
+        if not isinstance(value, dict) or not set(value).issubset({"name", "url", "safeId", "sectionId"}) or any(not isinstance(item, str) for item in value.values()):
+            raise CliError("personal_link_input_invalid", 2)
+        if ("url" in value) == ("safeId" in value) or ("url" in value and not value.get("name", "").strip()):
+            raise CliError("personal_link_input_invalid", 2)
+    else:
+        value = {"safeId": args.source_id}
+    if args.section is not None and "sectionId" in value:
+        raise CliError("personal_link_input_conflict", 2)
+    section_id = args.section if args.section is not None else value.pop("sectionId", None)
+    if not value.get("url", value.get("safeId", "")).strip():
+        raise CliError("personal_link_input_invalid", 2)
+    response = client.request({"op": "personal_link_prepare", **value})
+    draft = response["personalLink"]
+    section_id = section_id if section_id is not None else draft["sectionId"]
+    section = next((item for item in draft["sections"] if item["safeId"] == section_id), None)
+    if section is None:
+        raise CliError("personal_link_section_changed", 2)
+    if args.dry_run:
+        return {"ok": True, "dryRun": {
+            "action": "addPersonalLink", "name": draft["name"], "url": draft["url"],
+            "section": section["name"], "confirmationRequired": True,
+            "sideEffects": ["creates_personal_bookmark_in_rock"] + (
+                ["creates_private_links_section"] if section_id == "new-links" else []
+            ), "executed": False,
+        }}
+    return client.request({"op": "personal_link_save", "draftId": draft["draftId"],
+                           "name": draft["name"], "url": draft["url"],
+                           "sectionId": section_id, "confirmed": True})
 
 
 def _profiles_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:

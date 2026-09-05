@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 
@@ -9,13 +10,23 @@ Column {
 
   required property var controller
   property alias repeater: personalLinkRepeater
+  property alias addButton: addLinkButton
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
 
-  PanelSectionHeader {
-    text: "PERSONAL LINKS"
+  RowLayout {
+    width: parent.width
+    PanelSectionHeader { text: "PERSONAL LINKS"; Layout.fillWidth: true }
+    Button {
+      id: addLinkButton
+      text: "Add link"
+      tooltipText: "Add a Personal Link · Ctrl+N"
+      focusable: true
+      visible: personalPanel.controller.rockConfigured && personalPanel.controller.contextName === "PROD"
+      onClicked: personalPanel.controller.beginPersonalLink("")
+    }
   }
 
   Column {
@@ -45,7 +56,7 @@ Column {
       text: personalPanel.controller.contextName !== "PROD"
         ? "Return to Search to browse preview data."
         : personalPanel.controller.rockConfigured
-          ? "Bookmarks saved in Rock will appear here."
+          ? "Add a link here or save a Search result. Bookmarks saved in Rock also appear here."
           : "Open Settings to sign in."
       textFormat: Text.PlainText
       color: personalPanel.dim

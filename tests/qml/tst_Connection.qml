@@ -72,6 +72,15 @@ TestCase {
     compare(connection.requestQueue.length, 0)
   }
 
+  function test_cancelling_a_link_discards_unsent_forms_and_saves() {
+    connection.request({op: "personal_link_prepare", name: "private"})
+    connection.request({op: "personal_link_save", draftId: "one-use", confirmed: true})
+    connection.request({op: "status"})
+    connection.dropPersonalLinkRequests()
+    socket.connected = true
+    compare(socket.messages, [{op: "status"}])
+  }
+
   function test_interrupted_capability_probe_recovers_once() {
     var state = {
       searchCapabilitiesInFlight: true,

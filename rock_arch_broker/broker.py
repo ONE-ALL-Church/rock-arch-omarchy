@@ -27,6 +27,7 @@ from .mock_adapter import MockAdapter
 from .navigation import NavigationTarget, open_rock_url
 from .notifications import notify_build_accepted
 from .origin import DEFAULT_ROCK_ORIGIN
+from .personal_links import PersonalLinkManager
 from .profiles import ProfileError, ProfileStore, RockProfile
 from .quick_return import QuickReturnStore
 from .rock_kb_adapter import (
@@ -120,6 +121,8 @@ class LiveReadAdapter(Protocol):
 
     def personal_links(self, force_refresh: bool = False) -> list[dict[str, Any]]: ...
 
+    def invalidate_personal_links(self) -> None: ...
+
     def resolve(self, safe_id: str) -> NavigationTarget | None: ...
 
     def set_origin(self, origin: str) -> None: ...
@@ -156,6 +159,7 @@ class Broker:
         session: RockSessionStatusProvider | None = None,
         magnus: MagnusStatusProvider | None = None,
         live: LiveReadAdapter | None = None,
+        personal_links: PersonalLinkManager | None = None,
         knowledge: KnowledgeProvider | None = None,
         quick_returns: QuickReturnStore | None = None,
         build_receipts: BuildReceiptStore | None = None,
@@ -207,6 +211,8 @@ class Broker:
         )
         if live and self._origin:
             self._live.set_origin(self._origin)
+        self._personal_links = personal_links or PersonalLinkManager(self._session)
+        self._personal_links.set_origin(self._origin)
         self._knowledge = knowledge or RockKbReadOnlyAdapter()
         self._quick_root = (
             state_file.parent
@@ -504,6 +510,7 @@ class Broker:
         )
 
     def _activate_profile(self, profile: RockProfile | None) -> None:
+        self._personal_links.set_origin(profile.origin if profile else None)
         if profile is None:
             self._active_profile_id = ""
             self._origin = None
