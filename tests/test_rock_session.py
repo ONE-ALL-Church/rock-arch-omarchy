@@ -3,13 +3,13 @@ import unittest
 from email.message import Message
 from unittest.mock import patch
 
-from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.rock_session import (
+from rock_arch_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_arch_broker.rock_session import (
     RockSessionError,
     RockSessionHttpClient,
     RockSessionProvider,
 )
-from rock_lens_broker.secret_store import SecretToolStore
+from rock_arch_broker.secret_store import SecretToolStore
 
 
 class FakeSecretStore:

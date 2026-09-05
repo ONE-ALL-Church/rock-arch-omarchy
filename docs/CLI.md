@@ -10,8 +10,10 @@ Arch does not overwrite it and reports the conflict in Settings.
 Terminal and agent access is enabled by default and can be disabled in
 **Settings**. It is intentionally not another onboarding decision: enabling it
 does not open a TCP port or allow another OS user through the owner-only socket.
-When disabled, the command stays installed but its official requests return
-`terminal_access_disabled`, so the user has a clear recovery path.
+When disabled, Rock commands return `terminal_access_disabled`. Local settings
+and shortcut management remain available, including
+`rock-arch settings set terminalAccess true` to restore access. Settings reads
+return preferences only, without profile identities or Rock data.
 
 The local Unix account remains the security boundary. The preference controls
 the supported CLI, not hostile software already running as that same account.
@@ -55,8 +57,9 @@ command. IDs are intentionally invalidated when the broker restarts.
 
 ## Login and profiles
 
-Login is interactive. The password is read by a masked prompt and is never a
-CLI argument or part of JSON output.
+Login normally uses a masked prompt. Agents can use `login --stdin` or
+`profiles add --stdin` to supply a bounded JSON object through stdin. Passwords
+are never CLI arguments or part of JSON output.
 
 ```bash
 rock-arch login
@@ -71,7 +74,56 @@ rock-arch profiles remove PROFILE_ID --confirm
 
 `login` updates the active profile. When no profile exists, it asks for profile
 name and domain before the username and masked password. `profiles add` also
-prompts for any omitted non-secret fields and always prompts for the password.
+prompts for any omitted non-secret fields and prompts for the password.
+
+For `login --stdin`, supply `username` and `password`; also include `name` and
+`domain` when there is no active profile. `profiles add --stdin` requires all
+four string fields. Input is limited to 8 KiB. Deliver it through a protected
+stdin channel, rather than embedding credentials in shell command text or
+arguments. Unknown fields and conflicting input modes are rejected.
+
+## Settings and keyboard shortcuts
+
+```bash
+rock-arch settings get
+rock-arch settings schema
+rock-arch settings set showPersonContext false
+rock-arch settings set enabledCategories '["People","Groups"]'
+rock-arch settings set tabOrder '["knowledge","search","personal","magnus"]'
+rock-arch settings set --stdin
+```
+
+The final form reads a JSON object such as:
+
+```json
+{"tabOrder":["knowledge","search","personal","magnus"],"recentLinks":false}
+```
+
+Changes use the same preference store and validation as the panel. A batch
+either saves completely or changes nothing. The offline schema lists every
+editable preference, type, default, and allowed category/tab ID. Internal
+onboarding flags are not editable settings. Tab order must contain every tab
+ID exactly once; `personal` is the Links tab. Numbered shortcuts follow the
+visible order, with unavailable tabs omitted; Settings uses `Ctrl+,`.
+
+Successful changes request a panel refresh without opening it. `panelRefreshed`
+indicates whether the running shell accepted that request; saved preferences
+also load the next time the panel opens. Hiding the menu icon requires an
+existing working shortcut.
+
+```bash
+rock-arch shortcuts status
+rock-arch shortcuts check 'Super + Shift + R'
+rock-arch shortcuts set 'Super + Shift + R' --dry-run
+rock-arch shortcuts set 'Super + Shift + R' --confirm
+rock-arch shortcuts remove --confirm
+```
+
+Shortcut changes use a fresh revision check, conflict detection, backup,
+Hyprland reload verification, and rollback from the panel's shortcut manager.
+Existing manual bindings are never replaced. Removal restores the menu icon.
+`status` and `check` return structured shortcut state; failed set/remove
+operations return nonzero and a stable error code.
 
 ## Rock search and links
 
@@ -182,3 +234,15 @@ Rock Arch stages a one-time view/query payload in the owner-only broker and
 then calls the canonical `omarchy-shell` IPC target with fixed arguments. Query
 text is never placed in the Omarchy command arguments. The panel consumes the
 payload once; an unclaimed payload is erased after 30 seconds.
+
+## Legacy module commands
+
+`python3 -m rock_arch_broker rock status|login` and
+`python3 -m rock_arch_broker magnus status|configure` are deprecated aliases.
+They print migration guidance on stderr and use the supported broker client,
+JSON output, and exit codes. `magnus configure` maps to `rock-arch login`.
+
+The raw-path `magnus ls|cat|hash` module commands now exit with status 2 and
+instructions to use `rock-arch magnus browse` plus opaque IDs. They do not start
+a broker, access the keyring or network, or write an output file. See
+[MAGNUS.md](MAGNUS.md) for replacement commands.

@@ -7,14 +7,14 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.cli import (
+from rock_arch_broker.cli import (
     BrokerClient,
     CliError,
     _parser,
     _request,
     run,
 )
-from rock_lens_broker.terminal_access import CLI_CLIENT
+from rock_arch_broker.terminal_access import CLI_CLIENT
 
 
 class FakeClient:
@@ -53,6 +53,41 @@ class FakeConnection:
 
 
 class RockArchCliTests(unittest.TestCase):
+    @patch("rock_arch_broker.cli._omarchy_shell")
+    def test_settings_values_and_atomic_json_batch_use_the_broker(self, refresh):
+        client = FakeClient()
+        _request(_parser().parse_args(["settings", "set", "recentLinks", "false"]), client)
+        with patch("sys.stdin", io.StringIO('{"tabOrder":["knowledge","search","personal","magnus"],"showPersonContext":false}')):
+            _request(_parser().parse_args(["settings", "set", "--stdin"]), client)
+        self.assertEqual(client.calls[0], {"op": "settings_update", "settings": {"recentLinks": False}})
+        self.assertEqual(client.calls[1]["settings"]["tabOrder"], ["knowledge", "search", "personal", "magnus"])
+        self.assertEqual(refresh.call_count, 2)
+
+    def test_settings_schema_is_offline_and_invalid_input_never_reaches_broker(self):
+        client = FakeClient()
+        schema = _request(_parser().parse_args(["settings", "schema"]), client)["schema"]
+        self.assertIn("tabOrder", schema["fields"])
+        self.assertNotIn("onboardingSetupCompleted", schema["fields"])
+        for raw in ("not json", "[]", "{}", '{"unknown":true}', "[" * 20000, "\udcff"):
+            with self.subTest(raw=raw[:40]), patch("sys.stdin", io.StringIO(raw)), self.assertRaises(CliError):
+                _request(_parser().parse_args(["settings", "set", "--stdin"]), client)
+        self.assertEqual(client.calls, [])
+
+    @patch("rock_arch_broker.cli._omarchy_shell")
+    def test_shortcut_set_rechecks_revision_and_requires_confirmation(self, refresh):
+        class ShortcutClient(FakeClient):
+            def request(self, payload):
+                self.calls.append(payload)
+                return {"ok": True, "shortcut": {"state": "available", "editable": True, "revision": "current-revision"}}
+
+        client = ShortcutClient()
+        with self.assertRaisesRegex(CliError, "confirmation_required"):
+            _request(_parser().parse_args(["shortcuts", "set", "Super+R"]), client)
+        self.assertEqual(client.calls, [])
+        _request(_parser().parse_args(["shortcuts", "set", "Super+R", "--confirm"]), client)
+        self.assertEqual(client.calls[-1], {"op": "shortcut_install", "combo": "Super+R", "revision": "current-revision", "confirmed": True})
+        refresh.assert_called_once_with("preferences")
+
     def test_search_and_knowledge_commands_map_to_broker_operations(self):
         client = FakeClient()
 
@@ -74,6 +109,26 @@ class RockArchCliTests(unittest.TestCase):
                 {"op": "magnus_hash", "safeId": "opaque-file"},
             ],
         )
+
+    def test_stdin_credentials_are_private_and_do_not_prompt(self):
+        credentials = {"name": "Demo", "domain": "demo.example.org", "username": "fixture", "password": "synthetic-password"}
+        output = io.StringIO()
+        with (
+            patch("sys.stdin", io.StringIO(json.dumps(credentials))),
+            patch("getpass.getpass") as password_prompt,
+            patch.object(BrokerClient, "request", return_value={"ok": True}) as request,
+            redirect_stdout(output),
+        ):
+            self.assertEqual(run(["profiles", "add", "--stdin"]), 0)
+        request.assert_called_once_with({"op": "profile_add", **credentials})
+        password_prompt.assert_not_called()
+        self.assertNotIn("synthetic-password", output.getvalue())
+        for raw in ('{"password":"secret"}', '{"username":"u","password":"p","unknown":true}', "x" * 9000,
+                    "\udcff", '{"username":"u","password":"\\ud800"}'):
+            client = FakeClient()
+            with patch("sys.stdin", io.StringIO(raw)), self.assertRaises(CliError):
+                _request(_parser().parse_args(["login", "--stdin"]), client)
+            self.assertEqual(client.calls, [])
 
     def test_login_is_interactive_and_password_has_no_argument(self):
         parser = _parser()
@@ -221,7 +276,7 @@ class RockArchCliTests(unittest.TestCase):
         client = FakeClient()
         with (
             patch("sys.stdin", io.StringIO("private person name\n")),
-            patch("rock_lens_broker.cli._omarchy_shell") as shell,
+            patch("rock_arch_broker.cli._omarchy_shell") as shell,
         ):
             response = _request(
                 _parser().parse_args(["ui", "open", "search", "--stdin"]),

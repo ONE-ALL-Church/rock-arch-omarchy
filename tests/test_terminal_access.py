@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.terminal_access import (
+from rock_arch_broker.terminal_access import (
     CLI_LAUNCHER_MARKER,
     TerminalAccessManager,
 )
@@ -32,7 +32,7 @@ class TerminalAccessManagerTests(unittest.TestCase):
         self.assertIn(CLI_LAUNCHER_MARKER, content)
         self.assertIn(str(self.plugin_root), content)
         with patch(
-            "rock_lens_broker.terminal_access.shutil.which",
+            "rock_arch_broker.terminal_access.shutil.which",
             return_value=str(self.launcher),
         ):
             status = manager.status(enabled=True)

@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+runner=/usr/lib/qt6/bin/qmltestrunner
+if [[ ! -x $runner ]]; then
+  runner=$(command -v qmltestrunner) || {
+    echo "Qt 6 qmltestrunner is required (qt6-declarative on Omarchy)." >&2
+    exit 1
+  }
+fi
+export QT_QPA_PLATFORM=offscreen
+export QT_QUICK_BACKEND=software
+exec "$runner" -input tests/qml -import plugin/oneall.rock-arch "$@"

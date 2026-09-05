@@ -4,16 +4,16 @@ import unittest
 import urllib.error
 from contextlib import contextmanager
 
-from rock_lens_broker.navigation import NavigationError, validate_rock_url
-from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.rock_rest_adapter import (
+from rock_arch_broker.navigation import NavigationError, validate_rock_url
+from rock_arch_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_arch_broker.rock_rest_adapter import (
     MAX_RESPONSE_BYTES,
     SEARCH_SPECS,
     RockRestError,
     RockRestHttpClient,
     RockRestReadOnlyAdapter,
 )
-from rock_lens_broker.version import HTTP_USER_AGENT
+from rock_arch_broker.version import HTTP_USER_AGENT
 
 
 class FakeCookieProvider:

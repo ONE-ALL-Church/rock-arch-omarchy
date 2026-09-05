@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.navigation import NavigationTarget
-from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.quick_return import MAX_QUICK_RETURNS, QuickReturnStore
+from rock_arch_broker.navigation import NavigationTarget
+from rock_arch_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_arch_broker.quick_return import MAX_QUICK_RETURNS, QuickReturnStore
 
 
 class QuickReturnTests(unittest.TestCase):

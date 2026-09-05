@@ -2,11 +2,15 @@
 
 ## Components
 
-1. `plugin/oneall.rock-arch`: a thin Quickshell controller composed from
+1. `plugin/oneall.rock-arch`: a Quickshell panel controller composed from
    focused Login, Search, Personal Links, Magnus, Settings, and navigation QML
    components. Shared key handling and selection chrome remain independent
-   primitives.
-2. `rock_lens_broker`: an allowlist-based local broker using an owner-only Unix
+   primitives. `RockArchBroker.qml` owns the Python process and Unix socket;
+   `RockArchConnection.qml` owns request coalescing, credential-queue cleanup,
+   and retries. `RockArchResponses.js` preserves response ordering and delegates
+   account, search/Knowledge/links, and Magnus updates to focused modules with
+   explicit controller and UI dependencies.
+2. `rock_arch_broker`: an allowlist-based local broker using an owner-only Unix
    socket (`0700` directory, `0600` socket).
 3. `rock-arch`: an owner-local, JSON-producing terminal and agent client for
    the same broker. It adds no independent HTTP or credential implementation.
@@ -40,7 +44,28 @@
 14. `UpdateManager`: daily public-Git revision checks plus a fixed detached
     worker that delegates installation, validation, rollback, and shell restart
     to Omarchy. Automatic installation is an explicit preference and defaults
-    to off.
+   to off.
+15. `ShortcutManager`: optional owner-local Lua shortcut edits. The UI model
+    and shared setup controls live in `RockArchShortcut.qml` and
+    `RockArchShortcutSettings.qml`. `shortcut_keymap.py` resolves physical
+    bindings through Hyprland's reported XKB layouts and its existing
+    libxkbcommon runtime library.
+
+Shortcut operations use fixed names (`shortcut_status`, `shortcut_install`,
+`shortcut_remove`) and a fixed Rock Arch summon command. Mutations require
+explicit confirmation, an installed plugin, PROD context, a fresh revision of
+the config and active bindings, and an unoccupied combination. The broker
+refuses symlinks, unsafe ownership/permissions, changed managed blocks, and
+unknown configuration/keymap shapes. It serializes its writers, preserves
+unrelated bytes, keeps an owner-only backup, atomically replaces the file,
+reloads Hyprland and verifies activation. Failed reloads roll back only if no
+concurrent file edit would be overwritten. The UI reports the configured
+binding and offers Change/Remove for managed shortcuts. Shortcut responses
+never reset Rock login/onboarding state.
+
+The broker module's legacy login/status aliases forward to the supported CLI.
+Retired raw-path diagnostic commands return migration guidance before creating
+a client. There is one supported command path for profile and session changes.
 
 ## Trust boundary
 
@@ -67,8 +92,10 @@ PATH-selected executable at this credential boundary.
 
 The supported terminal client validates the owner and permissions of the same
 socket and its directory, bounds responses to 5 MiB, and adds an explicit
-official-client marker. The broker refuses marked terminal requests when the
-default-on `terminalAccess` preference is disabled. This preference is a
+official-client marker. The broker refuses marked Rock requests when the
+default-on `terminalAccess` preference is disabled. Owner-local settings and
+shortcut management remain available for configuration and recovery; settings
+reads return no profile identities or Rock data. This preference is a
 supported-client control, not a sandbox against hostile software already
 running as the same Unix account. The Unix account remains the OS security
 boundary.
@@ -199,7 +226,7 @@ authoritative server-side boundary.
 ## Public Rock Knowledge boundary
 
 Public Knowledge search is a separate trust path from live Rock search. A
-dedicated Knowledge workspace and `Alt+K` own the external query flow. The
+dedicated Knowledge workspace and `Ctrl+3` (default order) own the external query flow. The
 leading `kb:` and `knowledge:` prefixes remain quiet main-Search transitions:
 QML moves their remainder into Knowledge before dispatch, so normal unscoped
 and entity-prefixed Rock text can never reach the external service.

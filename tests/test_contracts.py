@@ -1,6 +1,6 @@
 import unittest
 
-from rock_lens_broker.contracts import sanitize_text
+from rock_arch_broker.contracts import sanitize_text
 
 
 class ContractSanitizationTests(unittest.TestCase):

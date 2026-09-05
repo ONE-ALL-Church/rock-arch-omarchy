@@ -3,7 +3,7 @@ import tomllib
 import unittest
 from pathlib import Path
 
-from rock_lens_broker.version import HTTP_USER_AGENT, VERSION
+from rock_arch_broker.version import HTTP_USER_AGENT, VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -47,10 +47,10 @@ class ReleaseContractTests(unittest.TestCase):
 
         self.assertEqual(
             pyproject["project"]["scripts"]["rock-arch"],
-            "rock_lens_broker.cli:main",
+            "rock_arch_broker.cli:main",
         )
-        self.assertTrue((ROOT / "rock_lens_broker/cli.py").is_file())
-        self.assertTrue((ROOT / "rock_lens_broker/terminal_access.py").is_file())
+        self.assertTrue((ROOT / "rock_arch_broker/cli.py").is_file())
+        self.assertTrue((ROOT / "rock_arch_broker/terminal_access.py").is_file())
         self.assertTrue((ROOT / "docs/CLI.md").is_file())
         self.assertIn("docs/CLI.md", readme)
 
@@ -64,14 +64,14 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("# Rock Arch — Bridging Rock RMS and Omarchy", readme)
 
     def test_obsolete_openid_surface_is_not_distributed(self):
-        self.assertFalse((ROOT / "rock_lens_broker/auth.py").exists())
+        self.assertFalse((ROOT / "rock_arch_broker/auth.py").exists())
         self.assertFalse((ROOT / "tests/test_auth.py").exists())
-        main = (ROOT / "rock_lens_broker/__main__.py").read_text(encoding="utf-8")
+        main = (ROOT / "rock_arch_broker/__main__.py").read_text(encoding="utf-8")
         self.assertNotIn('sys.argv[1] == "configure"', main)
 
     def test_ci_dependencies_and_broker_interpreter_are_pinned(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        qml = (ROOT / "plugin/oneall.rock-arch/RockLens.qml").read_text(
+        qml = (ROOT / "plugin/oneall.rock-arch/RockArchBroker.qml").read_text(
             encoding="utf-8"
         )
 
@@ -81,7 +81,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("uvx --from ruff==", workflow)
         self.assertIn("uvx --from ty==", workflow)
         self.assertIn(
-            'command: ["/usr/bin/python3", "-m", "rock_lens_broker"]', qml
+            'command: ["/usr/bin/python3", "-m", "rock_arch_broker"]', qml
         )
 
 

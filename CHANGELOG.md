@@ -5,6 +5,67 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-05
+
+### Security
+
+- Preserve every existing file when Magnus exhausts download filename choices;
+  failed downloads remove only a file created by that attempt.
+- Recheck the current automatic-update preference after background checks,
+  so switching it off prevents a pending check from installing an update.
+- Reject non-finite JSON numbers, oversized integer literals, invalid cookie
+  characters, and malformed navigation authorities with stable errors. Handle
+  malformed HTTP responses without exposing parser details or dropping requests.
+- Finish failed update checks with an error state when Git output cannot be
+  decoded, and limit displayed version strings to 64 characters.
+- Enable GitHub private vulnerability reporting and link its reporting form.
+
+### Added
+
+- Static category hints beneath empty Search, with More for remaining enabled
+  categories and keyboard access to every hint.
+- Editable tab order in Settings. Numbered shortcuts and Tab navigation follow
+  visible order; Settings uses Ctrl+comma. Remove the separate Alt+K alias.
+- JSON CLI settings get/set/schema, atomic batches, shortcut management, and
+  private stdin login/profile input for agents. Local settings remain available
+  when Rock access through the CLI is disabled.
+- Optional global shortcut setup in Finish Setup and Settings. Suggest Super+R,
+  check active named and physical bindings against the reported keyboard layouts,
+  and offer another combination when occupied. Recognize manual Rock Arch binds;
+  change or remove only an unchanged block created by Rock Arch.
+- Show a simple configured status after adding a shortcut and restore the
+  menu-bar icon when removing a managed shortcut. Save configuration
+  changes atomically with a private backup, reload verification, and rollback.
+
+### Changed
+
+- Correct the Pages prefix mapping so `pg:` displays and clears its scope.
+- Keep update progress and results in the Updates section, without duplicate
+  footer messages that can linger after a check finishes.
+- Align the interface with Omarchy's built-in panels: search before work-area
+  tabs, Settings in the hero, compact profile rows with explicit Edit controls,
+  shorter preference copy, and a native automatic-update toggle in setup.
+- Collapse empty status space and fit the scrolling region to the available
+  panel height. Document the research and design decisions in `docs/DESIGN.md`.
+- Rename the QML and JavaScript components to `RockArch*` and the Python
+  package to `rock_arch_broker`, including imports, launchers, and developer
+  commands. Keep the plugin ID, public commands, and saved-login storage stable.
+- Route legacy module login/status commands through the supported broker CLI,
+  with deprecation guidance. Retire raw-path Magnus `ls`, `cat`, and `hash`
+  diagnostics; use `rock-arch magnus browse` and opaque IDs instead. Retired
+  commands exit without accessing credentials, the network, or output files.
+- Separate the panel's broker process/socket, request queue, and account,
+  search/Knowledge/links, and Magnus response handling into focused components.
+- Correct the optional keyboard-shortcut guidance and document runtime packages,
+  disable/re-enable, removal, saved-login cleanup, and retained local data.
+
+### Verification
+
+- Add Qt behavioral tests for reconnects, partial disconnects, credential
+  cleanup, stale results, selection, profile transitions, focus, and responses.
+- Add isolated distribution coverage for launcher installation, real broker
+  requests, restart, and fixture removal. Run Qt behavioral checks in CI.
+
 ## [0.25.4] - 2026-09-03
 
 ### Fixed

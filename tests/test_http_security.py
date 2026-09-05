@@ -1,6 +1,6 @@
 import unittest
 
-from rock_lens_broker.http_security import (
+from rock_arch_broker.http_security import (
     HttpSecurityError,
     RejectRedirects,
     decode_bounded_json,

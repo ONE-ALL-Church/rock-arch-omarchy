@@ -2,11 +2,11 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from rock_lens_broker.clipboard import copy_to_clipboard
+from rock_arch_broker.clipboard import copy_to_clipboard
 
 
 class ClipboardTests(unittest.TestCase):
-    @patch("rock_lens_broker.clipboard.subprocess.run")
+    @patch("rock_arch_broker.clipboard.subprocess.run")
     @patch("pathlib.Path.is_file", return_value=True)
     def test_value_is_passed_only_on_stdin(self, _exists, run):
         run.return_value = subprocess.CompletedProcess(["/usr/bin/wl-copy"], 0)

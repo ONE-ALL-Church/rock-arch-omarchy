@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.server import BrokerServer
+from rock_arch_broker.server import BrokerServer
 
 
 class BrokerServerSecurityTests(unittest.IsolatedAsyncioTestCase):
@@ -14,7 +14,7 @@ class BrokerServerSecurityTests(unittest.IsolatedAsyncioTestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         root = Path(self.temporary.name)
-        with patch("rock_lens_broker.server.Broker"):
+        with patch("rock_arch_broker.server.Broker"):
             self.server = BrokerServer(root / "broker.sock", root / "state.json")
 
     async def test_regular_file_at_socket_path_is_never_deleted(self):
@@ -69,7 +69,7 @@ class BrokerServerSecurityTests(unittest.IsolatedAsyncioTestCase):
         parent = self.server.socket_path.parent
         self.assertTrue(parent.is_dir())
         with patch(
-            "rock_lens_broker.server.os.getuid", return_value=os.getuid() + 1
+            "rock_arch_broker.server.os.getuid", return_value=os.getuid() + 1
         ), self.assertRaisesRegex(RuntimeError, "unsafe_socket_directory"):
             await self.server.run()
 

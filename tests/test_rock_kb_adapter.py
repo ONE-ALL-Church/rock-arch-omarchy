@@ -2,8 +2,8 @@ import json
 import unittest
 import urllib.error
 
-from rock_lens_broker.contracts import ALLOWED_RESULT_KEYS
-from rock_lens_broker.rock_kb_adapter import (
+from rock_arch_broker.contracts import ALLOWED_RESULT_KEYS
+from rock_arch_broker.rock_kb_adapter import (
     DETAIL_RESPONSE_LIMIT,
     HTTP_TIMEOUT_SECONDS,
     ROCK_KB_ORIGIN,
@@ -14,7 +14,7 @@ from rock_lens_broker.rock_kb_adapter import (
     parse_knowledge_query,
     validate_public_source_url,
 )
-from rock_lens_broker.version import HTTP_USER_AGENT
+from rock_arch_broker.version import HTTP_USER_AGENT
 
 
 class FakeResponse:

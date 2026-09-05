@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from rock_lens_broker.instance import InstanceStore
-from rock_lens_broker.origin import OriginError, validate_rock_origin
+from rock_arch_broker.instance import InstanceStore
+from rock_arch_broker.origin import OriginError, validate_rock_origin
 
 
 class InstanceTests(unittest.TestCase):

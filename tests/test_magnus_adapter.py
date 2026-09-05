@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from email.message import Message
 from pathlib import Path
 
-from rock_lens_broker.magnus_adapter import (
+from rock_arch_broker.magnus_adapter import (
     CANONICAL_MAGNUS_SERVER,
     DEFAULT_TREE_PATH,
     MAGNUS_API_PREFIX,

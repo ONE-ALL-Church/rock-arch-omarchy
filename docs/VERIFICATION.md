@@ -1,6 +1,6 @@
 # Verification record
 
-This record describes the current `0.25.4` release boundary. Historical feature
+This record describes the prepared `0.26.0` release boundary. Historical feature
 changes belong in [CHANGELOG.md](../CHANGELOG.md), not in this acceptance record.
 
 ## Automated checks
@@ -9,16 +9,18 @@ Run from the repository root:
 
 ```bash
 python3 -m unittest discover -s tests -v
-uvx --from ruff==0.16.5 ruff check rock_lens_broker tests
-uvx --from ty==0.0.78 ty check rock_lens_broker
-python3 -m compileall -q rock_lens_broker
+scripts/check-qml
+uvx --from ruff==0.16.5 ruff check rock_arch_broker tests
+uvx --from ty==0.0.78 ty check rock_arch_broker
+python3 -m compileall -q rock_arch_broker
 omarchy plugin validate .
 /usr/lib/qt6/bin/qmllint plugin/oneall.rock-arch/*.qml plugin/oneall.rock-arch/*.js
 git diff --check
 ```
 
-The suite contains 191 passing tests. Release-contract coverage keeps
-the manifest, package, network user-agent, and displayed version synchronized;
+The suite contains 232 Python tests and 35 Qt behavioral tests. Release-contract
+coverage keeps the manifest, package, network user-agent, and displayed version
+synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
 obsolete OpenID implementation or nested plugin manifest from returning.
 Public-KB coverage verifies explicit scope parsing, fixed-origin credentialless
@@ -33,8 +35,54 @@ handoffs, command routing, masked interactive login, confirmation gates,
 bounded JSON transport, socket ownership checks, default-on preference
 enforcement, and safe launcher installation without replacing another command.
 
-GitHub Actions runs the unit tests, Ruff, ty, and bytecode compilation on every
-push to `main` and on pull requests.
+GitHub Actions is configured to run Python tests, Ruff, ty, bytecode compilation,
+and Qt behavioral tests on every push to `main` and on pull requests. Qt Test
+runs headlessly through `scripts/check-qml`; it is a development dependency,
+not a plugin runtime requirement.
+
+The Qt suite executes the production connection component and response modules
+with synthetic sockets and display state. It covers coalesced reconnects, partial
+disconnects, no replay of sent mutations, queued credential purging, capability
+recovery, stale Search and Knowledge results, retained selection, profile and
+permission transitions, focus callbacks, error recovery, and build-acceptance
+feedback. Existing static QML checks remain for layout and wiring contracts.
+
+Shortcut coverage checks opt-in add/change/remove, conflict detection including
+physical workspace keys and multiple XKB layouts, manual binding recognition,
+stale config refusal, backup permissions, exact preservation of personal bytes,
+reload activation checks, rollback and concurrent-edit protection. Preview and
+source checkouts cannot write shortcuts. Qt tests execute the production shortcut
+model's conflict checks, stale drafts, removal confirmation, icon recovery,
+disconnect behavior, configured feedback and form cleanup.
+Fixtures simulate Hyprland reloads; they do not edit the active desktop config
+or substitute for exercising the shortcut in an installed Omarchy panel.
+
+The installed 0.26.0 candidate was also checked on Omarchy 4.0.2 on
+2026-09-04 and 2026-09-05. The Settings panel recognized the existing manual
+Super+R binding. The simplified interface has no shortcut-test controls or
+timed reopen behavior, and its global keypress path was verified again.
+Standard-keymap Wayland input reopened the actual panel through Hyprland,
+including with the menu-bar icon hidden. The icon preference was restored
+afterward, and the user's binding file was preserved.
+
+On 2026-09-05, a fresh plugin clone of the audited candidate was installed through
+`omarchy plugin add` on the running Omarchy 4.0.2 desktop, with existing plugin
+data and installation set aside in a private backup. The real panel opened from
+its bar icon, the shell summon command, and an installed Super+R binding; Escape
+and the shell hide route closed it. The production CLI added Super+R, changed it
+to Super+Shift+R, and removed it through actual Hyprland reloads. Each operation
+reported the expected active binding and no configuration errors. Other binding
+bytes were preserved. Disable/re-enable, shell restart, plugin removal, and
+managed-launcher removal also passed. The original profiles, state, bindings,
+launcher, and bar layout were restored afterward. This was a fresh plugin
+installation on an existing desktop, not an OS reinstall. No login or production
+build was performed by this acceptance check.
+
+The isolated distribution test copies the runtime into a temporary installation,
+creates its launcher, exchanges real Unix-socket status requests, restarts the
+broker against its stale socket, and cleans up the fixture. Keyring and network
+access are forbidden in that test. It does not operate the user's installed
+plugin or assert that the interactive Omarchy shell lifecycle was tested.
 
 ## Authentication boundary
 
@@ -61,12 +109,14 @@ push to `main` and on pull requests.
   at 5 MiB. A missing broker may be started through fixed module arguments;
   `--no-start` refuses that behavior.
 - Terminal access defaults on, is configured in Settings rather than onboarding,
-  and marked CLI requests fail with `terminal_access_disabled` when it is off.
+  and marked Rock CLI requests fail with `terminal_access_disabled` when it is
+  off. Local settings and shortcut management stay available for recovery.
   The Unix account remains the OS trust boundary.
 - The launcher is installed atomically in `~/.local/bin`, refuses unsafe shapes
   and unrelated existing commands, and contains no credentials or profile data.
-- `rock-arch login` always reads the password from a masked prompt. No password
-  argument exists. JSON responses never contain submitted credentials.
+- `rock-arch login` reads the password from a masked prompt or a bounded JSON
+  object with `--stdin`. No password argument exists. JSON responses never
+  contain submitted credentials.
 - Private Search and Knowledge queries can be read from bounded stdin. Native
   UI handoff moves the query through a one-time, 30-second broker value rather
   than an Omarchy process argument.
@@ -102,7 +152,7 @@ push to `main` and on pull requests.
 
 ## Public Knowledge boundary
 
-- Knowledge is a dedicated workspace entered from its tab or `Alt+K`.
+- Knowledge is a dedicated workspace entered from its tab or `Ctrl+3` (default order).
   `kb:` and `knowledge:` transfer a main-Search query into that workspace;
   unscoped and entity-prefixed searches remain local to the selected Rock
   instance.
@@ -189,7 +239,7 @@ browser, clipboard, download, history-clear, source-open, or build actions. See
 - Full OS logout/login and a live Magnus deployment are intentionally outside
   this release check.
 
-Automated verification performs no telemetry, live search, profile change,
-credential change, file mutation, or production build. The documentation
-captures intentionally use only the public Demo Church, the public Knowledge
+Automated verification writes temporary test fixtures only; it performs no
+telemetry, live search, user profile or credential change, or production build.
+The documentation captures intentionally use only the public Demo Church, the public Knowledge
 service, and deterministic preview fixtures.

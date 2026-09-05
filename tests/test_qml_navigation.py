@@ -2,22 +2,22 @@ import unittest
 from pathlib import Path
 
 QML_PATH = (
-    Path(__file__).resolve().parents[1] / "plugin" / "oneall.rock-arch" / "RockLens.qml"
+    Path(__file__).resolve().parents[1] / "plugin" / "oneall.rock-arch" / "RockArch.qml"
 )
-SELECTION_PATH = QML_PATH.with_name("RockLensSelectionChrome.qml")
+SELECTION_PATH = QML_PATH.with_name("RockArchSelectionChrome.qml")
 BAR_BUTTON_PATH = QML_PATH.with_name("RockArchBarButton.qml")
 ICON_PATH = QML_PATH.with_name("RockArchIcon.qml")
-HERO_PATH = QML_PATH.with_name("RockLensHero.qml")
-KEY_CATCHER_PATH = QML_PATH.with_name("RockLensKeyCatcher.qml")
-LOGIN_PATH = QML_PATH.with_name("RockLensLoginPanel.qml")
-FINISH_SETUP_PATH = QML_PATH.with_name("RockLensFinishSetupPanel.qml")
-MAGNUS_PATH = QML_PATH.with_name("RockLensMagnusPanel.qml")
-NAVIGATION_PATH = QML_PATH.with_name("RockLensNavigationTabs.qml")
-PERSONAL_PATH = QML_PATH.with_name("RockLensPersonalPanel.qml")
-SEARCH_PATH = QML_PATH.with_name("RockLensSearchPanel.qml")
-KNOWLEDGE_PATH = QML_PATH.with_name("RockLensKnowledgePanel.qml")
-SETTINGS_PATH = QML_PATH.with_name("RockLensSettingsPanel.qml")
-SCOPES_PATH = QML_PATH.with_name("RockLensSearchScopes.js")
+HERO_PATH = QML_PATH.with_name("RockArchHero.qml")
+KEY_CATCHER_PATH = QML_PATH.with_name("RockArchKeyCatcher.qml")
+LOGIN_PATH = QML_PATH.with_name("RockArchLoginPanel.qml")
+FINISH_SETUP_PATH = QML_PATH.with_name("RockArchFinishSetupPanel.qml")
+MAGNUS_PATH = QML_PATH.with_name("RockArchMagnusPanel.qml")
+NAVIGATION_PATH = QML_PATH.with_name("RockArchNavigationTabs.qml")
+PERSONAL_PATH = QML_PATH.with_name("RockArchPersonalPanel.qml")
+SEARCH_PATH = QML_PATH.with_name("RockArchSearchPanel.qml")
+KNOWLEDGE_PATH = QML_PATH.with_name("RockArchKnowledgePanel.qml")
+SETTINGS_PATH = QML_PATH.with_name("RockArchSettingsPanel.qml")
+SCOPES_PATH = QML_PATH.with_name("RockArchSearchScopes.js")
 PANEL_PATHS = (
     BAR_BUTTON_PATH,
     ICON_PATH,
@@ -31,6 +31,7 @@ PANEL_PATHS = (
     KNOWLEDGE_PATH,
     SETTINGS_PATH,
     SCOPES_PATH,
+    *sorted(QML_PATH.parent.glob("RockArch*Responses.js")),
 )
 
 
@@ -46,11 +47,6 @@ class QmlNavigationTests(unittest.TestCase):
     def test_first_recent_and_search_results_are_selected_automatically(self):
         source = all_qml_source()
 
-        self.assertIn(
-            "resultCursor = preservedCursor >= 0 ? preservedCursor : "
-            "(results.length ? 0 : -1)",
-            source,
-        )
         self.assertIn("recentCursor = quickReturns.length ? 0 : -1", source)
         self.assertIn(
             "readonly property bool rowSelected: resultRow.index === searchPanel.controller.resultCursor ||",
@@ -60,7 +56,7 @@ class QmlNavigationTests(unittest.TestCase):
             "readonly property bool rowSelected: recentRow.index === searchPanel.controller.recentCursor ||",
             source,
         )
-        self.assertEqual(source.count("RockLensSelectionChrome {"), 5)
+        self.assertEqual(source.count("RockArchSelectionChrome {"), 5)
 
     def test_down_arrow_stays_on_the_last_search_or_recent_item(self):
         source = QML_PATH.read_text(encoding="utf-8")
@@ -167,7 +163,8 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('text: "Finish setup"', prompt)
         self.assertIn('PanelSectionHeader { text: "SEARCH CATEGORIES" }', prompt)
         self.assertIn('PanelSectionHeader { text: "UPDATES" }', prompt)
-        self.assertIn('"Automatic updates · On"', prompt)
+        self.assertIn('label: "Automatic updates"', prompt)
+        self.assertIn("checked: finishSetup.controller.onboardingAutomaticUpdates", prompt)
         self.assertIn('"Continue to Search"', prompt)
         self.assertIn("controller.availableCategoryOptions()", prompt)
         self.assertIn("searchCapabilitiesInFlight", prompt)
@@ -200,10 +197,10 @@ class QmlNavigationTests(unittest.TestCase):
         knowledge = KNOWLEDGE_PATH.read_text(encoding="utf-8")
 
         self.assertIn('prefix === "kb" || prefix === "knowledge"', source)
-        self.assertIn('sequence: "Alt+K"', source)
-        self.assertIn("onActivated: root.openKnowledge()", source)
+        self.assertNotIn('sequence: "Alt+K"', source)
+        self.assertIn('else if (key === "knowledge") openKnowledge()', source)
         self.assertIn(
-            '{ key: "knowledge", label: "Knowledge", shortcut: "Alt+K" }', source
+            'navigation.controller.navigationTabs', source
         )
         self.assertIn('root.scopeKeyForQuery(text) === "kb"', source)
         self.assertNotIn("Knowledge", search)
@@ -260,17 +257,6 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn("controller.availableCategoryOptions()", finish)
         self.assertIn('text: "Check again"', settings)
 
-    def test_socket_failure_requeues_an_in_flight_capability_probe(self):
-        source = QML_PATH.read_text(encoding="utf-8")
-        error_handler = source[source.index("onError: function(error)") :]
-        error_handler = error_handler[:600]
-
-        self.assertIn('payload.op === "search_capabilities"', source)
-        self.assertIn("if (root.searchCapabilitiesInFlight)", error_handler)
-        self.assertIn("root.searchCapabilitiesInFlight = false", error_handler)
-        self.assertIn('root.searchCapabilitiesState = "unknown"', error_handler)
-        self.assertIn("root.probeSearchCapabilities(false)", error_handler)
-
     def test_existing_profiles_have_a_keyboard_accessible_rename_form(self):
         source = all_qml_source()
 
@@ -294,11 +280,9 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
 
         self.assertIn("function dropQueuedCredentialRequests()", source)
-        self.assertIn("if (!isCredentialRequest(requestQueue[index]))", source)
-        self.assertIn(
-            "else { dropQueuedCredentialRequests(); panelCleanupTimer.restart() }",
-            source,
-        )
+        self.assertIn("broker.dropCredentials()", source)
+        closing = source[source.index("onOpenedChanged:"):source.index("RockArchBroker {")]
+        self.assertIn("dropQueuedCredentialRequests()", closing)
         timeout = source[source.index("id: setupTimeoutTimer") :]
         self.assertIn("root.dropQueuedCredentialRequests()", timeout[:500])
 
@@ -316,9 +300,6 @@ class QmlNavigationTests(unittest.TestCase):
         key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
 
         self.assertIn("if (query !== searchInFlightQuery) searchPending = true", source)
-        self.assertIn("completedSearchQuery === resultsQuery", source)
-        self.assertIn("results.findIndex(function(item)", source)
-        self.assertIn("if (preservedCursor < 0) panelFlick.contentY = 0", source)
         self.assertIn("setupBusy || searchInFlight || searchTimer.running", source)
         self.assertIn("id: searchTimer; interval: 160", source)
         self.assertIn("magnusProbeTimer.restart()", source)
@@ -334,38 +315,6 @@ class QmlNavigationTests(unittest.TestCase):
         reset = reset[: reset.index("onOpenedChanged:")]
         self.assertNotIn("refreshPersonalLinks()", reset)
 
-    def test_tab_ring_includes_settings_in_both_directions(self):
-        source = all_qml_source()
-
-        self.assertIn(
-            'else if (viewMode === "knowledge" || viewMode === "magnus")\n'
-            "        openSettings(false)",
-            source,
-        )
-        self.assertIn(
-            'if (viewMode === "settings") {\n'
-            "      if (showMagnus) openMagnus()\n"
-            "      else openKnowledge()",
-            source,
-        )
-        self.assertIn(
-            'else if (viewMode === "personal")\n        openKnowledge()', source
-        )
-        self.assertIn(
-            '} else if (viewMode === "magnus") {\n      openKnowledge()', source
-        )
-        self.assertIn(
-            'if (viewMode === "settings")\n        focusSearch()',
-            source,
-        )
-        self.assertIn(
-            "} else if (resultCursor >= 0 || recentCursor >= 0) {\n"
-            "      focusSearch()\n"
-            "    } else {\n"
-            "      openSettings(false)",
-            source,
-        )
-
     def test_settings_controls_use_omarchy_keyboard_focus_chain(self):
         source = all_qml_source()
         key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
@@ -379,7 +328,7 @@ class QmlNavigationTests(unittest.TestCase):
             key_catcher.index("if (blocked || formMode) return"),
         )
         self.assertIn(
-            'formMode: root.onboardingFlowActive || root.viewMode === "settings"',
+            'formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings"',
             source,
         )
         self.assertIn(
@@ -416,7 +365,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn(
             'updatePreference("showMenuBar", controller.preferenceShowMenuBar)', source
         )
-        self.assertIn("Super+R still opens Rock Arch", source)
+        self.assertIn("Set up a shortcut before hiding the icon.", source)
 
     def test_menu_bar_uses_the_theme_colored_rock_arch_mark(self):
         source = all_qml_source()
@@ -432,7 +381,7 @@ class QmlNavigationTests(unittest.TestCase):
         source = all_qml_source()
 
         self.assertIn(
-            'text: "Settings" + (navigation.controller.updateAvailable ? "  •" : "")',
+            'text: hero.controller.updateAvailable ? "Settings · Update" : "Settings"',
             source,
         )
         self.assertIn('label: "Install updates automatically"', source)
@@ -449,12 +398,12 @@ class QmlNavigationTests(unittest.TestCase):
         finish_setup = FINISH_SETUP_PATH.read_text(encoding="utf-8")
 
         self.assertIn("property bool preferenceTerminalAccess: true", source)
-        self.assertIn('label: "Allow terminal and agent access"', source)
+        self.assertIn('label: "Terminal and agent access"', source)
         self.assertIn(
             'updatePreference("terminalAccess", preferenceTerminalAccess)', source
         )
         self.assertIn(
-            '"Use rock-arch from this account; no network listener is opened."', source
+            '"Use the rock-arch command with this account."', source
         )
         self.assertNotIn("terminal", finish_setup.lower())
 
@@ -472,7 +421,7 @@ class QmlNavigationTests(unittest.TestCase):
         navigation = NAVIGATION_PATH.read_text(encoding="utf-8")
         self.assertNotIn("navigation.controller.contextName", navigation)
         self.assertNotIn("Switch preview context", navigation)
-        self.assertIn('{ key: "magnus", label: "Magnus", shortcut: "Ctrl+3" }', source)
+        self.assertIn('root.openTabAt(3)', source)
         self.assertIn('tooltipText: "Clear Recent Links · X"', source)
         self.assertIn("onDeleteRequested: root.deleteCurrentItem()", source)
         self.assertIn("event.key === Qt.Key_Delete", key_catcher)
@@ -554,8 +503,8 @@ class QmlNavigationTests(unittest.TestCase):
             'text: root.feedbackText || (root.onboardingFlowActive ? "" : root.guidanceText())',
             source,
         )
-        self.assertIn("height: Math.max(Style.space(18), implicitHeight)", source)
-        self.assertIn("opacity: text.length > 0 ? 1 : 0", source)
+        self.assertIn("visible: text.length > 0", source)
+        self.assertNotIn("height: Math.max(Style.space(18), implicitHeight)", source)
         self.assertIn('"Getting your Rock workspace ready…"', source)
         self.assertIn('if (updateState === "updating")', source)
         self.assertIn('return ""', source[source.index("function guidanceText()") :])
@@ -573,7 +522,7 @@ class QmlNavigationTests(unittest.TestCase):
     def test_panel_matches_first_party_omarchy_anatomy(self):
         source = all_qml_source()
 
-        self.assertIn("RockLensHero {", source)
+        self.assertIn("RockArchHero {", source)
         self.assertIn("PanelSeparator {}", source)
         self.assertIn("panel.fittedContentWidth(Style.space(430))", source)
         self.assertIn(
@@ -589,15 +538,15 @@ class QmlNavigationTests(unittest.TestCase):
         source = QML_PATH.read_text(encoding="utf-8")
 
         for component in (
-            "RockLensLoginPanel",
-            "RockLensFinishSetupPanel",
-            "RockLensSearchPanel",
-            "RockLensPersonalPanel",
-            "RockLensKnowledgePanel",
-            "RockLensMagnusPanel",
-            "RockLensSettingsPanel",
-            "RockLensNavigationTabs",
-            "RockLensHero",
+            "RockArchLoginPanel",
+            "RockArchFinishSetupPanel",
+            "RockArchSearchPanel",
+            "RockArchPersonalPanel",
+            "RockArchKnowledgePanel",
+            "RockArchMagnusPanel",
+            "RockArchSettingsPanel",
+            "RockArchNavigationTabs",
+            "RockArchHero",
             "RockArchBarButton",
         ):
             self.assertIn(f"{component} {{", source)

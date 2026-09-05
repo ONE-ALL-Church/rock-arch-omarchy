@@ -2,15 +2,15 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from rock_lens_broker.notifications import notify_build_accepted
+from rock_arch_broker.notifications import notify_build_accepted
 
 
 class NotificationTests(unittest.TestCase):
     def test_notification_uses_fixed_program_and_contains_no_target_data(self):
         with (
-            patch("rock_lens_broker.notifications.NOTIFY_SEND") as executable,
+            patch("rock_arch_broker.notifications.NOTIFY_SEND") as executable,
             patch(
-                "rock_lens_broker.notifications.subprocess.run",
+                "rock_arch_broker.notifications.subprocess.run",
                 return_value=subprocess.CompletedProcess([], 0),
             ) as runner,
         ):

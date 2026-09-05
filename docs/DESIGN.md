@@ -9,8 +9,8 @@ first-party components, not from a parallel application theme.
 The primary references are the current Omarchy shell and the Basecamp-owned
 plugins that ship the same kind of keyboard-first bar panel:
 
-- [Omarchy shell architecture and theme tokens](https://github.com/basecamp/omarchy/blob/quattro/docs/omarchy-shell.md)
-- [Omarchy first-party plugins](https://github.com/basecamp/omarchy/blob/quattro/shell/plugins/README.md)
+- [Omarchy shell architecture and theme tokens](https://github.com/omacom/omarchy/blob/quattro/docs/omarchy-shell.md)
+- [Omarchy first-party plugins](https://github.com/omacom/omarchy/blob/quattro/shell/plugins/README.md)
 - [Basecamp notifications for Omarchy](https://github.com/basecamp/omarchy-basecamp-plugin)
 - [HEY for Omarchy](https://github.com/basecamp/omarchy-hey-plugin)
 
@@ -39,7 +39,7 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 
 ### Panel anatomy
 
-- Match the first-party utility-panel width of `Style.space(430)` and cap
+- Use the Basecamp and HEY plugin panel width of `Style.space(430)` and cap
   content height at `Style.space(600)`.
 - Start with a compact hero: Rock Arch mark, product name, and the active
   profile or onboarding purpose.
@@ -47,8 +47,11 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 - Keep primary navigation on one quiet row. The active destination uses the
   shell's selected state; pointer hover and keyboard focus use the shell's
   hover/focus state.
+- Keep tab order user-editable. Numbered shortcuts follow the visible order;
+  Settings stays in the header on `Ctrl+,`. Alt shortcuts filter Rock entity
+  categories. Knowledge has a numbered tab shortcut and no Alt alias.
 - Put persistent status in the relevant section. Keep the panel footer for
-  transient progress, success, and error messages only.
+  transient progress, success, and error messages only; hide it when empty.
 
 ### Hierarchy and density
 
@@ -78,13 +81,13 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 
 - Use quiet, borderless actions for low-risk row commands and bordered controls
   for primary or confirmable actions.
-- Preferences are full-width toggle rows with a short title and one useful
-  description. Category choices are compact selected buttons, not a loose
-  wrap of platform-default checkboxes.
+- Preferences are full-width toggle rows with a short title and an optional
+  description that adds useful information. Category choices use an evenly
+  sized grid of compact selected buttons.
 - Destructive actions use `Color.urgent`, require an explicit second action,
   and always support Escape to cancel.
-- Profile cards show identity and connection capability first. Management
-  actions are visually secondary and use the same action treatment.
+- Profile rows show identity, active state, and the direct Use action first.
+  Edit reveals management actions and connection capabilities.
 
 ### Keyboard and accessibility
 
@@ -118,6 +121,9 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 - **Search:** search input first, then either Recent Links or Rock results. It
   contains no public-KB control or tutorial copy. Person context stays attached
   to the person result instead of becoming a competing card.
+  Static, clickable category hints appear beneath the empty input. More reveals
+  remaining enabled and accessible categories; typing hides the hints. They
+  participate in keyboard focus and use the same scope logic as typed prefixes.
 - **Knowledge:** a dedicated top-level workspace whose empty state teaches the
   supported area prefixes without crowding Search. Results reuse the standard
   selected-row treatment;
@@ -130,7 +136,93 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   bounded preview. Deploy remains the only server-side action and keeps a
   dedicated production confirmation.
 - **Settings:** profiles, preferences, categories, and updates are four visibly
-  separate groups. The active profile includes Magnus availability so there is
+  separate groups. Editing the active profile reveals Magnus availability, so there is
   no redundant Connection section. Terminal and agent access is a default-on
   preference here, not another onboarding choice; its copy names `rock-arch`
-  and explains that no network listener is opened.
+  and shows installation errors when relevant. Transport details belong in the
+  CLI documentation.
+
+## September 2026 research and review
+
+Research and implementation review, 5 September 2026. The runtime reference
+is the installed Omarchy 4.0.2 shell. This is Rock Arch's interpretation of
+the sources below, not an official Omarchy certification or a claim that DHH
+personally designed every component.
+
+### Sources and practical rules
+
+| Source | Finding | Application to Rock Arch |
+| --- | --- | --- |
+| [Omarchy plugin development guide](https://plugins.omarchy.org/develop.html) | Begin with a built-in plugin matching the interaction; use the shared shell and its components. | Keep `Panel`, `KeyboardPanel`, the native hero, controls, separators, and IPC lifecycle. |
+| [Shipped style tokens](https://github.com/omacom/omarchy/blob/quattro/shell/Commons/Style.qml) and [UI components](https://github.com/omacom/omarchy/tree/quattro/shell/Ui) | Typography, spacing, border states, and corner shape respond to the user's theme and display settings. | Use `Style`, `Color`, and `Border`; keep the Rock Arch mark theme-colored. Do not impose a separate palette or corner style. |
+| [Built-in panels](https://github.com/omacom/omarchy/tree/quattro/shell/plugins/panels) | Audio, Clock, and Tailscale organize a compact hero, small section labels, direct controls, and clear current/cursor states. | Keep the existing hero; use its trailing-control slot for Settings, and reserve the tab row for work areas. Use flat profile rows with the native selected fill. |
+| [Basecamp plugin](https://github.com/basecamp/omarchy-basecamp-plugin/blob/master/Panel.qml) and [HEY plugin](https://github.com/basecamp/omarchy-hey-plugin/blob/master/Panel.qml) | Both use scaled 430-wide panels capped at 600, compact headers, quiet controls, and an inner scrolling list. HEY puts Settings at the header's trailing edge. | Keep Rock Arch's dimensions; use native layout sizing to give the list the remaining space. Place a labeled Settings control in the hero. |
+| [DHH's Quattro proposal](https://github.com/omacom/omarchy/pull/6231) | Related launcher and menu actions share one searchable surface; theming and text sizing apply across the shell. | Keep immediate search focus, existing keyboard routes, and a single panel. Fit the scrollable content after accounting for fixed controls. |
+| [DHH: Omarchy is out](https://world.hey.com/dhh/omarchy-is-out-4666dd31) | Omarchy offers an opinionated, ready-to-use developer environment that users can make their own. | Provide useful defaults and optional shortcuts; keep existing user bindings and preferences. |
+| [DHH: Beautiful motivations](https://world.hey.com/dhh/beautiful-motivations-6fef7c73) | Aesthetic care contributes to the quality and pleasure of using tools; it is an accumulation of small decisions. | Refine hierarchy, language, and spacing in the working interface. Preserve function and recognizable identity. |
+| [Basecamp: Epicenter Design](https://basecamp.com/gettingreal/09.2-epicenter-design) and [Build Less](https://basecamp.com/gettingreal/02.1-build-less) | Start with the essential task and limit incidental choices. These are broader product principles, not shell specifications. | Put the search field before secondary navigation. Keep profile switching immediate; reveal maintenance actions through Edit. |
+| [GNOME writing guidance](https://developer.gnome.org/hig/guidelines/writing-style.html), [KDE accessibility](https://develop.kde.org/hig/accessibility/), and [W3C focus appearance](https://www.w3.org/WAI/WCAG22/Understanding/focus-appearance) | Use familiar, concise language without losing meaning; test keyboard navigation and visible focus. | Shorten routine descriptions, retain actionable errors and confirmation text, and exercise the controls using only the keyboard. These support interaction review, not adoption of another desktop's appearance. |
+
+The official references inspected do not present a separate comprehensive
+plugin visual-standard document. The installed component implementation and
+built-in plugins provide the strongest practical reference. A community
+style guide is not treated as an official requirement.
+
+### Audit and changes
+
+The native Search and Settings screens and the built-in Audio panel were
+captured and inspected before implementation. Captures containing account
+information are private local review artifacts, not repository assets.
+
+1. **Search:** The main field followed a navigation row, and an empty status
+   footer still consumed space. Search now appears before the work-area tabs;
+   its input has an accessible name. The status area occupies space only while
+   it has something to report. Search matching, selection, and open behavior
+   retain their existing contracts.
+2. **Settings:** Every profile exposed maintenance actions continuously.
+   Profile rows now emphasize account identity, the active account, and Use.
+   Edit reveals rename, login, connection testing, sign-out, and removal;
+   those actions wrap when space is limited. Confirmation remains required
+   for sign-out and removal. Routine successful status uses quiet text.
+3. **Preferences and setup:** Several descriptions repeated their labels or
+   explained implementation details during normal use. Descriptions now focus
+   on consequences and actionable errors. Finish Setup uses the same native
+   toggle as Settings for automatic updates. Shortcut setup remains optional.
+4. **Panel sizing:** The shell could cap the outer panel while its inner list
+   retained a fixed height. The list now uses the space remaining after the
+   header, navigation, search, and feedback, keeping its end reachable. Setup
+   grows to its natural height within the shell's cap, and keyboard focus
+   reveals the Continue action if the content must scroll.
+
+### Native review evidence
+
+These screenshots show the installed QML components with an isolated broker
+using synthetic accounts and injected test adapters. The preview forbids
+credential-store access and network connections.
+
+![Search with synthetic results](../outputs/screenshots/design-search.png)
+
+![Settings with synthetic profiles](../outputs/screenshots/design-settings.png)
+
+The native keyboard walkthrough covered search entry, opening Settings, profile
+editing, sign-out confirmation cancellation, reaching the last Settings
+controls, and completing setup with Enter. Closing a profile editor now also
+clears its pending confirmation message. Completing setup saved the fixture's
+choices and returned focus to Search.
+
+Verification passed: 222 Python tests, 35 Qt behavioral tests (43 including
+suite setup and cleanup), Ruff, and Omarchy plugin validation. Follow-up native
+checks exercised More, selecting Pages by keyboard, CLI-driven tab reordering,
+Ctrl+1 opening the newly first tab, and keyboard reordering from Settings.
+
+### Review boundaries
+
+Live checks cover the installed shell and the exercised keyboard paths.
+Preview data is used for public screenshots and operations that should not
+touch a real account. Automated broker and Qt behavioral tests retain the
+existing credential, search, reconnect, and shortcut safeguards.
+
+Native control reuse and an accessible input name are useful foundations;
+they do not establish full screen-reader accessibility, larger-font coverage,
+or contrast compliance for every user-supplied theme. Avoid claiming these
+without direct testing.

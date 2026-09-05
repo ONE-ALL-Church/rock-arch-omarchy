@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.update_worker import run_update
-from rock_lens_broker.updates import OMARCHY, PLUGIN_ID
+from rock_arch_broker.update_worker import run_update
+from rock_arch_broker.updates import OMARCHY, PLUGIN_ID
 
 
 class UpdateWorkerTests(unittest.TestCase):
@@ -23,13 +23,13 @@ class UpdateWorkerTests(unittest.TestCase):
     def test_successful_update_restarts_shell_before_reporting_success(self):
         completed = subprocess.CompletedProcess([], 0)
         with (
-            patch("rock_lens_broker.update_worker.Path.home", return_value=self.home),
-            patch("rock_lens_broker.update_worker._validated_version", return_value="0.24.1"),
-            patch("rock_lens_broker.update_worker._origin_is_canonical", return_value=True),
-            patch("rock_lens_broker.update_worker._revision", return_value="a" * 40),
-            patch("rock_lens_broker.update_worker.subprocess.run", side_effect=[completed, completed]) as runner,
-            patch("rock_lens_broker.update_worker._notify"),
-            patch("rock_lens_broker.update_worker._terminate_broker") as terminate,
+            patch("rock_arch_broker.update_worker.Path.home", return_value=self.home),
+            patch("rock_arch_broker.update_worker._validated_version", return_value="0.24.1"),
+            patch("rock_arch_broker.update_worker._origin_is_canonical", return_value=True),
+            patch("rock_arch_broker.update_worker._revision", return_value="a" * 40),
+            patch("rock_arch_broker.update_worker.subprocess.run", side_effect=[completed, completed]) as runner,
+            patch("rock_arch_broker.update_worker._notify"),
+            patch("rock_arch_broker.update_worker._terminate_broker") as terminate,
         ):
             result = run_update(self.state, self.root, 4242)
 
@@ -49,12 +49,12 @@ class UpdateWorkerTests(unittest.TestCase):
         success = subprocess.CompletedProcess([], 0)
         failure = subprocess.CompletedProcess([], 1)
         with (
-            patch("rock_lens_broker.update_worker.Path.home", return_value=self.home),
-            patch("rock_lens_broker.update_worker._validated_version", return_value="0.24.1"),
-            patch("rock_lens_broker.update_worker._origin_is_canonical", return_value=True),
-            patch("rock_lens_broker.update_worker.subprocess.run", side_effect=[success, failure]),
-            patch("rock_lens_broker.update_worker._notify"),
-            patch("rock_lens_broker.update_worker._terminate_broker") as terminate,
+            patch("rock_arch_broker.update_worker.Path.home", return_value=self.home),
+            patch("rock_arch_broker.update_worker._validated_version", return_value="0.24.1"),
+            patch("rock_arch_broker.update_worker._origin_is_canonical", return_value=True),
+            patch("rock_arch_broker.update_worker.subprocess.run", side_effect=[success, failure]),
+            patch("rock_arch_broker.update_worker._notify"),
+            patch("rock_arch_broker.update_worker._terminate_broker") as terminate,
         ):
             result = run_update(self.state, self.root, 4242)
 
@@ -66,10 +66,10 @@ class UpdateWorkerTests(unittest.TestCase):
 
     def test_noncanonical_origin_is_rejected_before_omarchy_runs(self):
         with (
-            patch("rock_lens_broker.update_worker.Path.home", return_value=self.home),
-            patch("rock_lens_broker.update_worker._validated_version", return_value="0.25.2"),
-            patch("rock_lens_broker.update_worker._origin_is_canonical", return_value=False),
-            patch("rock_lens_broker.update_worker.subprocess.run") as runner,
+            patch("rock_arch_broker.update_worker.Path.home", return_value=self.home),
+            patch("rock_arch_broker.update_worker._validated_version", return_value="0.25.2"),
+            patch("rock_arch_broker.update_worker._origin_is_canonical", return_value=False),
+            patch("rock_arch_broker.update_worker.subprocess.run") as runner,
         ):
             result = run_update(self.state, self.root, 4242)
 

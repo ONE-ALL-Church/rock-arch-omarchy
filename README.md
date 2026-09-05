@@ -9,21 +9,67 @@ Every user signs directly into their own Rock instance. Rock Arch uses the
 native Rock session and fixed REST v1 routes; it does not require an OpenID
 client, OAuth application, Rock MCP server, Magnus CLI, Node.js, or npm.
 
-![Live Demo Church search for Decker](outputs/screenshots/search-demo-decker.png)
+![Rock Arch search in the native Omarchy panel](outputs/screenshots/design-search.png)
 
-_Live search captured against the public Rock Solid Church Demo. Person context
-and related Group matches make duplicate names easier to distinguish._
+_The current Omarchy interface, shown with synthetic preview data. Person context
+helps distinguish people with similar names._
 
 ## Install
 
-Rock Arch supports Omarchy 4.0.2 or newer:
+Rock Arch supports Omarchy 4.0.2 or newer. Runtime requirements are:
+
+- Omarchy's Quickshell desktop and Python 3.11 or newer (`python`).
+- Hyprland (`hyprctl`) and `libxkbcommon` for optional shortcut setup and
+  physical-key conflict checks; both are part of the Omarchy desktop.
+- `secret-tool` (`libsecret`) and a running, unlocked Secret Service provider,
+  normally `gnome-keyring`, for saved Rock logins.
+- Git (`git`) for installation and updates, `xdg-open` (`xdg-utils`) for browser
+  actions, `wl-copy` (`wl-clipboard`) for clipboard actions, and `notify-send`
+  (`libnotify`) for build/update notifications.
+
+These are standard Omarchy desktop packages. If a helper is missing, install
+its named package through `omarchy pkg add`. Python uses only its standard
+library; Qt Test is a development dependency, and no pip packages are required.
+
+Install the plugin:
 
 ```bash
 omarchy plugin add https://github.com/ONE-ALL-Church/rock-arch-omarchy.git --enable
 ```
 
-Open Rock Arch with `Super+R` or its rock-arch menu-bar icon. On first launch,
-enter:
+Open Rock Arch with its menu-bar icon. During **Finish setup**, or later in
+**Settings → Keyboard shortcut**, optionally select **Add Super + R**.
+Nothing is bound until you choose Add. To open it from a terminal:
+
+```bash
+omarchy-shell shell summon oneall.rock-arch '{}'
+```
+
+Rock Arch checks active Hyprland bindings before adding anything. If the
+suggested shortcut is occupied, select **Choose another**, type a combination
+such as `Super + Shift + R`, select **Check shortcut**, then **Save shortcut**.
+Super is required, with a letter, number, or F1–F12; Ctrl, Alt, and Shift are
+optional. Existing assignments are never replaced. `Super + Ctrl + R` is
+Omarchy's reminder shortcut.
+
+An existing literal Rock Arch binding in `~/.config/hypr/bindings.lua` is
+recognized as manually managed. Shortcuts created here have **Change** and
+**Remove** controls. Removing a shortcut restores the menu-bar icon.
+After saving, Rock Arch confirms that the shortcut is configured. Press your
+shortcut whenever you want to open Rock Arch, including when the menu-bar icon
+is hidden.
+
+Automatic setup supports Omarchy's Lua configuration and is available only in
+an installed plugin outside Preview. It writes one marked block in
+`~/.config/hypr/bindings.lua`, keeps a private
+`.rock-arch-shortcut-backup-*.lua` beside it, reloads Hyprland, checks
+`hyprctl configerrors`, and verifies that the binding became active. Failed
+changes restore the previous file unless another edit would be overwritten.
+Modified blocks, linked files, unsupported loaders, or unresolved keyboard
+layouts require manual configuration. You can inspect bindings with
+`omarchy menu keybindings --print` and bind the fixed summon command above.
+
+On first launch, enter:
 
 1. A recognizable profile name, such as `Rock Solid Church Production`
 2. The Rock domain, such as `rock.example.org`
@@ -60,6 +106,11 @@ probes each supported category and hides any category that is unavailable or
 unauthorized. Search never falls back to sample data during normal use.
 
 An unscoped query searches every enabled category plus matching Personal Links.
+
+When Search is empty, static category hints appear beneath the field. Select
+`p: People` or `g: Groups` to insert a prefix, or **More** for other enabled,
+accessible categories. The hints disappear while typing. Tab reaches the hints;
+Enter chooses one, and Escape collapses More or returns to the search field.
 A numeric ID or GUID is checked across all enabled categories, so `42` can
 return several entity types whose IDs overlap. Use a prefix when the type is
 known:
@@ -113,7 +164,7 @@ without opening a browser or deploying anything._
 
 ## Search public Rock Knowledge
 
-Open the dedicated **Knowledge** workspace or press `Alt+K`. A plain question
+Open the dedicated **Knowledge** workspace or press `Ctrl+3` (default order). A plain question
 searches the public Rock Agent Knowledge Base. Prefixes narrow the search to a
 structured area:
 
@@ -187,10 +238,24 @@ acceptance time and never invents a completion or “last deployed” state.
 
 ## Profiles, preferences, and updates
 
-Open **Settings** with `Ctrl+,` or `Ctrl+4` to:
+Open **Settings** with `Ctrl+,`.
+
+Tab order is editable under **Tab order → Edit** using the up/down controls.
+Changes save immediately. `Ctrl+1` through `Ctrl+4` follow the visible tabs from
+left to right; by default these are Search, Links, Knowledge, and Magnus.
+Unavailable Magnus stays in the saved order but takes no shortcut number.
+Tab/Shift+Tab follow the same order. Settings remains on `Ctrl+,`.
+
+All preferences also support JSON through `rock-arch settings get`,
+`rock-arch settings schema`, and `rock-arch settings set KEY JSON_VALUE`.
+Use `rock-arch settings set --stdin` for an atomic JSON object of changes.
+See [the CLI guide](docs/CLI.md) for profiles, login, shortcuts, and updates.
+
+Settings also lets you:
 
 - Add, rename, switch, test, sign out of, or remove Rock profiles
-- Hide the menu-bar icon while keeping `Super+R` available
+- Add, change, or remove an optional keyboard shortcut; hide the menu-bar
+  icon once a working shortcut is configured
 - Show or hide person context
 - Enable or disable Recent Links
 - Choose whether the panel closes after opening an item (enabled by default)
@@ -214,13 +279,76 @@ Manual update:
 omarchy plugin update oneall.rock-arch
 ```
 
+## Disable or remove
+
+To temporarily unload the panel and later enable it again:
+
+```bash
+omarchy plugin disable oneall.rock-arch
+omarchy plugin enable oneall.rock-arch
+```
+
+For removal:
+
+1. If you want saved logins deleted, use **Settings → Remove profile** for each
+   profile and confirm success before removing the plugin. **Sign out** also
+   deletes that profile's saved login while retaining its metadata. Plugin
+   removal by itself leaves Secret Service records intact.
+2. In **Settings → Keyboard shortcut**, remove any shortcut created by Rock
+   Arch before uninstalling. For a manually configured shortcut, remove only
+   its own lines from `~/.config/hypr/bindings.lua`, then run `hyprctl reload`
+   and `hyprctl configerrors`.
+3. Remove the plugin:
+
+   ```bash
+   omarchy plugin remove oneall.rock-arch
+   ```
+
+   If already uninstalled, remove only the block between the
+   `BEGIN Rock Arch shortcut (managed v1)` and matching `END` comments in
+   `~/.config/hypr/bindings.lua`, then reload and check Hyprland as above.
+4. Inspect `~/.local/bin/rock-arch`. If its first two lines are exactly the
+   following managed-launcher header, delete that file. Leave an unrelated
+   command untouched.
+
+   ```text
+   #!/usr/bin/python3
+   # Managed by Rock Arch; terminal access is controlled in Settings.
+   ```
+
+   ```bash
+   rm -- "$HOME/.local/bin/rock-arch"
+   ```
+
+The plugin leaves local settings in `${XDG_CONFIG_HOME:-$HOME/.config}/rock-arch`
+and Recent Links, build receipts, and update state in
+`${XDG_STATE_HOME:-$HOME/.local/state}/rock-arch`. You may delete those two
+directories after removal if you no longer want the data. Previously downloaded
+Magnus files remain in Downloads. Legacy OpenID keyring records are not used or
+deleted by Rock Arch.
+
+A broker started by the terminal client can outlive the panel. Log out and back
+in after removal to end remaining session processes and clear the memory-only
+cookie. Runtime socket files live under `$XDG_RUNTIME_DIR/rock-arch`; the CLI
+launcher cannot run after its plugin source has been removed.
+
+## Roadmap and ideas
+
+These are future directions under consideration, not committed release dates:
+
+- **People:** Send email or SMS and run permission-aware person actions, such
+  as triggering a workflow.
+- **Links:** Add a Personal Link without leaving Rock Arch.
+- **Knowledge Base:** Improve the response reader and connect Model Map
+  references to the full entity view.
+
 ## Keyboard map
 
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
-| Workspaces | Tab / Shift+Tab | — | `Esc` closes | `Ctrl+1` Search, `Ctrl+2` Links, `Alt+K` Knowledge, `Ctrl+3` Magnus, `Ctrl+4` Settings |
+| Workspaces | Tab / Shift+Tab | — | `Esc` closes | `Ctrl+1`–`Ctrl+4` follow visible tab order; `Ctrl+,` Settings |
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `X` or Delete clears recents |
-| Knowledge results | Up / Down | Enter | Backspace edits search | `Alt+K` opens Knowledge |
+| Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
 | Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
@@ -310,7 +438,7 @@ confirmation.
 Start a development broker with the exact process flag:
 
 ```bash
-ROCK_ARCH_DEVELOPER_MODE=1 python3 -m rock_lens_broker
+ROCK_ARCH_DEVELOPER_MODE=1 python3 -m rock_arch_broker
 ```
 
 Only the literal value `1` enables preview context. The panel intentionally
@@ -326,9 +454,10 @@ Run the local acceptance suite from the repository root:
 
 ```bash
 python3 -m unittest discover -s tests -v
-uvx --from ruff==0.16.5 ruff check rock_lens_broker tests
-uvx --from ty==0.0.78 ty check rock_lens_broker
-python3 -m compileall -q rock_lens_broker
+scripts/check-qml
+uvx --from ruff==0.16.5 ruff check rock_arch_broker tests
+uvx --from ty==0.0.78 ty check rock_arch_broker
+python3 -m compileall -q rock_arch_broker
 omarchy plugin validate .
 /usr/lib/qt6/bin/qmllint plugin/oneall.rock-arch/*.qml plugin/oneall.rock-arch/*.js
 git diff --check
@@ -341,5 +470,15 @@ Additional references:
 - [Magnus behavior](docs/MAGNUS.md)
 - [Release process](docs/RELEASING.md)
 - [Changelog](CHANGELOG.md)
+
+## Acknowledgments
+
+Special thanks to [Bradley “Brad” Erb](https://github.com/bradcerb), creator of
+[rock-magnus-cli](https://github.com/bradcerb/rock-magnus-cli). His work
+implementing and documenting the Magnus command model provided the foundation
+for Rock Arch's optional Magnus integration.
+
+Rock Arch connects directly to the Magnus API and does not bundle or require
+the CLI.
 
 Rock Arch is licensed under the [MIT License](LICENSE).

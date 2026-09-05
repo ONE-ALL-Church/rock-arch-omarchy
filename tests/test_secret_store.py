@@ -2,8 +2,8 @@ import unittest
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
-from rock_lens_broker.contracts import Context
-from rock_lens_broker.secret_store import SECRET_TOOL, SecretStoreError, SecretToolStore
+from rock_arch_broker.contracts import Context
+from rock_arch_broker.secret_store import SECRET_TOOL, SecretStoreError, SecretToolStore
 
 
 class SecretStoreTests(unittest.TestCase):

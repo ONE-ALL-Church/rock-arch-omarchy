@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.broker import Broker
-from rock_lens_broker.contracts import (
+from rock_arch_broker.broker import Broker
+from rock_arch_broker.contracts import (
     ALLOWED_PERSON_KEYS,
     ALLOWED_RESULT_KEYS,
     CATEGORIES,
@@ -17,12 +17,12 @@ from rock_lens_broker.contracts import (
     developer_mode_enabled,
     parse_search_query,
 )
-from rock_lens_broker.instance import InstanceStore
-from rock_lens_broker.magnus_adapter import MagnusBuildOutcome
-from rock_lens_broker.navigation import NavigationTarget
-from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.rock_rest_adapter import SearchBatch, SearchCapabilities
-from rock_lens_broker.terminal_access import CLI_CLIENT
+from rock_arch_broker.instance import InstanceStore
+from rock_arch_broker.magnus_adapter import MagnusBuildOutcome
+from rock_arch_broker.navigation import NavigationTarget
+from rock_arch_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_arch_broker.rock_rest_adapter import SearchBatch, SearchCapabilities
+from rock_arch_broker.terminal_access import CLI_CLIENT
 
 
 class FakeSession:
@@ -76,19 +76,19 @@ class FakeSession:
 
     def test_connection(self):
         if not self.configured:
-            from rock_lens_broker.rock_session import RockSessionError
+            from rock_arch_broker.rock_session import RockSessionError
 
             raise RockSessionError("rock_login_required")
 
 
 class FailedRollbackSession(FakeSession):
     def configure(self, username, password):
-        from rock_lens_broker.rock_session import RockSessionError
+        from rock_arch_broker.rock_session import RockSessionError
 
         raise RockSessionError("rock_login_failed")
 
     def remove_profile_credentials(self, profile_id):
-        from rock_lens_broker.rock_session import RockSessionError
+        from rock_arch_broker.rock_session import RockSessionError
 
         raise RockSessionError("secure_storage_failed")
 
@@ -359,7 +359,7 @@ class FakeKnowledge:
     def detail(self, safe_id):
         self.detail_calls.append(safe_id)
         if safe_id != "kb-safe-result":
-            from rock_lens_broker.rock_kb_adapter import RockKbError
+            from rock_arch_broker.rock_kb_adapter import RockKbError
 
             raise RockKbError("knowledge_result_not_found")
         return {
@@ -385,7 +385,7 @@ class FakeKnowledge:
 
     def describe(self, safe_id):
         if safe_id != "kb-safe-result":
-            from rock_lens_broker.rock_kb_adapter import RockKbError
+            from rock_arch_broker.rock_kb_adapter import RockKbError
 
             raise RockKbError("knowledge_result_not_found")
         return {
@@ -478,6 +478,33 @@ class BrokerContractTests(unittest.TestCase):
             {"ok": False, "error": "terminal_access_disabled"},
         )
         self.assertTrue(broker.handle({"op": "status"})["ok"])
+
+    def test_local_settings_can_recover_terminal_access_without_exposing_rock(self):
+        broker = Broker(self.state, instance_file=self.instance, developer_mode=True)
+        order = ["knowledge", "search", "personal", "magnus"]
+        changed = broker.handle({"op": "settings_update", "client": CLI_CLIENT,
+                                 "settings": {"terminalAccess": False, "tabOrder": order}})
+        self.assertEqual(changed["settings"]["tabOrder"], order)
+        self.assertNotIn("profiles", changed)
+        self.assertNotIn("rock", changed)
+        self.assertTrue(broker.handle({"op": "settings_status", "client": CLI_CLIENT})["ok"])
+        self.assertEqual(broker.handle({"op": "profiles_status", "client": CLI_CLIENT})["error"], "terminal_access_disabled")
+        invalid = broker.handle({"op": "settings_update", "client": CLI_CLIENT,
+                                 "settings": {"onboardingSetupCompleted": True}})
+        self.assertEqual(invalid["error"], "invalid_preferences")
+        recovered = broker.handle({"op": "settings_update", "client": CLI_CLIENT,
+                                   "settings": {"terminalAccess": True}})
+        self.assertTrue(recovered["settings"]["terminalAccess"])
+        self.assertTrue(broker.handle({"op": "status", "client": CLI_CLIENT})["ok"])
+
+    def test_cli_cannot_hide_the_icon_without_a_working_shortcut(self):
+        broker = Broker(self.state, instance_file=self.instance, developer_mode=True)
+        response = broker.handle({"op": "settings_update", "client": CLI_CLIENT,
+                                  "settings": {"showMenuBar": False, "recentLinks": False}})
+        self.assertEqual(response["error"], "shortcut_required")
+        settings = broker.handle({"op": "settings_status"})["settings"]
+        self.assertTrue(settings["showMenuBar"])
+        self.assertTrue(settings["recentLinks"])
 
     def test_onboarding_setup_choices_are_explicit_and_persisted(self):
         updates = FakeUpdates()

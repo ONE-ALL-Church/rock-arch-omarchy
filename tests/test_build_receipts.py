@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rock_lens_broker.build_receipts import (
+from rock_arch_broker.build_receipts import (
     MAX_BUILD_RECEIPTS,
     BuildReceiptStore,
 )

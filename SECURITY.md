@@ -2,8 +2,9 @@
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately through GitHub's security
-advisory interface for this repository. Do not include Rock credentials,
+Please report suspected vulnerabilities through the repository's
+[private vulnerability reporting form](https://github.com/ONE-ALL-Church/rock-arch-omarchy/security/advisories/new).
+Do not include Rock credentials,
 cookies, tenant records, or other production data in a report. A minimal local
 reproduction using synthetic data is preferred.
 

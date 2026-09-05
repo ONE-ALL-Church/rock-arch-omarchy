@@ -5,7 +5,7 @@ import unittest
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rock_lens_broker.updates import (
+from rock_arch_broker.updates import (
     CANONICAL_REPOSITORY_URLS,
     PLUGIN_ID,
     PYTHON,
@@ -141,7 +141,7 @@ class UpdateManagerTests(unittest.TestCase):
         self.assertEqual(status["state"], "updating")
         self.assertEqual(len(launched), 1)
         command, working_directory = launched[0]
-        self.assertEqual(command[:3], [str(PYTHON), "-m", "rock_lens_broker.update_worker"])
+        self.assertEqual(command[:3], [str(PYTHON), "-m", "rock_arch_broker.update_worker"])
         self.assertEqual(working_directory, self.root)
         self.assertEqual(self.state_file.stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.state_file.parent.stat().st_mode & 0o777, 0o700)

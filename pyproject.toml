@@ -1,6 +1,6 @@
 [project]
 name = "rock-arch"
-version = "0.25.4"
+version = "0.26.0"
 requires-python = ">=3.11"
 description = "Rock RMS search, public Rock knowledge, and optional Magnus for Omarchy"
 
@@ -9,8 +9,8 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-rock-arch = "rock_lens_broker.cli:main"
-rock-arch-broker = "rock_lens_broker.__main__:main"
+rock-arch = "rock_arch_broker.cli:main"
+rock-arch-broker = "rock_arch_broker.__main__:main"
 
 [tool.setuptools]
-packages = ["rock_lens_broker"]
+packages = ["rock_arch_broker"]

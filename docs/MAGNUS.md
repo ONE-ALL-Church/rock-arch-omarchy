@@ -51,10 +51,16 @@ rock-arch magnus builds
 rock-arch magnus build-status BUILD_ID
 ```
 
-The legacy path-oriented `python3 -m rock_lens_broker magnus ls|cat|hash`
-commands remain available for local diagnostics and obey the same Settings
-access preference. The public `rock-arch` client is preferred for agents because
-raw server paths stay behind the broker.
+The legacy path-oriented `python3 -m rock_arch_broker magnus ls|cat|hash`
+commands are retired. They exit with migration guidance without opening a
+session, reading a server path, or writing an output file. Start with
+`rock-arch magnus browse`, then use the returned opaque IDs with `preview`,
+`hash`, or `download --confirm` as shown above.
+
+The legacy `rock status`, `rock login`, `magnus status`, and `magnus configure`
+module commands remain deprecated aliases for the corresponding `rock-arch`
+status or login commands. They use the broker's active profile, login and access
+checks, JSON output, and exit status.
 
 Tree paths must begin with
 `api/TriumphTech/Magnus/GetTreeItems/`. Content paths must begin with

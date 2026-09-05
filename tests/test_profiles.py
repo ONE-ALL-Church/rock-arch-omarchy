@@ -3,10 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from rock_lens_broker.contracts import CATEGORIES
-from rock_lens_broker.instance import InstanceStore
-from rock_lens_broker.origin import DEFAULT_ROCK_ORIGIN
-from rock_lens_broker.profiles import (
+from rock_arch_broker.contracts import CATEGORIES
+from rock_arch_broker.instance import InstanceStore
+from rock_arch_broker.origin import DEFAULT_ROCK_ORIGIN
+from rock_arch_broker.profiles import (
     PROFILE_STORE_VERSION,
     ProfileError,
     ProfileStore,
@@ -81,6 +81,28 @@ class ProfileStoreTests(unittest.TestCase):
             store.update_preferences({"rawCookie": True})
         with self.assertRaisesRegex(ProfileError, "invalid_profile_name"):
             store.add({"unexpected": "record"}, DEFAULT_ROCK_ORIGIN)
+
+    def test_tab_order_persists_and_invalid_batch_is_atomic(self):
+        store = ProfileStore(self.path, self.instance)
+        order = ["knowledge", "search", "magnus", "personal"]
+        store.update_preferences({"tabOrder": order})
+        self.assertEqual(ProfileStore(self.path, self.instance).preferences()["tabOrder"], order)
+        before = self.path.read_bytes()
+        for invalid in ([], ["search"] * 4, ["search", "personal", "knowledge", "unknown"],
+                        "search", [None, "personal", "knowledge", "magnus"]):
+            with self.subTest(order=invalid), self.assertRaisesRegex(ProfileError, "invalid_preferences"):
+                store.update_preferences({"recentLinks": False, "tabOrder": invalid})
+            self.assertEqual(self.path.read_bytes(), before)
+
+    def test_existing_preferences_gain_default_tab_order(self):
+        store = ProfileStore(self.path, self.instance)
+        store.update_preferences({"recentLinks": False})
+        saved = json.loads(self.path.read_text())
+        saved["preferences"].pop("tabOrder")
+        self.path.write_text(json.dumps(saved))
+        preferences = ProfileStore(self.path, self.instance).preferences()
+        self.assertEqual(preferences["tabOrder"], ["search", "personal", "knowledge", "magnus"])
+        self.assertFalse(preferences["recentLinks"])
 
     def test_version_one_preferences_gain_new_search_categories_once(self):
         self.path.write_text(
