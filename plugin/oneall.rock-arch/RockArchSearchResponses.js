@@ -52,7 +52,7 @@ function knowledgeResults(root, ui, response, frame) {
 
 function links(root, ui, response, frame) {
     if (Array.isArray(response.personalLinks)) {
-      root.linkView.replace(response.personalLinks, root.pendingPersonalLinkSelection)
+      root.linkView.replace(response.personalLinks, root.pendingPersonalLinkSelection, response.personalLinkSections || [])
       root.pendingPersonalLinkSelection = null
     }
     if (Array.isArray(response.quickReturns)) {

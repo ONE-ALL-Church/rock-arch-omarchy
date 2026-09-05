@@ -46,6 +46,8 @@ class FakeRock:
         self.links = []
         self.calls = []
         self.lose_response = False
+        self.lose_section_response = False
+        self.corrupt_section_readback = False
         self.corrupt_readback = False
 
     @property
@@ -57,7 +59,10 @@ class FakeRock:
         if path == CURRENT_PERSON:
             return dict(self.person)
         if path == SECTIONS:
-            return copy.deepcopy(self.sections)
+            sections = copy.deepcopy(self.sections)
+            if self.corrupt_section_readback and self.writes:
+                sections[-1]["Name"] = "Unexpected section"
+            return sections
         condition = params["$filter"]
         match = re.search(r"and Id eq (\d+)", condition)
         if match:
@@ -76,15 +81,18 @@ class FakeRock:
     def create(self, origin, path, body, cookie):
         self.calls.append(("POST", path, copy.deepcopy(body)))
         if path == SECTIONS:
+            number = max([8] + [section["Id"] for section in self.sections]) + 1
             self.sections.append(
                 {
-                    "Id": 9,
+                    "Id": number,
                     "Name": body["Name"],
                     "IsShared": body["IsShared"],
                     "PersonAliasId": body["PersonAliasId"],
                 }
             )
-            return 9
+            if self.lose_section_response:
+                raise PersonalLinkError("personal_link_save_uncertain")
+            return number
         self.links.append({"Id": 100 + len(self.links), **body})
         if self.lose_response:
             raise PersonalLinkError("personal_link_save_uncertain")
@@ -99,6 +107,110 @@ class PersonalLinkTests(unittest.TestCase):
 
     def draft(self):
         return self.manager.prepare("People", "/page/42")
+
+    def test_explicit_section_creation_is_private_confirmed_and_read_back(self):
+        draft = self.manager.prepare_section("  Projects  ")
+        self.assertEqual(self.rock.writes, [])
+        self.assertEqual(draft["name"], "Projects")
+        result = self.manager.save_section(
+            draft["draftId"], draft["name"], confirmed=True
+        )
+        self.assertTrue(result["saved"])
+        self.assertFalse(result["alreadySaved"])
+        self.assertEqual(
+            self.rock.writes,
+            [
+                (
+                    "POST",
+                    SECTIONS,
+                    {"Name": "Projects", "PersonAliasId": 420, "IsShared": False},
+                )
+            ],
+        )
+        self.assertTrue(result["sectionId"].startswith("link-section-"))
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.save_section(draft["draftId"], draft["name"], confirmed=True)
+
+    def test_section_duplicate_reuses_case_insensitive_name(self):
+        draft = self.manager.prepare_section(" work ")
+        result = self.manager.save_section(
+            draft["draftId"], draft["name"], confirmed=True
+        )
+        self.assertTrue(result["alreadySaved"])
+        self.assertEqual(result["name"], "Work")
+        self.assertEqual(self.rock.writes, [])
+
+    def test_lost_section_response_can_be_checked_then_retried_without_duplicate(self):
+        self.rock.lose_section_response = True
+        draft = self.manager.prepare_section("Projects")
+        with self.assertRaisesRegex(PersonalLinkError, "save_uncertain"):
+            self.manager.save_section(draft["draftId"], draft["name"], confirmed=True)
+        self.rock.lose_section_response = False
+        retry = self.manager.prepare_section("Projects")
+        result = self.manager.save_section(
+            retry["draftId"], retry["name"], confirmed=True
+        )
+        self.assertTrue(result["alreadySaved"])
+        self.assertEqual(len(self.rock.writes), 1)
+
+    def test_section_confirmation_name_and_draft_kind_prevent_unintended_writes(self):
+        draft = self.manager.prepare_section("Projects")
+        with self.assertRaisesRegex(PersonalLinkError, "confirmation_required"):
+            self.manager.save_section(draft["draftId"], "Projects", confirmed=False)
+        for name in ("", " ", "x" * 101, "bad\nname", "\udcff", None):
+            with (
+                self.subTest(name=repr(name)),
+                self.assertRaisesRegex(PersonalLinkError, "name_invalid"),
+            ):
+                self.manager.save_section(draft["draftId"], name, confirmed=True)
+        link = self.draft()
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.save_section(link["draftId"], "Projects", confirmed=True)
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.save(
+                draft["draftId"], "Page", "/page/42", None, confirmed=True
+            )
+        self.assertEqual(self.rock.writes, [])
+
+    def test_section_account_change_or_expiration_never_writes(self):
+        draft = self.manager.prepare_section("Projects")
+        self.rock.person["PrimaryAliasId"] = 421
+        with self.assertRaisesRegex(PersonalLinkError, "account_changed"):
+            self.manager.save_section(draft["draftId"], "Projects", confirmed=True)
+        self.assertFalse(self.manager._drafts)
+        self.rock.person["PrimaryAliasId"] = 420
+        draft = self.manager.prepare_section("Projects")
+        with (
+            patch(
+                "rock_arch_broker.personal_links.time.monotonic",
+                return_value=float("inf"),
+            ),
+            self.assertRaisesRegex(PersonalLinkError, "draft_expired"),
+        ):
+            self.manager.save_section(draft["draftId"], "Projects", confirmed=True)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_section_readback_mismatch_never_reports_success(self):
+        draft = self.manager.prepare_section("Projects")
+        self.rock.corrupt_section_readback = True
+        with self.assertRaisesRegex(PersonalLinkError, "save_uncertain"):
+            self.manager.save_section(draft["draftId"], "Projects", confirmed=True)
+        self.assertEqual(len(self.rock.writes), 1)
+
+    def test_section_limit_refuses_creation_before_post(self):
+        self.rock.sections = [
+            {
+                "Id": i + 1,
+                "Name": f"Section {i}",
+                "IsShared": False,
+                "PersonAliasId": 420,
+            }
+            for i in range(100)
+        ]
+        draft = self.manager.prepare_section("New section")
+        with self.assertRaisesRegex(PersonalLinkError, "personal_section_limit"):
+            self.manager.save_section(draft["draftId"], "New section", confirmed=True)
+        self.assertEqual(self.rock.writes, [])
 
     def save(self, draft, **overrides):
         return self.manager.save(
@@ -424,6 +536,87 @@ class PersonalLinkBrokerCliTests(unittest.TestCase):
             ["personal_link_prepare", "personal_link_save"],
         )
         self.assertTrue(self.live.invalidated)
+
+    def test_cli_section_list_includes_empty_sections_without_allocating_a_draft(self):
+        result = _request(_parser().parse_args(["links", "sections"]), self)
+        section = result["sections"][0]
+        self.assertEqual(set(section), {"safeId", "groupId", "name", "isShared"})
+        self.assertEqual(section["name"], "Work")
+        self.assertFalse(self.manager._drafts)
+        self.rock.sections = []
+        result = _request(_parser().parse_args(["links", "sections"]), self)
+        self.assertEqual(result["sections"], [])
+        self.assertIsNone(result["defaultSectionId"])
+
+    def test_cli_section_creation_and_duplicate_return_only_public_metadata(self):
+        args = _parser().parse_args(
+            ["links", "sections", "add", "--stdin", "--confirm"]
+        )
+        for expected_duplicate in (False, True):
+            with patch("sys.stdin", io.StringIO('{"name":"Projects"}')):
+                result = _request(args, self)["personalSection"]
+            self.assertEqual(result["alreadySaved"], expected_duplicate)
+            self.assertTrue(result["saved"])
+            self.assertEqual(
+                set(result),
+                {"requestId", "saved", "alreadySaved", "name", "sectionId", "groupId"},
+            )
+            self.assertRegex(result["groupId"], r"^link-group-[a-f0-9]{32}$")
+        self.assertEqual(len(self.rock.writes), 1)
+        self.assertTrue(self.live.invalidated)
+
+    def test_cli_section_dry_run_and_invalid_inputs_never_write(self):
+        with patch("sys.stdin", io.StringIO('{"name":"Projects"}')):
+            result = _request(
+                _parser().parse_args(
+                    ["links", "sections", "add", "--stdin", "--dry-run"]
+                ),
+                self,
+            )
+        self.assertFalse(result["dryRun"]["executed"])
+        self.assertEqual(self.rock.writes, [])
+        self.calls.clear()
+        for value in (
+            "{}",
+            "[]",
+            '{"name":" "}',
+            '{"name":false}',
+            '{"name":"x","IsShared":true}',
+            '{"name":"x","PersonAliasId":9}',
+            '{"name":"x","url":"/page/42"}',
+        ):
+            with patch("sys.stdin", io.StringIO(value)), self.assertRaises(CliError):
+                _request(
+                    _parser().parse_args(
+                        ["links", "sections", "add", "--stdin", "--confirm"]
+                    ),
+                    self,
+                )
+        with self.assertRaisesRegex(CliError, "confirmation_required"):
+            _request(
+                _parser().parse_args(["links", "sections", "add", "--stdin"]), self
+            )
+        self.assertEqual(self.calls, [])
+
+    def test_navigation_catalog_is_optional_and_does_not_expose_raw_identifiers(self):
+        result = self.broker.handle({"op": "navigation_status", "section": "personal"})
+        self.assertTrue(result["personalLinkSectionsAvailable"])
+        self.assertEqual(
+            set(result["personalLinkSections"][0]),
+            {"safeId", "groupId", "name", "isShared"},
+        )
+        with patch.object(
+            self.manager,
+            "list_sections",
+            side_effect=PersonalLinkError("personal_links_not_authorized"),
+        ):
+            result = self.broker.handle(
+                {"op": "navigation_status", "section": "personal"}
+            )
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["personalLinksAvailable"])
+        self.assertFalse(result["personalLinkSectionsAvailable"])
+        self.assertTrue(result["personalLinks"])
 
     def test_cli_bad_input_and_missing_confirmation_never_reach_broker(self):
         for value in (

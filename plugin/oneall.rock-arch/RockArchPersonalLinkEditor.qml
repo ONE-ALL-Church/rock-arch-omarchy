@@ -15,7 +15,7 @@ Column {
 
   RowLayout {
     width: parent.width
-    PanelSectionHeader { text: "ADD PERSONAL LINK"; Layout.fillWidth: true }
+    PanelSectionHeader { text: editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
     Button {
       text: "Cancel"
       focusable: true
@@ -25,7 +25,7 @@ Column {
   }
   Text {
     width: parent.width
-    text: "Save to your Rock account · " + editor.controller.activeProfileName()
+    text: (editor.model.kind === "section" ? "Private section in " : "Save to your Rock account · ") + editor.controller.activeProfileName()
     textFormat: Text.PlainText
     color: Qt.darker(Color.foreground, 1.4)
     font.family: Style.font.family
@@ -45,13 +45,14 @@ Column {
       text: editor.model.name
       maximumLength: 100
       enabled: !editor.model.busy
-      Accessible.name: "Link name"
+      Accessible.name: editor.model.kind === "section" ? "Section name" : "Link name"
       onTextEdited: editor.model.name = text
-      onAccepted: urlField.forceActiveFocus(Qt.TabFocusReason)
+      onAccepted: { if (editor.model.kind === "section") editor.model.save(); else urlField.forceActiveFocus(Qt.TabFocusReason) }
       onActiveFocusChanged: if (activeFocus) editor.controller.revealFocusedControl(nameField)
     }
   }
   Column {
+    visible: editor.model.kind === "link"
     width: parent.width
     spacing: Style.spacing.labelGap
     Text {
@@ -73,6 +74,7 @@ Column {
   Dropdown {
     id: sectionField
     width: parent.width
+    visible: editor.model.kind === "link"
     label: "Personal section"
     value: editor.model.sectionId
     options: editor.model.sections.map(function(item) { return {value: item.safeId, label: item.name} })
@@ -99,8 +101,8 @@ Column {
       onClicked: editor.model.reload()
     }
     Button {
-      text: editor.model.saving ? "Saving…" : "Save link"
-      tooltipText: "Save to Personal Links · Ctrl+S"
+      text: editor.model.saving ? "Saving…" : editor.model.kind === "section" ? "Create section" : "Save link"
+      tooltipText: editor.model.kind === "section" ? "Create section · Ctrl+S" : "Save to Personal Links · Ctrl+S"
       focusable: true
       bordered: true
       enabled: editor.model.canSave

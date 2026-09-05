@@ -87,6 +87,9 @@ class BrokerOperations:
             "activate_recent": self._activate_recent,
             "personal_link_prepare": self._personal_link,
             "personal_link_save": self._personal_link,
+            "personal_section_list": self._personal_link,
+            "personal_section_prepare": self._personal_link,
+            "personal_section_save": self._personal_link,
         }
 
     def handle(self, raw: dict[str, Any]) -> dict[str, Any]:
@@ -1024,12 +1027,23 @@ class BrokerOperations:
     def _personal_link(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
         request_id = sanitize_text(raw.get("requestId"), 80)
+        envelope = "personalSection" if raw["op"].startswith("personal_section_") else "personalLink"
         try:
             if broker._context is not Context.PROD:
                 raise PersonalLinkError("personal_links_preview_only")
             if not broker._origin or not broker._session.status()["configured"]:
                 raise PersonalLinkError("rock_login_required")
-            if raw["op"] == "personal_link_prepare":
+            if raw["op"] == "personal_section_list":
+                sections = broker._public_link_sections()
+                default = next((item["safeId"] for item in sections if item["name"] == "Links"), sections[0]["safeId"] if sections else None)
+                result = {"sections": sections, "defaultSectionId": default}
+            elif raw["op"] == "personal_section_prepare":
+                result = broker._personal_links.prepare_section(raw.get("name", ""))
+            elif raw["op"] == "personal_section_save":
+                result = broker._personal_links.save_section(raw.get("draftId"), raw.get("name"), confirmed=raw.get("confirmed") is True)
+                result["groupId"] = broker._live.personal_link_group_id(result.pop("_sectionId"))
+                broker._live.invalidate_personal_links()
+            elif raw["op"] == "personal_link_prepare":
                 name, url = raw.get("name", ""), raw.get("url", "")
                 if "safeId" in raw:
                     safe_id = raw["safeId"]
@@ -1046,11 +1060,11 @@ class BrokerOperations:
                     raw.get("sectionId"), confirmed=raw.get("confirmed") is True,
                 )
                 broker._live.invalidate_personal_links()
-            return broker._ok(personalLink={**result, "requestId": request_id})
+            return broker._ok(**{envelope: {**result, "requestId": request_id}})
         except (PersonalLinkError, RockSessionError, RockRestError) as error:
             if str(error) == "personal_links_not_authorized":
                 broker._session.invalidate_authenticated_cookie()
-            return {**broker._error(str(error)), "personalLink": {
+            return {**broker._error(str(error)), envelope: {
                 "requestId": request_id, "error": str(error),
             }}
 

@@ -51,8 +51,12 @@ sections owned by that alias, and rechecks both account and section at Save.
 Clients cannot choose a raw owner or record ID. The URL must resolve to the
 active HTTPS Rock origin. Single-use drafts expire after ten minutes and are
 cleared on account/context changes and sign-out. Saves are read back before
-success is reported; ambiguous outcomes are not retried automatically. A first
-private Links section can be created only as part of an explicit bookmark save.
+success is reported; ambiguous outcomes are not retried automatically. Explicit
+section creation accepts only a name and fixes the authenticated owner and
+`IsShared: false`. It checks for a matching private section before creating one,
+and verifies the returned section's ID, name, ownership, and private status.
+Link and section drafts cannot be used interchangeably. A first private Links
+section can also be created as part of an explicit bookmark save.
 
 ## Secret handling
 

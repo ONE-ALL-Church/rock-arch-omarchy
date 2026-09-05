@@ -35,7 +35,7 @@ def settings_schema() -> dict[str, Any]:
     fields["personalLinksExpandedGroups"] = {
         "type": "object", "default": {},
         "description": "Map profile IDs to arrays of expanded groupId values from links personal. Omitted groups start collapsed. Replaces the complete map.",
-        "maxGroupsPerProfile": 50,
+        "maxGroupsPerProfile": 150,
         "maxTotalGroups": 200,
     }
     return {
@@ -111,12 +111,14 @@ def protocol_schema() -> dict[str, Any]:
         "settings": settings_schema(),
         "personalLinks": {
             "sections": "rock-arch links sections",
+            "addSection": "rock-arch links sections add --stdin --confirm",
+            "sectionInput": {"name": "private section name, at most 100 UTF-16 units"},
             "add": "rock-arch links add --stdin --confirm",
             "saveResult": "rock-arch links add --from SAFE_ID --confirm",
             "input": {"name": "bookmark name, at most 100 UTF-16 units", "url": "URL on the active Rock instance",
                       "safeId": "alternative to URL; prefills a current Rock result", "sectionId": "optional section safeId"},
             "preview": "Use --dry-run for validated details without saving.",
-            "scope": "Current user's private sections only; creates a private Links section when none exist.",
+            "scope": "Current user's private sections only. Explicit section creation, or a first private Links section during bookmark creation.",
             "retries": "Never automatically repeat a save after an uncertain result. Check links first.",
         },
         "buildStatus": {

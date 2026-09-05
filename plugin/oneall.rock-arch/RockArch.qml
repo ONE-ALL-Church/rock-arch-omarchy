@@ -28,6 +28,7 @@ Panel {
   property alias query: searchField.text
   property var results: []
   property alias personalLinks: linkViewModel.links
+  property alias personalLinkSections: linkViewModel.sections
   property alias linkView: linkViewModel
   property string preferencePersonalLinksView: "groups"
   property var preferenceExpandedLinkGroups: ({})
@@ -543,13 +544,27 @@ Panel {
     preferenceExpandedLinkGroups = next
     updatePreference("personalLinksExpandedGroups", next)
   }
-  function beginPersonalLink(safeId) {
+  function beginPersonalLink(safeId, preferredSection) {
     if (!rockConfigured || contextName !== "PROD" || personalLinkModel.saving) return
     personalLinkReturnView = viewMode
     viewMode = "personal"
     feedbackText = ""
     broker.dropPersonalLinkRequests()
-    personalLinkModel.begin(safeId || "")
+    if (!safeId && !preferredSection) {
+      var selected = linkViewModel.selected()
+      var section = selected ? personalLinkSections.find(function(item) { return item.groupId === selected.sectionId }) : null
+      if (section) preferredSection = section.safeId
+    }
+    personalLinkModel.begin(safeId || "", preferredSection || "")
+    panelFlick.contentY = 0
+  }
+  function beginPersonalSection() {
+    if (!rockConfigured || contextName !== "PROD" || personalLinkModel.saving) return
+    personalLinkReturnView = viewMode
+    viewMode = "personal"
+    feedbackText = ""
+    broker.dropPersonalLinkRequests()
+    personalLinkModel.beginSection()
     panelFlick.contentY = 0
   }
   function saveSearchLink() {
@@ -1306,10 +1321,10 @@ Panel {
     }
   }
 
-  onActiveProfileIdChanged: { personalLinkModel.closed(); personalLinks = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
-  onRockConfiguredChanged: if (!rockConfigured) { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onActiveProfileIdChanged: { personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onRockConfiguredChanged: if (!rockConfigured) { personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
   onViewModeChanged: if (viewMode !== "personal") { personalLinkModel.closed(); broker.dropPersonalLinkRequests() }
-  onContextNameChanged: { personalLinkModel.closed(); pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onContextNameChanged: { personalLinkModel.closed(); personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
 
   RockArchPersonalLinkState {
     id: personalLinkModel
@@ -1329,12 +1344,21 @@ Panel {
       root.feedbackText = alreadySaved ? "Already in Personal Links" : "Saved to Personal Links"
       personalLinkNoticeTimer.restart()
     }
+    onSavedSection: function(alreadySaved, name, groupId) {
+      if (root.preferencePersonalLinksView !== "groups") root.setLinkView("groups")
+      root.pendingPersonalLinkSelection = {kind: "section", name: name, groupId: groupId}
+      root.selectPersonalLink(0)
+      root.refreshPersonalLinks()
+      root.feedbackText = alreadySaved ? "Section already exists" : "Section created"
+      personalLinkNoticeTimer.restart()
+    }
   }
 
   RockArchLinkView {
     id: linkViewModel
     onExpandedChanged: function(groups) { root.persistExpandedLinkGroups(groups) }
     onOpenRequested: function(safeId) { root.request({op: "open_navigation", safeId: safeId}) }
+    onAddLinkRequested: function(sectionId) { root.beginPersonalLink("", sectionId) }
     onFocusRequested: Qt.callLater(function() {
       if (root.viewMode !== "personal" || personalLinkModel.editing) return
       keyCatcher.forceActiveFocus()
@@ -1357,7 +1381,7 @@ Panel {
   Timer {
     id: personalLinkNoticeTimer
     interval: 4000
-    onTriggered: if (root.feedbackText === "Saved to Personal Links" || root.feedbackText === "Already in Personal Links") root.feedbackText = ""
+    onTriggered: if (["Saved to Personal Links", "Already in Personal Links", "Section created", "Section already exists"].indexOf(root.feedbackText) >= 0) root.feedbackText = ""
   }
   Timer { id: knowledgeSearchTimer; interval: 400; onTriggered: root.refreshKnowledgeSearch() }
   Timer {
@@ -1428,7 +1452,7 @@ Panel {
   Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Items"); onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
-  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD"; onActivated: root.beginPersonalLink("") }
+  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalPanel.openAddMenu() }
   Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && (personalLinkModel.editing || root.viewMode === "search"); onActivated: { if (personalLinkModel.editing) personalLinkModel.save(); else root.saveSearchLink() } }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(0) }

@@ -519,9 +519,7 @@ class RockRestReadOnlyAdapter:
             if not section_name or not isinstance(links, list):
                 continue
             section_identity = self._positive_id(self._field(section, "Id")) or f"{shared}:{section_name}:{section_index}"
-            section_id = "link-group-" + hmac.new(
-                self._group_key, f"{self.origin}:{section_identity}".encode(), hashlib.sha256
-            ).hexdigest()[:32]
+            section_id = self.personal_link_group_id(section_identity)
             for link in links:
                 if seen >= MAX_PERSONAL_LINKS:
                     break
@@ -559,6 +557,11 @@ class RockRestReadOnlyAdapter:
         )
         self._personal_links_loaded = True
         return result
+
+    def personal_link_group_id(self, section: int | str) -> str:
+        return "link-group-" + hmac.new(
+            self._group_key, f"{self.origin}:{section}".encode(), hashlib.sha256
+        ).hexdigest()[:32]
 
     def resolve(self, safe_id: str) -> NavigationTarget | None:
         entry = self._registry.get(sanitize_text(safe_id, 100))

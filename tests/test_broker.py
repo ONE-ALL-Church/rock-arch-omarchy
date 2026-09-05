@@ -245,6 +245,9 @@ class FakeLive:
     def set_profile_scope(self, profile_id):
         self.profile_scope = profile_id
 
+    def personal_link_group_id(self, section):
+        return "link-group-" + f"{int(section):032x}"
+
     def clear(self):
         self.cleared = True
 
@@ -402,6 +405,9 @@ class FakeKnowledge:
 
 class BrokerContractTests(unittest.TestCase):
     def setUp(self):
+        sections = patch("rock_arch_broker.personal_links.PersonalLinkManager.list_sections", return_value=[])
+        sections.start()
+        self.addCleanup(sections.stop)
         self.tmp = tempfile.TemporaryDirectory()
         self.state = Path(self.tmp.name) / "context"
         self.instance = Path(self.tmp.name) / "instance.json"

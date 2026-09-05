@@ -130,7 +130,7 @@ class ProfileStoreTests(unittest.TestCase):
             [], {"unknown-profile": [group]}, {profile.profile_id: "all"},
             {profile.profile_id: [group, group]}, {profile.profile_id: [42]},
             {profile.profile_id: ["raw-section-id"]},
-            {profile.profile_id: ["link-group-" + f"{number:032x}" for number in range(51)]},
+            {profile.profile_id: ["link-group-" + f"{number:032x}" for number in range(151)]},
         )]
         for update in updates:
             with self.subTest(update=update), self.assertRaisesRegex(ProfileError, "invalid_preferences"):

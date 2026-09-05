@@ -30,6 +30,46 @@ TestCase {
     compare(model.name, "Directory")
     compare(requests.length, 1)
   }
+  function test_section_form_only_needs_name_and_emits_section_result() {
+    var result = null
+    model.savedSection.connect(function(duplicate, name, groupId) { result = {duplicate: duplicate, name: name, groupId: groupId} })
+    model.beginSection()
+    compare(requests[0].op, "personal_section_prepare")
+    model.accept({requestId: model.requestId, draftId: "section-draft", name: "", kind: "section", sections: []})
+    verify(!model.canSave)
+    model.name = "  Projects  "
+    verify(model.canSave)
+    model.save()
+    compare(requests[1].op, "personal_section_save")
+    compare(requests[1].name, "Projects")
+    compare(requests[1].url, undefined)
+    compare(requests[1].sectionId, undefined)
+    model.accept({requestId: model.requestId, saved: true, alreadySaved: false, name: "Projects", groupId: "empty"})
+    compare(result, {duplicate: false, name: "Projects", groupId: "empty"})
+    compare(saves, 0)
+    verify(!model.editing)
+  }
+  function test_empty_section_action_prefills_target_and_expired_target_falls_back() {
+    model.begin("", "target")
+    model.accept({requestId: model.requestId, draftId: "draft", name: "", url: "", sectionId: "default",
+      sections: [{safeId: "default", name: "Work"}, {safeId: "target", name: "Projects"}]})
+    compare(model.sectionId, "target")
+    model.begin("", "removed")
+    ready()
+    compare(model.sectionId, "section")
+  }
+  function test_section_interruption_keeps_name_and_requires_explicit_reload() {
+    model.beginSection()
+    model.accept({requestId: model.requestId, draftId: "draft", name: "Projects", sections: []})
+    model.save()
+    model.interrupted()
+    verify(model.notice.indexOf("saved this section") >= 0)
+    model.save()
+    compare(requests.length, 2)
+    model.reload()
+    compare(requests[2].op, "personal_section_prepare")
+    compare(requests[2].name, "Projects")
+  }
   function test_save_requires_ready_valid_fields_and_ignores_double_clicks() {
     model.begin("")
     model.save()

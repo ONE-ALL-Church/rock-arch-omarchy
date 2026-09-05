@@ -27,7 +27,7 @@ from .mock_adapter import MockAdapter
 from .navigation import NavigationTarget, open_rock_url
 from .notifications import notify_build_accepted
 from .origin import DEFAULT_ROCK_ORIGIN
-from .personal_links import PersonalLinkManager
+from .personal_links import PersonalLinkError, PersonalLinkManager
 from .profiles import ProfileError, ProfileStore, RockProfile
 from .quick_return import QuickReturnStore
 from .rock_kb_adapter import (
@@ -120,6 +120,8 @@ class LiveReadAdapter(Protocol):
     def person_quick_look(self, safe_id: str) -> dict[str, Any] | None: ...
 
     def personal_links(self, force_refresh: bool = False) -> list[dict[str, Any]]: ...
+
+    def personal_link_group_id(self, section: int | str) -> str: ...
 
     def invalidate_personal_links(self) -> None: ...
 
@@ -338,6 +340,8 @@ class Broker:
             return self._ok(**response)
         if section in {"all", "personal"}:
             personal_links: list[dict[str, Any]] = []
+            personal_sections: list[dict[str, Any]] = []
+            sections_available = False
             available = False
             if (
                 self._context is Context.PROD
@@ -348,11 +352,18 @@ class Broker:
                     personal_links = self._live.personal_links(force_refresh=True)
                     self._live_health = HealthState.HEALTHY
                     available = True
+                    try:
+                        personal_sections = self._public_link_sections()
+                        sections_available = True
+                    except (PersonalLinkError, RockSessionError):
+                        pass
                 except RockRestError:
                     self._live_health = HealthState.STALE
             response.update(
                 personalLinks=personal_links,
                 personalLinksAvailable=available,
+                personalLinkSections=personal_sections,
+                personalLinkSectionsAvailable=sections_available,
             )
         if section in {"all", "quick_returns"}:
             response["quickReturns"] = (
@@ -362,6 +373,12 @@ class Broker:
                 else []
             )
         return self._ok(**response)
+
+    def _public_link_sections(self) -> list[dict[str, Any]]:
+        return [{
+            "name": section["name"], "safeId": section["safeId"],
+            "groupId": self._live.personal_link_group_id(section["id"]), "isShared": False,
+        } for section in self._personal_links.list_sections()]
 
     @staticmethod
     def _matching_personal_links(

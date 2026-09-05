@@ -10,10 +10,11 @@ Column {
 
   required property var controller
   property alias repeater: personalLinkRepeater
-  property alias addButton: addLinkButton
-  readonly property bool inputActive: viewDropdown.popupOpen
+  property alias addButton: addDropdown
+  readonly property bool inputActive: viewDropdown.popupOpen || addDropdown.popupOpen
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
   function openViewMenu() { viewDropdown.open() }
+  function openAddMenu() { addDropdown.open() }
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
@@ -31,18 +32,27 @@ Column {
       Accessible.name: "Links view"
       onChanged: function(value) { personalPanel.controller.setLinkView(value) }
     }
-    Button {
-      id: addLinkButton
-      text: "Add link"
-      tooltipText: "Add a Personal Link · Ctrl+N"
-      focusable: true
+    Dropdown {
+      id: addDropdown
+      Layout.preferredWidth: Style.space(88)
+      value: "Add"
+      showLabel: false
+      label: "Add link or section"
+      Accessible.name: "Add link or section"
+      options: [{value: "link", label: "Link"}, {value: "section", label: "Section"}]
       visible: personalPanel.controller.rockConfigured && personalPanel.controller.contextName === "PROD"
-      onClicked: personalPanel.controller.beginPersonalLink("")
+      onChanged: function(value) {
+        addDropdown.value = "Add"
+        if (value === "section") personalPanel.controller.beginPersonalSection()
+        else personalPanel.controller.beginPersonalLink("")
+      }
+      Keys.onReturnPressed: open()
+      Keys.onSpacePressed: open()
     }
   }
 
   Column {
-    visible: personalPanel.controller.personalLinks.length === 0
+    visible: personalPanel.controller.linkView.rows.length === 0
     width: parent.width
     topPadding: Style.spacing.xxxl
     bottomPadding: Style.spacing.huge
@@ -99,7 +109,7 @@ Column {
       Accessible.name: modelData.title
       Accessible.description: modelData.group
         ? (modelData.expanded ? "Expanded" : "Collapsed") + ", " + modelData.count + " links"
-        : "Open Personal Link"
+          : modelData.empty ? "Add a link to this section" : "Open Personal Link"
       Accessible.onPressAction: personalPanel.controller.linkView.activate(row.index)
 
       Rectangle {

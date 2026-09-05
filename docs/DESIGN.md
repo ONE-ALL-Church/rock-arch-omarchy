@@ -138,7 +138,12 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   the view selector. This follows the show/hide heading model in the
   [WAI accordion pattern](https://www.w3.org/WAI/ARIA/apg/patterns/accordion/),
   adapted to Omarchy's existing list and workspace keyboard navigation.
-  Add link remains in the header. Save on a Search result opens a focused form with name
+  One **Add** dropdown in the header offers **Link** and **Section**; Ctrl+N opens
+  it. Choosing Section opens a name-only form for a private section in the active
+  account. Saving switches to Groups and opens the section with an indented
+  **Add a link** action that preselects it. Empty private sections remain visible
+  in Groups; Alphabetical stays a flat list of links.
+  Save on a Search result opens a focused form with name
   and URL prefilled. Use native text fields and a private-section dropdown;
   Ctrl+S saves and Escape returns to the source view. Saving expands the section, selects and reveals
   the bookmark; success feedback clears after four seconds.

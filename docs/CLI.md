@@ -159,10 +159,28 @@ to arrays of expanded `groupId`s (from `links personal`). Read the current map
 with `settings get`, edit it, and write it using `settings set --stdin`.
 The supplied map replaces the complete value; preserve other profiles' entries
 when editing one account. An empty array collapses that profile's groups; an
-empty map resets all groups. The map supports up to 50 groups per profile and
+empty map resets all groups. The map supports up to 150 groups per profile and
 200 in total. IDs survive restarts and section renames, and are scoped to the
 profile and Rock origin. These display IDs cannot open links or select a section
 for creating a bookmark; use `links sections` for creation targets.
+
+Create a private section in the active account:
+
+```bash
+rock-arch links sections add --stdin --confirm <<'JSON'
+{"name":"Projects"}
+JSON
+```
+
+The input accepts only `name` (1–100 UTF-16 units); owner and sharing are fixed
+by the broker. Use `--dry-run` instead of `--confirm` to validate without creating
+anything. An existing private section with the same case-insensitive name is
+returned with `alreadySaved: true`. A successful result includes a `sectionId`
+for `links add` and a stable `groupId` for display preferences.
+`links sections` includes empty private sections without creating a draft or
+a default section. Empty sections appear in the panel's Groups view, where
+**Add a link** opens the link form with that section selected. After an uncertain
+save, check `links sections` before explicitly retrying.
 
 Save a Search result to your Rock Personal Links:
 

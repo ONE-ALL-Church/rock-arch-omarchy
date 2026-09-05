@@ -395,7 +395,7 @@ class ProfileStore:
         result = {}
         for profile, groups in value.items():
             if (
-                not isinstance(groups, list) or len(groups) > 50
+                not isinstance(groups, list) or len(groups) > 150
                 or any(not isinstance(group, str) or not LINK_GROUP_PATTERN.fullmatch(group) for group in groups)
                 or len(set(groups)) != len(groups)
             ):

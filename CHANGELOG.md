@@ -7,11 +7,15 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Add an **Add → Link / Section** menu and a name-only private-section form.
+  Reveal new and empty sections in Groups with an **Add a link** action.
+  Support `links sections add --stdin --confirm` and `--dry-run` in the CLI,
+  with case-insensitive duplicate protection and verified private ownership.
 - Default Links to collapsible sections with indented bookmarks and link counts.
   Remember expanded sections per account, and offer a flat Alphabetical view.
   Expose both view and expansion preferences through the CLI.
 - Add Personal Links directly from Links, or prefill a bookmark from Search.
-  Use Ctrl+N in Links and Ctrl+S to prepare or save a bookmark. Select and reveal
+  Use Ctrl+N for the Add menu and Ctrl+S to prepare or save a bookmark. Select and reveal
   the saved link after refreshing.
 - Expose personal sections and confirmed additions through the JSON CLI, with
   private stdin input, search-result prefilling, and a read-only dry run.

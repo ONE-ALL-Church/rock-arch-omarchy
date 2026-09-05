@@ -1,13 +1,13 @@
 # Verification record
 
 This record describes the prepared `0.26.0` release boundary and the unreleased
-Personal Link creation acceptance below. Historical feature changes belong in
+Personal Link and section creation acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
 
 ## Unreleased Personal Link creation
 
-On 2026-09-05, the feature branch passed 259 Python tests and 52 Qt behavioral
-tests (64 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
+On 2026-09-05, the feature branch passed 270 Python tests and 57 Qt behavioral
+tests (69 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
 compilation, Omarchy manifest validation, and `git diff --check`. Standalone
 `qmllint` exited successfully with expected warnings for shell-provided imports.
 
@@ -42,6 +42,25 @@ stable while a newly encountered group started collapsed. Actual CLI commands
 changed the view and reset expansion; the panel reflected the changes. The review
 installation was then removed and the original desktop layout preserved.
 No bookmarks were created, edited, or deleted during the view checks.
+
+Standalone section creation was then checked with two temporary private sections
+and one bookmark, each recorded by exact ID in a private review harness. The
+native Add menu offered Link and Section, kept its Add label after selection,
+and opened a name-only section form. Saving revealed the empty section with
+Add a link; activating that row preselected the section in the bookmark form.
+Saving from Alphabetical switched to Groups and revealed the section. A shell
+and broker restart preserved both empty-section visibility and expansion.
+The actual CLI created the second section, while a dry run and a repeated save
+made no writes. Qt and Python tests additionally cover typed draft misuse,
+case-insensitive section duplicates, uncertain saves, account changes, limits,
+optional catalog authorization, and section metadata without raw owner IDs.
+
+Cleanup verified the exact recorded fields before deleting the test bookmark,
+then checked that both test sections were empty before deleting them. Readback
+confirmed all three records absent and the original 16 bookmarks and two
+sections restored. The temporary plugin was removed and the shell restarted;
+the original bar layout and canonical profile file were preserved byte for byte.
+The submitted main branch and installed public release remain unchanged.
 
 Regression tests cover distinct same-named sections, case-insensitive sorting,
 multiple open groups, Left/Right navigation, selection during refresh and removal,

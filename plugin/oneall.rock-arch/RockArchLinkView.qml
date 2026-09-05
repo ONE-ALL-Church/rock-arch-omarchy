@@ -3,6 +3,7 @@ import QtQml
 QtObject {
   id: state
   property var links: []
+  property var sections: []
   property string mode: "groups"
   property var expandedGroups: []
   property int cursor: -1
@@ -10,6 +11,7 @@ QtObject {
   readonly property var rows: visibleRows()
   signal expandedChanged(var groups)
   signal openRequested(string safeId)
+  signal addLinkRequested(string sectionId)
   signal focusRequested()
 
   function groupId(link) {
@@ -27,6 +29,12 @@ QtObject {
       else result.push({group: true, key: "group:" + id, sectionId: id,
         title: link.section, isShared: !!link.isShared, count: 1})
     })
+    sections.forEach(function(section) {
+      var group = result.find(function(item) { return item.sectionId === section.groupId })
+      if (group) group.sectionSafeId = section.safeId
+      else result.push({group: true, key: "group:" + section.groupId, sectionId: section.groupId,
+        title: section.name, isShared: false, count: 0, sectionSafeId: section.safeId})
+    })
     return result
   }
   function visibleRows() {
@@ -43,6 +51,9 @@ QtObject {
       if (expanded) links.forEach(function(link) {
         if (groupId(link) === group.sectionId) result.push(linkRow(link))
       })
+      if (expanded && group.count === 0 && group.sectionSafeId)
+        result.push({group: false, empty: true, key: "empty:" + group.sectionId, sectionId: group.sectionId,
+          title: "Add a link", sectionSafeId: group.sectionSafeId})
     })
     return result
   }
@@ -59,10 +70,14 @@ QtObject {
     if (JSON.stringify(expandedGroups) !== JSON.stringify(next)) expandedGroups = next.slice()
     restoreSelection(item)
   }
-  function replace(value, saved) {
+  function replace(value, saved, catalog) {
     var item = selected()
     links = value
-    if (saved) {
+    if (Array.isArray(catalog)) sections = catalog
+    if (saved && saved.kind === "section") {
+      var section = groups.find(function(candidate) { return candidate.sectionId === saved.groupId })
+      if (section) { item = section; expand(section.sectionId, true) }
+    } else if (saved) {
       var link = links.find(function(candidate) {
         return candidate.title === saved.name && candidate.section === saved.section && !candidate.isShared
       })
@@ -85,6 +100,7 @@ QtObject {
     if (index < 0 || index >= rows.length) return
     cursor = index
     var item = rows[index]
+    if (item.empty) { addLinkRequested(item.sectionSafeId); return }
     if (!item.group) { openRequested(item.safeId); return }
     expand(item.sectionId, !item.expanded)
     restoreSelection(item)
@@ -94,7 +110,7 @@ QtObject {
     var item = selected()
     if (mode !== "groups" || !item) return false
     if (direction > 0 && item.group) {
-      if (item.expanded && cursor + 1 < rows.length) cursor++
+      if (item.expanded && cursor + 1 < rows.length && rows[cursor + 1].sectionId === item.sectionId && !rows[cursor + 1].group) cursor++
       else { expand(item.sectionId, true); restoreSelection(item) }
     } else if (direction < 0) {
       if (item.group) expand(item.sectionId, false)

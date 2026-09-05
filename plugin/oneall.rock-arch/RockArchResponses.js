@@ -30,6 +30,10 @@ function accept(root, ui, line) {
       root.personalLink.accept(response.personalLink)
       return
     }
+    if (response && response.personalSection) {
+      root.personalLink.accept(response.personalSection)
+      return
+    }
     if (!response || response.ok !== true) {
       if (root.personalLink) root.personalLink.interrupted()
       var onboardingSetupFailed = root.onboardingSetupPending

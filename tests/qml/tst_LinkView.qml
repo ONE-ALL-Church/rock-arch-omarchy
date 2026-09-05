@@ -7,7 +7,9 @@ TestCase {
   RockArch.RockArchLinkView { id: model }
   SignalSpy { id: opened; target: model; signalName: "openRequested" }
   SignalSpy { id: expanded; target: model; signalName: "expandedChanged" }
+  SignalSpy { id: added; target: model; signalName: "addLinkRequested" }
   function init() {
+    model.sections = []
     model.links = [
       {safeId: "z", title: "Zulu", section: "Work", groupId: "work", isShared: false},
       {safeId: "a", title: "alpha", section: "Work", groupId: "work", isShared: false},
@@ -16,6 +18,7 @@ TestCase {
     model.configure("groups", [])
     opened.clear()
     expanded.clear()
+    added.clear()
   }
   function test_groups_default_collapsed_and_same_names_remain_distinct() {
     compare(model.rows.length, 2)
@@ -76,6 +79,39 @@ TestCase {
     compare(model.expandedGroups, ["work"])
     compare(model.selected().safeId, "a")
     compare(expanded.count, 1)
+  }
+  function test_empty_private_sections_have_an_action_that_targets_the_right_section() {
+    model.replace(model.links, null, [
+      {groupId: "work", safeId: "private-work", name: "Work"},
+      {groupId: "empty", safeId: "private-empty", name: "Projects"}
+    ])
+    compare(model.rows.length, 3)
+    compare(model.rows[0].sectionSafeId, "private-work")
+    compare(model.rows[1].sectionSafeId, undefined)
+    compare(model.rows[2].count, 0)
+    model.activate(2)
+    compare(model.rows[3].title, "Add a link")
+    model.horizontal(1)
+    compare(model.cursor, 3)
+    model.activate(3)
+    compare(added.signalArguments[0][0], "private-empty")
+    compare(opened.count, 0)
+    model.horizontal(-1)
+    compare(model.cursor, 2)
+    model.configure("alpha", model.expandedGroups)
+    compare(model.rows.length, 3)
+    verify(model.rows.every(function(row) { return !row.empty && !row.group }))
+  }
+  function test_new_section_is_revealed_and_catalog_clears_with_account() {
+    model.replace([], {kind: "section", groupId: "empty"}, [
+      {groupId: "empty", safeId: "private-empty", name: "Projects"}
+    ])
+    compare(model.rows.length, 2)
+    compare(model.selected().sectionId, "empty")
+    compare(model.selected().expanded, true)
+    model.replace([], null, [])
+    compare(model.rows.length, 0)
+    compare(model.cursor, -1)
   }
   function test_account_preferences_restore_without_writing_or_crossing_accounts() {
     model.configure("groups", ["work"])

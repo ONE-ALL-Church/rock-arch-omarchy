@@ -160,16 +160,24 @@ Every target must resolve to the selected Rock instance.
 Links opens in **Groups** view. Click a section or press Enter to expand or
 collapse it; multiple sections can stay open. Links appear indented beneath
 their section, in Rock's existing order. Expansion is remembered separately for
-each profile, including after restarting the shell. New sections start collapsed.
+each profile, including after restarting the shell. Newly discovered sections
+start collapsed; a section you create here opens automatically.
 Use the view dropdown (or press `V`) to choose a flat **Alphabetical** list.
 Returning to Groups restores the expanded sections. Both preferences are
 editable through the CLI.
 
 Choose **Save** beside a Search result, or press `Ctrl+S`, to prefill its name and
-URL. In **Links**, choose **Add link** or press `Ctrl+N` to enter a bookmark
-manually. Review the name, Rock URL, and personal section, then select **Save
+URL. In **Links**, choose **Add → Link** to enter a bookmark manually; `Ctrl+N`
+opens the Add menu. Review the name, Rock URL, and personal section, then select **Save
 link** or press `Ctrl+S`. Escape cancels the form. The saved bookmark is selected
 in Links and also appears in your Rock account.
+
+Choose **Add → Section**, enter its name, and select **Create section** or press
+`Ctrl+S`. The private section opens in Groups with an **Add a link** action that
+preselects it. Empty private sections remain visible in Groups. An existing
+section with the same name, ignoring case, is reused. The CLI supports this
+through `rock-arch links sections add --stdin --confirm` with
+`{"name":"Projects"}`; use `--dry-run` to validate without creating it.
 
 Only your own personal sections are offered. If you have none, Save creates a
 private **Links** section first. Shared sections are excluded. Names are limited
@@ -380,7 +388,7 @@ These are future directions under consideration, not committed release dates:
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
-| Personal Links | Up / Down; Left / Right collapses or expands groups | Enter or Space toggles a group or opens a link | Backspace returns to Search | `V` changes view; `Ctrl+N` adds a link |
+| Personal Links | Up / Down; Left / Right collapses or expands groups | Enter or Space toggles a group or opens a link | Backspace returns to Search | `V` changes view; `Ctrl+N` opens Add |
 | Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | `D` download, `C` copy, `H` hash, `O` open, `R` refresh |
@@ -448,9 +456,9 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
   origin and bounded schemas.
 - The broker socket and local state are owner-only. The current Unix account is
   the terminal client's OS trust boundary.
-- Production never falls back to preview data. Personal Link creation and
-  Magnus builds require explicit confirmation. These are the only supported
-  server mutations, apart from creating a private first bookmark section.
+- Production never falls back to preview data. Personal Link and private-section
+  creation, and Magnus builds, require explicit confirmation. These are the only
+  supported server mutations.
 
 The experimental OpenID implementation was removed in version 0.14. Rock Arch
 does not read legacy OpenID metadata, client secrets, or tokens; user-owned old

@@ -75,6 +75,8 @@ TestCase {
   function test_cancelling_a_link_discards_unsent_forms_and_saves() {
     connection.request({op: "personal_link_prepare", name: "private"})
     connection.request({op: "personal_link_save", draftId: "one-use", confirmed: true})
+    connection.request({op: "personal_section_prepare", name: "private"})
+    connection.request({op: "personal_section_save", draftId: "one-use-section", confirmed: true})
     connection.request({op: "status"})
     connection.dropPersonalLinkRequests()
     socket.connected = true

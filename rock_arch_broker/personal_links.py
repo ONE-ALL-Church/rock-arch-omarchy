@@ -173,6 +173,7 @@ class _Draft:
     sections: frozenset[str]
     default_section: str
     deadline: float
+    kind: str = "link"
 
 
 class PersonalLinkManager:
@@ -263,6 +264,47 @@ class PersonalLinkManager:
             (item["safeId"] for item in public if item["name"] == "Links"),
             public[0]["safeId"],
         )
+        draft_id = self._store_draft(person, alias, public, default, "link")
+        return {
+            "draftId": draft_id,
+            "name": clean_name,
+            "url": clean_url,
+            "sections": public,
+            "sectionId": default,
+            "expiresInSeconds": DRAFT_SECONDS,
+        }
+
+    def list_sections(self) -> list[dict[str, Any]]:
+        """Broker-internal section metadata, including empty private sections."""
+        if not self._origin:
+            raise PersonalLinkError("rock_login_required")
+        with self._session.authenticated_cookie() as cookie:
+            person, alias = self._identity(cookie)
+            return self._sections(person, alias, cookie)
+
+    def prepare_section(self, name: object = "") -> dict[str, Any]:
+        if not self._origin:
+            raise PersonalLinkError("rock_login_required")
+        clean_name = _name(name, empty=True)
+        with self._session.authenticated_cookie() as cookie:
+            person, alias = self._identity(cookie)
+            self._sections(person, alias, cookie)
+        return {
+            "draftId": self._store_draft(person, alias, [], "", "section"),
+            "name": clean_name,
+            "kind": "section",
+            "sections": [],
+            "expiresInSeconds": DRAFT_SECONDS,
+        }
+
+    def _store_draft(
+        self,
+        person: int,
+        alias: int,
+        public: list[dict[str, Any]],
+        default: str,
+        kind: str,
+    ) -> str:
         now = time.monotonic()
         self._drafts = {
             key: value for key, value in self._drafts.items() if value.deadline > now
@@ -276,15 +318,76 @@ class PersonalLinkManager:
             frozenset(item["safeId"] for item in public),
             default,
             now + DRAFT_SECONDS,
+            kind,
         )
+        return draft_id
+
+    def _draft(self, draft_id: object, kind: str, confirmed: bool) -> _Draft:
+        if confirmed is not True:
+            raise PersonalLinkError("personal_link_confirmation_required")
+        draft = self._drafts.get(draft_id) if isinstance(draft_id, str) else None
+        if draft is None or draft.deadline <= time.monotonic() or draft.kind != kind:
+            raise PersonalLinkError("personal_link_draft_expired")
+        return draft
+
+    def _check_account(self, draft: _Draft, cookie: str) -> tuple[int, int]:
+        person, alias = self._identity(cookie)
+        if (person, alias) != (draft.person_id, draft.alias_id):
+            self.clear()
+            raise PersonalLinkError("personal_link_account_changed")
+        return person, alias
+
+    def save_section(
+        self, draft_id: object, name: object, *, confirmed: bool
+    ) -> dict[str, Any]:
+        draft = self._draft(draft_id, "section", confirmed)
+        clean_name = _name(name)
+        with self._session.authenticated_cookie() as cookie:
+            person, alias = self._check_account(draft, cookie)
+            sections = self._sections(person, alias, cookie)
+            section = next(
+                (
+                    item
+                    for item in sections
+                    if item["name"].casefold() == clean_name.casefold()
+                ),
+                None,
+            )
+            already_saved = section is not None
+            if section is None and len(sections) >= MAX_SECTIONS:
+                raise PersonalLinkError("personal_section_limit")
+            del self._drafts[str(draft_id)]
+            if section is None:
+                section = self._create_section(person, alias, clean_name, cookie)
         return {
-            "draftId": draft_id,
-            "name": clean_name,
-            "url": clean_url,
-            "sections": public,
-            "sectionId": default,
-            "expiresInSeconds": DRAFT_SECONDS,
+            "saved": True,
+            "alreadySaved": already_saved,
+            "name": section["name"],
+            "sectionId": section["safeId"],
+            "_sectionId": section["id"],
         }
+
+    def _create_section(
+        self, person: int, alias: int, name: str, cookie: str
+    ) -> dict[str, Any]:
+        number = self._client.create(
+            self._origin,
+            SECTIONS,
+            {
+                "Name": name,
+                "PersonAliasId": alias,
+                "IsShared": False,
+            },
+            cookie,
+        )
+        try:
+            sections = self._sections(person, alias, cookie)
+            section = next((item for item in sections if item["id"] == number), None)
+            if section is None or section["name"] != name:
+                raise PersonalLinkError("personal_link_save_uncertain")
+        except PersonalLinkError as error:
+            raise PersonalLinkError("personal_link_save_uncertain") from error
+        return section
 
     def _url(self, value: object) -> str:
         if not isinstance(value, str) or len(value) > 2048:
@@ -306,20 +409,13 @@ class PersonalLinkManager:
         *,
         confirmed: bool,
     ) -> dict[str, Any]:
-        if confirmed is not True:
-            raise PersonalLinkError("personal_link_confirmation_required")
-        draft = self._drafts.get(draft_id) if isinstance(draft_id, str) else None
-        if draft is None or draft.deadline <= time.monotonic():
-            raise PersonalLinkError("personal_link_draft_expired")
+        draft = self._draft(draft_id, "link", confirmed)
         clean_name, clean_url = _name(name), self._url(url)
         selected = draft.default_section if section_id is None else section_id
         if not isinstance(selected, str) or selected not in draft.sections:
             raise PersonalLinkError("personal_link_section_changed")
         with self._session.authenticated_cookie() as cookie:
-            person, alias = self._identity(cookie)
-            if (person, alias) != (draft.person_id, draft.alias_id):
-                self.clear()
-                raise PersonalLinkError("personal_link_account_changed")
+            person, alias = self._check_account(draft, cookie)
             sections = self._sections(person, alias, cookie)
             section = next(
                 (item for item in sections if item["safeId"] == selected), None
@@ -334,22 +430,7 @@ class PersonalLinkManager:
             # resubmit the same mutation, including creation of a first section.
             del self._drafts[str(draft_id)]
             if section is None:
-                section_number = self._client.create(
-                    self._origin,
-                    SECTIONS,
-                    {
-                        "Name": "Links",
-                        "PersonAliasId": alias,
-                        "IsShared": False,
-                    },
-                    cookie,
-                )
-                sections = self._sections(person, alias, cookie)
-                section = next(
-                    (item for item in sections if item["id"] == section_number), None
-                )
-                if section is None:
-                    raise PersonalLinkError("personal_link_save_uncertain")
+                section = self._create_section(person, alias, "Links", cookie)
             number = section["id"]
             # A deliberate retry after a lost response detects an existing URL.
             quoted_url = clean_url.replace("'", "''")

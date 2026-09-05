@@ -304,7 +304,11 @@ def _parser() -> argparse.ArgumentParser:
     link_commands = links.add_subparsers(dest="links_command", required=True)
     link_commands.add_parser("personal", help="list Personal Links")
     link_commands.add_parser("recent", help="list Recent Links")
-    link_commands.add_parser("sections", help="list your writable Personal Link sections")
+    link_sections = link_commands.add_parser("sections", help="list or create your private Personal Link sections")
+    section_commands = link_sections.add_subparsers(dest="sections_command")
+    section_add = section_commands.add_parser("add", help="create a private Personal Link section")
+    section_add.add_argument("--stdin", action="store_true", required=True, help="read a JSON object with a name")
+    _confirmation(section_add)
     link_add = link_commands.add_parser("add", help="save a Personal Link to your Rock account")
     link_input = link_add.add_mutually_exclusive_group(required=True)
     link_input.add_argument("--stdin", action="store_true", help="read name, URL or safeId, and optional sectionId as JSON")
@@ -596,9 +600,10 @@ def _knowledge_request(
 
 def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
     if args.links_command == "sections":
-        response = client.request({"op": "personal_link_prepare"})
-        draft = response["personalLink"]
-        return {"ok": True, "sections": draft["sections"], "defaultSectionId": draft["sectionId"]}
+        if args.sections_command == "add":
+            return _add_personal_section(args, client)
+        response = client.request({"op": "personal_section_list"})["personalSection"]
+        return {"ok": True, "sections": response["sections"], "defaultSectionId": response["defaultSectionId"]}
     if args.links_command == "add":
         return _add_personal_link(args, client)
     if args.links_command in {"personal", "recent"}:
@@ -617,18 +622,41 @@ def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, 
     )
 
 
+def _read_personal_input() -> dict[str, str]:
+    try:
+        raw = sys.stdin.read(MAX_QUERY_INPUT_BYTES + 1).encode("utf-8")
+        if len(raw) > MAX_QUERY_INPUT_BYTES:
+            raise CliError("personal_link_input_too_large", 2)
+        value = decode_bounded_json(raw)
+    except (UnicodeError, HttpSecurityError):
+        raise CliError("personal_link_input_invalid", 2) from None
+    if not isinstance(value, dict) or any(not isinstance(item, str) for item in value.values()):
+        raise CliError("personal_link_input_invalid", 2)
+    return value
+
+
+def _add_personal_section(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
+    if not args.dry_run:
+        _require_confirmation(args)
+    value = _read_personal_input()
+    if set(value) != {"name"} or not value["name"].strip():
+        raise CliError("personal_link_input_invalid", 2)
+    draft = client.request({"op": "personal_section_prepare", **value})["personalSection"]
+    if args.dry_run:
+        return {"ok": True, "dryRun": {
+            "action": "addPersonalSection", "name": draft["name"],
+            "confirmationRequired": True, "sideEffects": ["creates_private_links_section"], "executed": False,
+        }}
+    return client.request({"op": "personal_section_save", "draftId": draft["draftId"],
+                           "name": draft["name"], "confirmed": True})
+
+
 def _add_personal_link(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
     if not args.dry_run:
         _require_confirmation(args)
     if args.stdin:
-        try:
-            raw = sys.stdin.read(MAX_QUERY_INPUT_BYTES + 1).encode("utf-8")
-            if len(raw) > MAX_QUERY_INPUT_BYTES:
-                raise CliError("personal_link_input_too_large", 2)
-            value = decode_bounded_json(raw)
-        except (UnicodeError, HttpSecurityError):
-            raise CliError("personal_link_input_invalid", 2) from None
-        if not isinstance(value, dict) or not set(value).issubset({"name", "url", "safeId", "sectionId"}) or any(not isinstance(item, str) for item in value.values()):
+        value = _read_personal_input()
+        if not set(value).issubset({"name", "url", "safeId", "sectionId"}):
             raise CliError("personal_link_input_invalid", 2)
         if ("url" in value) == ("safeId" in value) or ("url" in value and not value.get("name", "").strip()):
             raise CliError("personal_link_input_invalid", 2)

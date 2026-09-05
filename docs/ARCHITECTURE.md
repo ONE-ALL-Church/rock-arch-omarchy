@@ -218,7 +218,8 @@ mutation, SQL, job execution, or Run Now operation.
 
 ### Personal Link additions
 
-`PersonalLinkManager` owns in-memory, ten-minute, single-use drafts. The Search
+`PersonalLinkManager` owns in-memory, ten-minute, single-use drafts, typed for
+either link or section creation. The Search
 source is resolved through the existing opaque registry; the UI receives the
 validated same-origin URL only for this explicit editor. Profile switches,
 credential changes, sign-out, and context changes clear drafts. UI request IDs
@@ -237,7 +238,12 @@ Save rechecks the authenticated identity and section ownership. The fixed
 `POST /api/PersonalLinks` payload contains only Name, Url, PersonAliasId,
 SectionId, and Order. If no personal sections exist, the explicit Save can first
 create a non-shared Links section through `POST /api/PersonalLinkSections` with
-the authenticated owner. Each endpoint remains subject to Rock's REST action
+the authenticated owner. Explicit section creation uses the same private endpoint
+with only Name, PersonAliasId, and IsShared fixed to false. The supplied name is
+checked against existing private sections without case sensitivity, then a new
+section is read back to verify ID, name, owner, and privacy. At most 100 private
+sections are supported; the limit is checked before creating another section.
+Each endpoint remains subject to Rock's REST action
 permissions. Names obey Rock's 100 UTF-16-unit limit; URLs are bounded,
 canonicalized HTTPS targets on the active origin. No shared-link writes, edits,
 deletes, or arbitrary entity writes are exposed.
@@ -249,20 +255,27 @@ causes a POST retry; a subsequent explicit attempt repeats the duplicate check.
 Successful saves invalidate the existing Personal Links cache.
 
 `RockArchLinkView.qml` derives section headers, expanded child rows, and a flat
-alphabetical list from that same allowlisted cache. It keeps the selected record
+alphabetical list from the allowlisted links and an owned-section catalog. Rock's
+Personal Links endpoint omits empty sections, so refreshing Links also reads the
+current identity and private sections. The catalog exposes only name, opaque
+creation and display IDs, and private status. If that optional read is denied,
+the existing authorized bookmarks remain available. Expanded empty sections
+offer Add a link with the section preselected. It keeps the selected record
 through reordering and expands the containing section after a save. Group display
 IDs are deterministic HMAC references scoped to the profile's random local ID,
 the Rock origin, and the section ID; they do not enter the navigation registry
 and are not action tokens. Only these references and view preferences persist in
 the owner-only profile store, not section names or bookmark URLs. Same-named
 sections stay distinct. Expansion settings are removed when a profile is deleted.
-These views require no additional Rock requests or creation-date metadata.
+Creating a section switches to Groups, opens it, and selects its heading.
+No creation-date metadata is requested or stored.
 
 The contract was checked against the official Rock source at
 [`a51094b`](https://github.com/SparkDevNetwork/Rock/tree/a51094b052a501983dfb746c45d441b59b67d2bb):
 [`ApiController.Post`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/ApiController.cs),
 [`GetCurrentPerson`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/Controllers/PeopleController.Partial.cs),
-and the [Personal Link model](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock/Model/CMS/PersonalLink/PersonalLink.cs).
+the [Personal Link model](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock/Model/CMS/PersonalLink/PersonalLink.cs),
+and the [Personal Link Section model](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock/Model/CMS/PersonalLinkSection/PersonalLinkSection.cs).
 
 The cookie authenticates the actor but does not override Rock authorization.
 The broker intersects saved category preferences with the detected account
