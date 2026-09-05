@@ -9,7 +9,7 @@ Every user signs directly into their own Rock instance. Rock Arch uses the
 native Rock session and fixed REST v1 routes; it does not require an OpenID
 client, OAuth application, Rock MCP server, Magnus CLI, Node.js, or npm.
 
-![Rock Arch search in the native Omarchy panel](outputs/screenshots/design-search.png)
+![Rock Arch search in the native Omarchy panel](preview.png)
 
 _The current Omarchy interface, shown with synthetic preview data. Person context
 helps distinguish people with similar names._
@@ -27,9 +27,14 @@ Rock Arch supports Omarchy 4.0.2 or newer. Runtime requirements are:
   actions, `wl-copy` (`wl-clipboard`) for clipboard actions, and `notify-send`
   (`libnotify`) for build/update notifications.
 
-These are standard Omarchy desktop packages. If a helper is missing, install
-its named package through `omarchy pkg add`. Python uses only its standard
-library; Qt Test is a development dependency, and no pip packages are required.
+These are standard Omarchy desktop packages. Rock Arch does not install, upgrade,
+or remove system packages. If a helper is missing, install its named package
+manually through `omarchy pkg add`. This command is guidance for the user and is
+not executed by the plugin. Rock Arch's optional self-updater updates only the
+`oneall.rock-arch` plugin through `omarchy plugin update`.
+
+Python uses only its standard library; Qt Test is a development dependency, and
+no pip packages are required.
 
 Install the plugin:
 
