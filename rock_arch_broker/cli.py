@@ -309,8 +309,9 @@ def _parser() -> argparse.ArgumentParser:
     section_add = section_commands.add_parser("add", help="create a private Personal Link section")
     section_add.add_argument("--stdin", action="store_true", required=True, help="read a JSON object with a name")
     _confirmation(section_add)
-    section_delete = section_commands.add_parser("delete", help="delete an empty private section")
+    section_delete = section_commands.add_parser("delete", help="delete a private section; populated sections require --with-links")
     section_delete.add_argument("safe_id", help="section safeId from links sections")
+    section_delete.add_argument("--with-links", action="store_true", help="also delete every link inside the section")
     _confirmation(section_delete)
     link_delete = link_commands.add_parser("delete", help="delete one of your private Personal Links")
     link_delete.add_argument("safe_id", help="deleteId from links personal")
@@ -635,12 +636,14 @@ def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, 
 def _delete_personal_item(args: argparse.Namespace, client: BrokerClient, kind: str) -> dict[str, Any]:
     if not args.dry_run:
         _require_confirmation(args)
-    draft = client.request({"op": "personal_delete_prepare", "kind": kind, "targetId": args.safe_id})["personalDelete"]
+    with_links = kind == "section" and args.with_links
+    draft = client.request({"op": "personal_delete_prepare", "kind": kind, "targetId": args.safe_id, "withLinks": with_links})["personalDelete"]
     if args.dry_run:
         return {"ok": True, "dryRun": {"action": "deletePersonalLink" if kind == "link" else "deletePersonalSection",
             "name": draft["name"], "section": draft["section"], "url": draft["url"], "confirmationRequired": True,
-            "sideEffects": ["deletes_personal_bookmark_in_rock" if kind == "link" else "deletes_empty_private_section_in_rock"], "executed": False}}
-    return client.request({"op": "personal_delete_commit", "draftId": draft["draftId"], "confirmed": True})
+            "linkCount": draft["linkCount"], "withLinks": with_links,
+            "sideEffects": ["deletes_personal_bookmark_in_rock" if kind == "link" else "deletes_private_section_and_all_links_in_rock" if with_links else "deletes_empty_private_section_in_rock"], "executed": False}}
+    return client.request({"op": "personal_delete_commit", "draftId": draft["draftId"], "confirmed": True, "withLinks": with_links})
 
 
 def _read_personal_input() -> dict[str, str]:

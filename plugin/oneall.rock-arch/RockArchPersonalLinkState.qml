@@ -9,6 +9,8 @@ QtObject {
   readonly property bool deleting: kind.indexOf("delete-") === 0
   property string deleteTarget: ""
   property string sectionName: ""
+  property int linkCount: 0
+  property bool withLinks: false
   property string draftId: ""
   property string requestId: ""
   property int revision: 0
@@ -24,7 +26,7 @@ QtObject {
   signal focusRequested()
   signal cancelled(bool wasDeleting)
   signal saved(bool alreadySaved, string name, string section)
-  signal deleted(string kind, string groupId)
+  signal deleted(string kind, string groupId, int linkCount)
   signal savedSection(bool alreadySaved, string name, string groupId)
 
   function send(payload) {
@@ -46,7 +48,8 @@ QtObject {
     kind = "delete-" + itemKind
     deleteTarget = targetId
     editing = true
-    send({op: "personal_delete_prepare", kind: itemKind, targetId: targetId})
+    withLinks = itemKind === "section"
+    send({op: "personal_delete_prepare", kind: itemKind, targetId: targetId, withLinks: withLinks})
   }
   function beginSection() {
     closed()
@@ -58,7 +61,7 @@ QtObject {
     if (!editing || busy) return
     notice = ""
     draftId = ""
-    send(deleting ? {op: "personal_delete_prepare", kind: kind.slice(7), targetId: deleteTarget}
+    send(deleting ? {op: "personal_delete_prepare", kind: kind.slice(7), targetId: deleteTarget, withLinks: withLinks}
       : kind === "section" ? {op: "personal_section_prepare", name: name}
       : {op: "personal_link_prepare", name: name, url: url})
   }
@@ -66,7 +69,7 @@ QtObject {
     if (!canSave) return
     saving = true
     notice = ""
-    send(deleting ? {op: "personal_delete_commit", draftId: draftId, confirmed: true}
+    send(deleting ? {op: "personal_delete_commit", draftId: draftId, confirmed: true, withLinks: withLinks}
       : kind === "section" ? {op: "personal_section_save", draftId: draftId, name: name.trim(), confirmed: true}
       : {op: "personal_link_save", draftId: draftId, name: name.trim(),
         url: url.trim(), sectionId: sectionId, confirmed: true})
@@ -84,7 +87,7 @@ QtObject {
     if (value.deleted === true && deleting) {
       var deletedKind = kind.slice(7)
       closed()
-      deleted(deletedKind, String(value.groupId || ""))
+      deleted(deletedKind, String(value.groupId || ""), Number(value.linkCount || 0))
       return
     }
     if (value.saved === true) {
@@ -99,6 +102,12 @@ QtObject {
       notice = "Rock Arch couldn't load the form. Reload to try again."
       return
     }
+    if (kind === "delete-section" && (value.withLinks !== true || typeof value.linkCount !== "number" || !Number.isInteger(value.linkCount) || value.linkCount < 0 || value.linkCount > 10000)) {
+      draftId = ""
+      notice = "Rock Arch could not verify this section’s link count. Reload to try again."
+      return
+    }
+    linkCount = Number(value.linkCount || 0)
     draftId = String(value.draftId)
     name = String(value.name || "")
     sectionName = String(value.section || "")
@@ -123,6 +132,8 @@ QtObject {
     kind = "link"
     deleteTarget = ""
     sectionName = ""
+    linkCount = 0
+    withLinks = false
     busy = false
     saving = false
     draftId = ""
@@ -140,7 +151,10 @@ QtObject {
     cancelled(wasDeleting)
   }
   function message(code) {
-    if (code === "personal_section_not_empty") return "This section still has links. Delete or move them in Rock before deleting the section."
+    if (code === "personal_section_not_empty") return "This section contains links. Reopen Delete to review deleting the section and all its links."
+    if (code === "personal_section_contents_changed") return "The links in this section changed. Reload to review the current count before deleting."
+    if (code === "personal_section_count_unavailable") return "Rock Arch could not verify the complete link count. Manage this section in Rock."
+    if (code === "personal_delete_scope_invalid") return "The deletion scope changed. Cancel and reopen Delete."
     if (code === "personal_delete_not_owned") return "Only your own private links and sections can be deleted here."
     if (code === "personal_delete_target_invalid" || code === "personal_delete_target_missing") return "This item is no longer available. Cancel and refresh Links."
     if (code === "personal_delete_target_changed") return "This item changed. Reload to review it before deleting."

@@ -59,7 +59,7 @@ QtObject {
   }
   function deletionTarget(item) {
     if (!item || item.empty || item.isShared) return null
-    if (item.group) return item.count === 0 && item.sectionSafeId ? {kind: "section", targetId: item.sectionSafeId} : null
+    if (item.group) return item.sectionSafeId ? {kind: "section", targetId: item.sectionSafeId} : null
     return item.deleteId && sections.some(function(section) { return section.groupId === item.sectionId })
       ? {kind: "link", targetId: item.deleteId} : null
   }

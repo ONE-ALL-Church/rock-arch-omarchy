@@ -1359,10 +1359,10 @@ Panel {
       root.feedbackText = alreadySaved ? "Already in Personal Links" : "Saved to Personal Links"
       personalLinkNoticeTimer.restart()
     }
-    onDeleted: function(kind, groupId) {
+    onDeleted: function(kind, groupId, linkCount) {
       if (kind === "section") linkViewModel.expand(groupId, false)
       root.refreshPersonalLinks()
-      root.feedbackText = kind === "section" ? "Section deleted" : "Link deleted"
+      root.feedbackText = kind === "section" ? (linkCount > 0 ? "Section and links deleted" : "Section deleted") : "Link deleted"
       personalLinkNoticeTimer.restart()
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
@@ -1403,7 +1403,7 @@ Panel {
   Timer {
     id: personalLinkNoticeTimer
     interval: 4000
-    onTriggered: if (["Saved to Personal Links", "Already in Personal Links", "Section created", "Section already exists", "Section deleted", "Link deleted"].indexOf(root.feedbackText) >= 0) root.feedbackText = ""
+    onTriggered: if (["Saved to Personal Links", "Already in Personal Links", "Section created", "Section already exists", "Section deleted", "Link deleted", "Section and links deleted"].indexOf(root.feedbackText) >= 0) root.feedbackText = ""
   }
   Timer { id: knowledgeSearchTimer; interval: 400; onTriggered: root.refreshKnowledgeSearch() }
   Timer {

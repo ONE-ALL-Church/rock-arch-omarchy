@@ -32,7 +32,7 @@ TestCase {
     compare(model.sectionName, "Work")
     compare(requests.length, 1)
     model.save()
-    compare(requests[1], {op: "personal_delete_commit", draftId: "draft", confirmed: true, requestId: model.requestId})
+    compare(requests[1], {op: "personal_delete_commit", draftId: "draft", confirmed: true, withLinks: false, requestId: model.requestId})
     model.save()
     compare(requests.length, 2)
     model.accept({requestId: model.requestId, deleted: true, groupId: "work"})
@@ -45,7 +45,7 @@ TestCase {
     model.cancel()
     compare(requests.length, 1)
     model.beginDelete("section", "opaque-section")
-    model.accept({requestId: model.requestId, draftId: "draft", name: "Work", sections: []})
+    model.accept({requestId: model.requestId, draftId: "draft", name: "Work", sections: [], withLinks: true, linkCount: 2})
     model.save()
     model.interrupted()
     verify(model.notice.indexOf("may have deleted") >= 0)
@@ -54,9 +54,29 @@ TestCase {
     model.reload()
     compare(requests[3].op, "personal_delete_prepare")
     compare(requests[3].targetId, "opaque-section")
-    model.accept({requestId: model.requestId, error: "personal_section_not_empty"})
+    model.accept({requestId: model.requestId, error: "personal_section_contents_changed"})
     verify(!model.canSave)
-    verify(model.notice.indexOf("still has links") >= 0)
+    verify(model.notice.indexOf("current count") >= 0)
+  }
+  function test_section_deletion_requires_verified_count_and_explicit_contents_scope() {
+    var completedCount = -1
+    model.deleted.connect(function(kind, groupId, count) { completedCount = count })
+    model.beginDelete("section", "owned-section")
+    verify(requests[0].withLinks)
+    for (var count of [undefined, -1, 1.5, "2", 10001]) {
+      model.accept({requestId: model.requestId, draftId: "draft", name: "Work", sections: [], withLinks: true, linkCount: count})
+      verify(!model.canSave)
+      model.reload()
+    }
+    model.accept({requestId: model.requestId, draftId: "draft", name: "Work", sections: [], withLinks: true, linkCount: 3})
+    compare(model.linkCount, 3)
+    verify(model.canSave)
+    model.save()
+    verify(requests[requests.length - 1].withLinks)
+    model.accept({requestId: model.requestId, deleted: true, linkCount: 3, groupId: "work"})
+    compare(completedCount, 3)
+    compare(model.linkCount, 0)
+    verify(!model.withLinks)
   }
   function test_begin_prefills_source_without_saving() {
     model.begin("rock-result")

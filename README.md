@@ -175,9 +175,13 @@ in Links and also appears in your Rock account.
 Select or hover over one of your private links to reveal **Delete**, or press
 the `Delete` key on the selected row. Review the bookmark's name, section, and
 URL, then choose **Delete link**. Cancel is focused initially; Escape cancels.
-Empty private sections offer the same flow with **Delete section**. The broker
-rechecks the record and section contents before deleting and verifies that the
-record is gone. Shared items cannot be deleted here.
+Private section headings also offer Delete. The confirmation names the section,
+shows its current link count from Rock, and warns that the section and **all links
+inside it** will be permanently deleted. Choose **Delete section and links** for
+a populated section. If links change while the confirmation is open, Reload
+shows a fresh count before another confirmation. The broker rechecks ownership
+and verifies the section and its contents are gone. Shared items cannot be
+deleted here.
 
 Choose **Add → Section**, enter its name, and select **Create section** or press
 `Ctrl+S`. The private section opens in Groups with an **Add a link** action that
@@ -464,7 +468,7 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
 - The broker socket and local state are owner-only. The current Unix account is
   the terminal client's OS trust boundary.
 - Production never falls back to preview data. Personal Link and private-section
-  creation, private-link and empty-section deletion, and Magnus builds require explicit confirmation. These are the only
+  creation, private-link and section deletion, and Magnus builds require explicit confirmation. These are the only
   supported server mutations.
 
 The experimental OpenID implementation was removed in version 0.14. Rock Arch

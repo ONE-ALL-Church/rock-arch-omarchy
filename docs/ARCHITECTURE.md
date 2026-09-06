@@ -264,14 +264,27 @@ fields. Confirmation repeats those checks, rejects changes, consumes the draft,
 sends one fixed DELETE, and reads back absence. A previously removed record is
 reported as already deleted without sending DELETE.
 
-Section emptiness is checked both during prepare and immediately before DELETE
-using an unfiltered-by-owner `PersonalLinks` query on SectionId with `$top=1`.
-This catches links hidden by URL validation or panel limits. Rock's standard
+Section preparation queries `PersonalLinks` by SectionId with `$select=Id,SectionId`,
+`$orderby=Id`, and `$top=10001`, without owner or URL filtering. Invalid rows,
+duplicate IDs, and more than 10,000 children block deletion. The sorted IDs stay
+in the in-memory draft; the UI and CLI receive only `linkCount` and `withLinks`.
+The strictly typed `withLinks` scope must match at preparation and confirmation.
+The UI authorizes all contents; the CLI requires `--with-links` for that scope.
+Confirmation compares the full child ID set and requires a fresh review if it
+changed, even when the count is unchanged. Without this flag, preparation refuses
+populated sections and confirmation rechecks emptiness with `$top=1`.
+
+Deletion sends one section DELETE and verifies both the section and its children
+are absent. It never loops over child DELETEs. The result's count is the last
+verified count, not an atomic server receipt. These queries include links hidden
+by URL validation or panel limits. Rock's standard
 [`ApiController.Delete`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/ApiController.cs)
 does not provide a conditional delete or transaction spanning these requests;
-the Personal Link model enables cascade deletion. An addition by another client
-between the final check and DELETE could therefore be cascaded. Atomic
-empty-only deletion would require a corresponding Rock server endpoint.
+the Personal Link model enables cascade deletion. The UI and flagged CLI explicitly
+authorize the section and all its contents. For the default empty-only CLI path,
+an addition by another client between the final check and DELETE could still be
+cascaded. Atomic empty-only deletion would require a corresponding Rock server
+endpoint.
 
 `RockArchLinkView.qml` derives section headers, expanded child rows, and a flat
 alphabetical list from the allowlisted links and an owned-section catalog. Rock's

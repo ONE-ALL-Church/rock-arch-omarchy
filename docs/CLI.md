@@ -212,7 +212,7 @@ save returns `personal_link_save_uncertain`; check `links personal` before an
 explicit retry. The client never repeats a POST automatically. Shared sections,
 other owners, edits, and deletes are outside this command's scope.
 
-Delete one private bookmark or an empty private section:
+Delete one private bookmark or a private section:
 
 ```bash
 rock-arch links personal
@@ -221,6 +221,8 @@ rock-arch links delete DELETE_ID --confirm
 rock-arch links sections
 rock-arch links sections delete SECTION_SAFE_ID --dry-run
 rock-arch links sections delete SECTION_SAFE_ID --confirm
+rock-arch links sections delete SECTION_SAFE_ID --with-links --dry-run
+rock-arch links sections delete SECTION_SAFE_ID --with-links --confirm
 ```
 
 Use the bookmark's `deleteId` from `links personal`, or the section's `safeId`
@@ -230,15 +232,28 @@ point to the same URL. Refresh the list after a mutation or broker restart.
 Dry run reads the exact target and makes no write. Confirmation rechecks the
 account, owner, private section, and fields reviewed by the draft. Section
 deletion checks all child links, including ones omitted from the panel.
-`personal_section_not_empty` refuses deletion of a populated section.
+Without `--with-links`, `personal_section_not_empty` refuses deletion of a
+populated section, preserving the existing CLI behavior. `--with-links` explicitly
+authorizes deleting the section and every link inside it. Its dry run reports
+the actual `linkCount`, `withLinks: true`, and the section-and-contents side effect.
+The flag must accompany `--confirm` to delete; it does not replace confirmation.
+The prepared scope cannot be widened by a later request. A section count is
+obtained from a bounded query of all child IDs, including links omitted from the
+panel; more than 10,000 children or an invalid response prevents deletion.
+`personal_section_contents_changed` requires a new review if child IDs change
+between preparation and confirmation, even when the total count stays the same.
 `personal_delete_target_changed` requires a fresh review; `personal_delete_uncertain`
 requires checking the list before an explicit retry. No DELETE is repeated
 automatically. Successful responses contain `personalDelete.deleted: true`;
-`alreadyDeleted: true` means the draft's record was already absent.
+`alreadyDeleted: true` means the draft's record was already absent. The result
+also includes the authorized `withLinks` scope and last verified `linkCount`;
+the count is not an atomic server receipt of cascaded records.
 
 Rock's REST API does not offer an atomic "delete only if empty" operation.
 The broker checks immediately before DELETE, but another Rock client could add
-a link between that check and the server deletion. See the
+a link between that check and the server deletion. The UI and `--with-links`
+explicitly authorize deleting all contents; the default CLI's empty-only check
+still cannot be atomic. See the
 [architecture limitation](ARCHITECTURE.md#personal-link-additions).
 
 The first two search forms read at most 8 KiB from stdin. With no query, an

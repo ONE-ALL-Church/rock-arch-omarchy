@@ -1,13 +1,13 @@
 # Verification record
 
 This record describes the prepared `0.26.0` release boundary and the unreleased
-Personal Link and section creation acceptance below. Historical feature changes belong in
+Personal Link and section management acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
 
-## Unreleased Personal Link creation
+## Unreleased Personal Link management
 
-On 2026-09-05, the feature branch passed 283 Python tests and 61 Qt behavioral
-tests (73 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
+On 2026-09-05, the feature branch passed 289 Python tests and 62 Qt behavioral
+tests (74 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
 compilation, Omarchy manifest validation, and `git diff --check`. Standalone
 `qmllint` exited successfully with expected warnings for shell-provided imports.
 
@@ -80,6 +80,30 @@ references, raw-ID and shared/foreign-owner rejection, expiry and draft misuse,
 account and record changes, links added after preparation, missing records,
 failed readback, and interrupted deletions without replay. Tests do not establish
 atomic empty-only deletion; that Rock API limitation is described in architecture.
+
+Section-and-contents deletion was then checked with two tracked private sections
+and five temporary bookmarks. The native confirmation displayed the section name,
+Rock's verified count, and a permanent-deletion warning, with Cancel initially
+focused. Enter on Cancel left all records intact. Adding a third link while the
+two-link confirmation was open caused the explicit deletion attempt to stop
+without issuing DELETE. Reload showed the new count of three and focused Cancel
+again. A fresh explicit confirmation deleted that section and its three links.
+
+The actual CLI refused the other populated section without `--with-links`, refused
+an unconfirmed flagged command, and reported two links in a dry run without a
+write. `--with-links --confirm` deleted its section and children. Exactly two
+parent section DELETEs were issued, with no loop of child DELETEs. Exact-ID
+readback verified all seven tracked records absent; the original 16 bookmarks
+and two sections matched their initial names, grouping, and privacy. The temporary
+review plugin was removed and original bar configuration and canonical profile
+metadata were preserved byte for byte. The submitted main branch and installed
+release were not changed.
+
+Additional regression coverage checks immutable deletion scope, same-count child
+replacement, additions and removals before confirmation, invalid or oversized
+counts, children hidden by panel filtering, failed cascade readback, and refusal
+to replay consumed drafts. QML checks require a verified count before enabling
+section deletion and pass the reviewed scope through both requests.
 
 Regression tests cover distinct same-named sections, case-insensitive sorting,
 multiple open groups, Left/Right navigation, selection during refresh and removal,

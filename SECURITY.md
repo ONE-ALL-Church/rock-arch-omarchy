@@ -61,13 +61,22 @@ section can also be created as part of an explicit bookmark save.
 Deletion uses separate opaque per-record references and expiring, single-use
 confirmation drafts. Navigation IDs, raw record IDs, shared items, and foreign
 owners cannot delete. Before DELETE the broker rechecks the account, exact
-record fields, and private section ownership. Empty-section checks query all
-children rather than relying on displayed counts. The fixed delete client
+record fields, and private section ownership. Section confirmation counts all
+children rather than relying on displayed counts, and retains only their IDs in
+the in-memory draft. Invalid counts or more than 10,000 children block deletion.
+The UI explicitly authorizes the section and all its contents; the CLI requires
+`--with-links --confirm` for populated sections. This scope cannot change between
+preparation and confirmation. Changed child IDs require a fresh review, even if
+the count stays the same. The fixed delete client
 accepts only positive integer IDs under the two Personal Links endpoints and
-verifies absence afterward. Uncertain responses are never retried automatically.
+verifies absence afterward, including child absence for section deletion.
+Uncertain responses are never retried automatically.
 Rock's section DELETE cascades to children and has no conditional empty-only
-operation; a concurrent addition after the final check remains a server-side
-race. Rock Arch cannot make the separate read and DELETE atomic.
+operation. The UI and flagged CLI authorize all contents, and the reported count
+is the last verified count, not an atomic server receipt. Without `--with-links`,
+the CLI checks emptiness immediately before deletion, but a concurrent addition
+after that check remains a server-side race. Rock Arch cannot make the separate
+read and DELETE atomic.
 
 ## Secret handling
 

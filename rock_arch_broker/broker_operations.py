@@ -1044,9 +1044,9 @@ class BrokerOperations:
                     target = broker._live.personal_link_delete_target(target)
                     if target is None:
                         raise PersonalLinkError("personal_delete_target_invalid")
-                result = broker._personal_links.prepare_delete(kind, target)
+                result = broker._personal_links.prepare_delete(kind, target, with_links=raw.get("withLinks", False))
             elif raw["op"] == "personal_delete_commit":
-                result = broker._personal_links.delete(raw.get("draftId"), confirmed=raw.get("confirmed") is True)
+                result = broker._personal_links.delete(raw.get("draftId"), confirmed=raw.get("confirmed") is True, with_links=raw.get("withLinks", False))
                 result["groupId"] = broker._live.personal_link_group_id(result.pop("_sectionId"))
                 broker._live.invalidate_personal_links()
             elif raw["op"] == "personal_section_list":

@@ -10,14 +10,14 @@ Column {
   required property var model
   property alias nameField: nameField
   property alias cancelButton: cancelButton
-  readonly property string deleteLabel: model.kind === "delete-section" ? "Delete section" : "Delete link"
+  readonly property string deleteLabel: model.kind === "delete-section" ? (model.linkCount > 0 ? "Delete section and links" : "Delete section") : "Delete link"
   readonly property bool inputActive: nameField.activeFocus || urlField.activeFocus || sectionField.popupOpen
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.panelGap
 
   RowLayout {
     width: parent.width
-    PanelSectionHeader { text: editor.model.deleting ? (editor.model.kind === "delete-section" ? "DELETE EMPTY SECTION" : "DELETE PERSONAL LINK") : editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
+    PanelSectionHeader { text: editor.model.deleting ? (editor.model.kind === "delete-section" ? "DELETE SECTION" : "DELETE PERSONAL LINK") : editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
     Button {
       id: cancelButton
       text: "Cancel"
@@ -38,9 +38,9 @@ Column {
   Text {
     visible: editor.model.deleting && editor.model.name !== ""
     width: parent.width
-    text: "Delete “" + editor.model.name + "”?" + (editor.model.kind === "delete-link"
-      ? "\nSection: " + editor.model.sectionName + "\nThis removes the bookmark from your Rock account."
-      : "\nThe section must still be empty when you confirm.")
+    text: editor.model.kind === "delete-section"
+      ? "Delete “" + editor.model.name + "” and all links inside it?\nCurrently contains " + editor.model.linkCount + (editor.model.linkCount === 1 ? " link." : " links.") + "\nThis permanently deletes the section and its contents from your Rock account."
+      : "Delete “" + editor.model.name + "”?\nSection: " + editor.model.sectionName + "\nThis removes the bookmark from your Rock account."
     textFormat: Text.PlainText
     color: Color.foreground
     font.family: Style.font.family

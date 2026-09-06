@@ -34,7 +34,7 @@ TestCase {
   }
   function test_delete_targets_require_owned_catalog_and_never_target_shared_or_child_actions() {
     model.sections = [{groupId: "work", safeId: "private-work", name: "Work"}, {groupId: "empty", safeId: "private-empty", name: "Empty"}]
-    compare(model.deletionTarget(model.rows[0]), null)
+    compare(model.deletionTarget(model.rows[0]), {kind: "section", targetId: "private-work"})
     compare(model.deletionTarget(model.rows[1]), null)
     compare(model.deletionTarget(model.rows[2]), {kind: "section", targetId: "private-empty"})
     model.links = [{safeId: "open", deleteId: "delete", title: "Page", section: "Work", groupId: "work", isShared: false}]

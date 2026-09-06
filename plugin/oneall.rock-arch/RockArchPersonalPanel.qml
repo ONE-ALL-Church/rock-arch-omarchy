@@ -195,7 +195,7 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         visible: row.deletable && (row.rowSelected || rowHover.hovered)
         text: "Delete"
-        tooltipText: row.modelData.group ? "Delete empty section" : "Delete Personal Link"
+        tooltipText: row.modelData.group ? "Delete section and its links" : "Delete Personal Link"
         Accessible.name: "Delete " + row.modelData.title
         focusable: true
         onClicked: personalPanel.controller.beginPersonalDelete(row.modelData)

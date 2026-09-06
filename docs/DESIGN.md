@@ -149,10 +149,15 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   the bookmark; success feedback clears after four seconds.
   Eligible hovered or selected rows offer Delete, also reachable with the Delete
   key. A focused confirmation displays the exact bookmark name, section, and URL
-  or the empty section name. Cancel receives initial focus. Delete requires an
-  explicit button activation; Ctrl+S does not delete. Shared items and populated
-  section headings have no Delete action. Cancel preserves the selected row;
-  a successful deletion refreshes Links and leaves the remaining section visible.
+  or the section name with a server-verified count of its links. Section wording
+  explicitly deletes the section and all contents, including when the current
+  count is zero. Populated sections use **Delete section and links**. Cancel
+  receives initial focus. Delete requires an explicit button activation;
+  Ctrl+S does not delete. Shared items have no Delete
+  action. Changed contents require Reload and a new confirmation; invalid or
+  unavailable counts never enable deletion. Cancel preserves the selected row;
+  successful deletion refreshes Links. Deleting a bookmark leaves its section
+  visible; deleting a section removes its heading.
 - **Magnus:** breadcrumb/task title plus Refresh, a shared list treatment, and a
   bounded preview. Deploy keeps a
   dedicated production confirmation.

@@ -20,6 +20,7 @@ from rock_arch_broker.personal_links import (
     CURRENT_PERSON,
     LINKS,
     MAX_RESPONSE,
+    MAX_SECTION_LINKS,
     NEW_SECTION,
     SECTIONS,
     PersonalLinkError,
@@ -51,6 +52,7 @@ class FakeRock:
         self.corrupt_readback = False
         self.keep_deleted = False
         self.lose_delete = False
+        self.keep_children = False
 
     @property
     def writes(self):
@@ -79,7 +81,7 @@ class FakeRock:
         if match:
             return [
                 dict(item) for item in self.links if item["SectionId"] == int(match[1])
-            ][:1]
+            ][: int(params.get("$top", "1"))]
         match = re.search(r"and SectionId eq (\d+) and Url eq '(.*)'$", condition)
         return [
             dict(item)
@@ -115,6 +117,10 @@ class FakeRock:
                 self.links = [item for item in self.links if item["Id"] != number]
             else:
                 self.sections = [item for item in self.sections if item["Id"] != number]
+                if not self.keep_children:
+                    self.links = [
+                        item for item in self.links if item["SectionId"] != number
+                    ]
         if self.lose_delete:
             raise PersonalLinkError("personal_delete_uncertain")
 
@@ -422,9 +428,9 @@ class PersonalDeleteTests(unittest.TestCase):
         }
         self.rock.links = [dict(self.link)]
 
-    def prepare(self, kind="link"):
+    def prepare(self, kind="link", *, with_links=False):
         target = 100 if kind == "link" else self.manager.list_sections()[0]["safeId"]
-        return self.manager.prepare_delete(kind, target)
+        return self.manager.prepare_delete(kind, target, with_links=with_links)
 
     def test_confirmed_link_delete_uses_exact_record_and_verifies_absence(self):
         draft = self.prepare()
@@ -445,13 +451,97 @@ class PersonalDeleteTests(unittest.TestCase):
         self.manager.delete(draft["draftId"], confirmed=True)
         self.assertEqual(self.rock.writes, [("DELETE", SECTIONS, 7)])
         child_reads = [call for call in self.rock.calls if call[:2] == ("GET", LINKS)]
-        self.assertEqual(len(child_reads), 2)
+        self.assertEqual(len(child_reads), 3)
+        self.assertEqual(
+            child_reads[0][2],
+            {
+                "$filter": "SectionId eq 7",
+                "$select": "Id,SectionId",
+                "$orderby": "Id",
+                "$top": str(MAX_SECTION_LINKS + 1),
+            },
+        )
         self.assertTrue(
             all(
                 call[2] == {"$filter": "SectionId eq 7", "$select": "Id", "$top": "1"}
-                for call in child_reads
+                for call in child_reads[1:]
             )
         )
+
+    def test_with_links_counts_all_children_and_verifies_cascade_with_one_delete(self):
+        self.rock.links += [
+            {
+                **self.link,
+                "Id": 101,
+                "Url": "https://other.example/hidden",
+                "PersonAliasId": 999,
+            }
+        ]
+        draft = self.prepare("section", with_links=True)
+        self.assertEqual(draft["linkCount"], 2)
+        self.assertTrue(draft["withLinks"])
+        self.assertNotIn("link_ids", draft)
+        self.assertNotIn("PersonAliasId", json.dumps(draft))
+        self.assertEqual(self.rock.writes, [])
+        result = self.manager.delete(draft["draftId"], confirmed=True, with_links=True)
+        self.assertEqual(result["linkCount"], 2)
+        self.assertTrue(result["withLinks"])
+        self.assertEqual(self.rock.links, [])
+        self.assertEqual(self.rock.writes, [("DELETE", SECTIONS, 7)])
+
+    def test_with_links_scope_is_explicit_and_bound_to_draft(self):
+        draft = self.prepare("section", with_links=True)
+        with self.assertRaisesRegex(PersonalLinkError, "scope_invalid"):
+            self.manager.delete(draft["draftId"], confirmed=True)
+        with self.assertRaisesRegex(PersonalLinkError, "confirmation_required"):
+            self.manager.delete(draft["draftId"], confirmed=False, with_links=True)
+        self.rock.links = []
+        empty = self.prepare("section")
+        with self.assertRaisesRegex(PersonalLinkError, "scope_invalid"):
+            self.manager.delete(empty["draftId"], confirmed=True, with_links=True)
+        for flag in (1, "true", None):
+            with self.assertRaisesRegex(PersonalLinkError, "scope_invalid"):
+                self.prepare("section", with_links=flag)
+        with self.assertRaisesRegex(PersonalLinkError, "scope_invalid"):
+            self.prepare(with_links=True)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_with_links_requires_new_review_for_changed_child_ids_even_same_count(self):
+        for records in (
+            [],
+            [{**self.link, "Id": 101}],
+            [self.link, {**self.link, "Id": 101}],
+        ):
+            self.rock.links = [dict(self.link)]
+            draft = self.prepare("section", with_links=True)
+            self.rock.links = records
+            with self.assertRaisesRegex(PersonalLinkError, "contents_changed"):
+                self.manager.delete(draft["draftId"], confirmed=True, with_links=True)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_count_refuses_truncated_invalid_duplicate_or_wrong_section_rows(self):
+        for rows in (
+            [self.link] * (MAX_SECTION_LINKS + 1),
+            [self.link, self.link],
+            [{"Id": True, "SectionId": 7}],
+            [{"Id": 100, "SectionId": 8}],
+            {"value": []},
+        ):
+            with (
+                patch.object(self.rock, "get", return_value=rows),
+                self.assertRaisesRegex(PersonalLinkError, "count_unavailable"),
+            ):
+                self.manager._section_links(7, ".ROCK=test")
+        self.assertEqual(self.rock.writes, [])
+
+    def test_missing_cascade_never_reports_success(self):
+        draft = self.prepare("section", with_links=True)
+        self.rock.keep_children = True
+        with self.assertRaisesRegex(PersonalLinkError, "delete_uncertain"):
+            self.manager.delete(draft["draftId"], confirmed=True, with_links=True)
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.delete(draft["draftId"], confirmed=True, with_links=True)
+        self.assertEqual(self.rock.writes, [("DELETE", SECTIONS, 7)])
 
     def test_nonempty_section_and_concurrent_new_link_never_delete(self):
         with self.assertRaisesRegex(PersonalLinkError, "section_not_empty"):
@@ -733,6 +823,45 @@ class PersonalLinkBrokerCliTests(unittest.TestCase):
         self.assertEqual(
             self.rock.writes, [("DELETE", LINKS, 100), ("DELETE", SECTIONS, 7)]
         )
+
+    def test_cli_populated_section_requires_flag_and_dry_run_reports_complete_count(
+        self,
+    ):
+        self.rock.links = [
+            {
+                "Id": 100 + index,
+                "Name": "Page",
+                "Url": ORIGIN + "/page/42",
+                "SectionId": 7,
+                "PersonAliasId": 420,
+            }
+            for index in range(3)
+        ]
+        section = self.manager.list_sections()[0]["safeId"]
+        base = ["links", "sections", "delete", section]
+        with self.assertRaisesRegex(CliError, "section_not_empty"):
+            _request(_parser().parse_args(base + ["--confirm"]), self)
+        self.calls.clear()
+        with self.assertRaisesRegex(CliError, "confirmation_required"):
+            _request(_parser().parse_args(base + ["--with-links"]), self)
+        self.assertEqual(self.calls, [])
+        preview = _request(
+            _parser().parse_args(base + ["--with-links", "--dry-run"]), self
+        )["dryRun"]
+        self.assertEqual(preview["linkCount"], 3)
+        self.assertTrue(preview["withLinks"])
+        self.assertIn(
+            "deletes_private_section_and_all_links_in_rock", preview["sideEffects"]
+        )
+        self.assertFalse(preview["executed"])
+        self.assertEqual(self.rock.writes, [])
+        result = _request(
+            _parser().parse_args(base + ["--with-links", "--confirm"]), self
+        )["personalDelete"]
+        self.assertTrue(result["deleted"])
+        self.assertEqual(result["linkCount"], 3)
+        self.assertNotIn("_sectionId", result)
+        self.assertEqual(self.rock.links, [])
 
     def test_delete_rejects_navigation_ids_preview_and_disabled_terminal(self):
         for target in ("rock-safe-person", "100", "link-delete-forged"):
