@@ -90,6 +90,9 @@ command. IDs are intentionally invalidated when the broker restarts.
 
 ## Scheduled jobs
 
+CLI execution requires `terminalMutationAccess: true` and the `runJobs` grant.
+Access discovery, status, and dry runs need only read access.
+
 ```bash
 rock-arch jobs access --refresh
 rock-arch search --entity jobs "Process"
@@ -186,6 +189,26 @@ Existing manual bindings are never replaced. Removal restores the menu icon.
 operations return nonzero and a stable error code.
 
 ## Rock search and links
+
+Search supports the same eight entity categories as the panel:
+
+| Entity | `--entity` value | Query prefix | `enabledCategories` value |
+|---|---|---|---|
+| People | `people` | `p:` | `People` |
+| Groups | `groups` | `g:` | `Groups` |
+| Group Types | `group-types` | `gt:` | `Group Types` |
+| Workflow Types | `workflows` | `w:` | `Workflows` |
+| Scheduled Jobs | `jobs` | `j:` | `Jobs` |
+| Pages | `pages` | `page:` | `Pages` |
+| Content Channel Types | `content-types` | `ct:` | `Content Channel Types` |
+| Content Channel Items | `content-items` | `c:` | `Content Channel Items` |
+
+Workflow search returns definitions from `WorkflowTypes`; it does not search
+individual workflow executions. Unscoped queries search every enabled,
+authorized category plus matching Personal Links. Bare prefixes list the first
+three accessible matches; numeric IDs and GUIDs support exact lookup. Use
+`rock-arch capabilities --refresh` to inspect account access. The
+[README prefix table](../README.md#search-rock) includes aliases and panel shortcuts.
 
 ```bash
 rock-arch search --stdin
@@ -350,8 +373,21 @@ Knowledge uses the same credentialless, fixed-origin public boundary as the UI.
 Details can return related items with their own `safeId`, allowing an agent to
 walk article, issue, Lava-context, concept, and Model Map relationships without
 receiving arbitrary URLs. Opening the cited public source requires confirmation.
+The [Knowledge scope table](../README.md#search-public-rock-knowledge) lists
+Model Map, issues, ideas, Lava contexts, recipes, and concept guides. General
+search also returns relevant public articles, videos, and other indexed material.
+`knowledge get` returns the same bounded Model Map properties, methods, flags,
+reference values, and related models shown in the panel. `knowledge open` uses
+the specific public model when its identifier is available; article, video, and
+issue results prefer their original public source over generated or code pages.
+All Knowledge source links stay public, independently of the active Rock profile.
+
 
 ## Magnus
+
+CLI builds require `terminalMutationAccess: true` and the `buildMagnus` grant,
+including a build launched with `links activate`. Browsing and previews need only
+read access.
 
 ```bash
 rock-arch magnus status
@@ -382,8 +418,9 @@ completion: the Magnus surface currently available to Rock Arch has no
 dependable completion-status endpoint, so each receipt explicitly returns
 `"statusSource": "local"` and `"completionVerifiable": false`.
 
-Rock Arch still exposes no Magnus write, upload, delete, mkdir, touch, arbitrary
-endpoint, SQL, or generic Rock mutation command. Scheduled jobs use the separate,
+Magnus builds are the only supported Magnus server mutation. There are no file
+write, upload, delete, mkdir, touch, arbitrary endpoint, SQL, or generic Rock
+mutation commands. Scheduled jobs use the separate,
 confirmed `jobs run` command described above.
 
 ## Updates

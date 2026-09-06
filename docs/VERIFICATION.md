@@ -1,8 +1,19 @@
 # Verification record
 
 This record describes the prepared `0.26.0` release boundary and the unreleased
-Personal Link and section management acceptance below. Historical feature changes belong in
+feature acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
+
+## Unreleased CLI permissions and bookmarks
+
+On 2026-09-05, development commit `47ab992` passed 342 Python tests, 90 Qt checks,
+Ruff, ty, bytecode compilation, Omarchy plugin validation, and `git diff --check`.
+The installed development checkout reported read access on, mutations off, and
+an empty action-grant list. Invalid verification targets at every direct write
+entry point were refused by the mutation gate before execution. The native
+Search panel rendered the outline bookmark beside Run and Open. No production
+writes were made in these permission checks. The new Ctrl+B physical key path
+was not exercised by this automated review; Ctrl+S remains the form-save shortcut.
 
 ## Unreleased Personal Link management
 
@@ -256,13 +267,15 @@ plugin or assert that the interactive Omarchy shell lifecycle was tested.
 ## Data and navigation boundary
 
 - The QML process receives no credentials, cookies, raw Rock IDs, raw server
-  URLs, or exception text. Content is limited to a user-selected bounded Magnus
+  URLs, or exception text, apart from the validated same-origin URL in the
+  explicit Personal Link editor. Content is limited to a user-selected bounded Magnus
   text preview and a user-selected bounded public Knowledge result.
 - Search uses eight fixed Rock REST v1 resources with fixed projections, bounded
   results, contains-style Workflow Type matching, fast prefix matching for the
   other entity categories, exact ID/GUID matching, and exact-origin navigation
-  targets. It exposes no generic HTTP, REST v2, SQL, mutation, job-run, or Run
-  Now transport.
+  targets. The search client exposes no writes, SQL, or generic HTTP transport.
+  Separate Personal Link and job clients provide the narrowly scoped, confirmed
+  writes described in [SECURITY.md](../SECURITY.md).
 - A bounded post-login probe checks those same eight endpoints with only
   `$select=Id&$top=1`. Denied or unsupported categories are hidden, and the
   broker independently excludes them from scoped and unscoped requests.

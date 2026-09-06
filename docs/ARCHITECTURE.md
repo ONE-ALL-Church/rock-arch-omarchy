@@ -51,6 +51,13 @@
     bindings through Hyprland's reported XKB layouts and its existing
     libxkbcommon runtime library.
 
+16. `PersonalLinkManager`: private link/section catalogs and confirmed creation
+    and deletion through fixed endpoints, with expiring, single-use drafts.
+17. `JobManager`: bounded Scheduled Job List discovery, authorization checks,
+    short-lived job drafts, confirmed RunNow requests, and latest-record status.
+18. `cli_permissions`: explicit grants for the six supported remote mutation
+    actions, enforced in the broker independently of interactive panel controls.
+
 Shortcut operations use fixed names (`shortcut_status`, `shortcut_install`,
 `shortcut_remove`) and a fixed Rock Arch summon command. Mutations require
 explicit confirmation, an installed plugin, PROD context, a fresh revision of
@@ -75,6 +82,8 @@ unavailable, it purges the queued credential request on panel close or after the
 18-second connection timeout. Credentials are never returned from the broker.
 QML never receives cookies, SQL, raw entity response bodies, raw URLs/record
 IDs, internal exception text, or fields outside the typed display contract.
+The Personal Link editor receives its explicitly selected, validated same-origin
+URL so the user can review and edit the bookmark.
 The content exceptions are a bounded UTF-8 Magnus file preview explicitly
 selected by the user and the bounded public body of an explicitly selected
 Rock Knowledge result. Both cross typed, size-limited contracts.
@@ -133,9 +142,10 @@ registered. Updater state is bounded, owner-only JSON and
 contains no Git output, credentials, cookies, or Rock data.
 
 Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and an
-opaque `safeId`. Live search deliberately reports campus as `Not requested`.
-No contact details, notes, addresses, dates of birth, family relationships,
-photos, raw record IDs, or authentication identifiers are in the contract.
+opaque `safeId`. Optional person context includes age, conservatively inferred
+spouse, family campus, and connection status. Contact details, notes, addresses,
+full birth dates, photos, raw record IDs, and authentication identifiers are
+excluded. The bounded family read is described below.
 
 ## Native Rock session boundary
 
@@ -189,7 +199,7 @@ The client cannot choose an endpoint. These are Rock's established REST v1
 controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
 `GroupTypes`, `WorkflowTypes`, `ServiceJobs`, `Pages`, `ContentChannelTypes`,
 and `ContentChannelItems`, with fixed `$select`, `$orderby`, `$top=3`, and
-generated `startswith` filters. The eight fixed reads share one native Rock
+generated prefix filters (contains-style matching for Workflow Types). The eight fixed reads share one native Rock
 session cookie and start in
 parallel; results are still transformed in a deterministic category order.
 After login, a separate bounded capability pass sends `$select=Id&$top=1` to
@@ -218,8 +228,10 @@ memory for five minutes. Unscoped search matches the allowlisted title and
 section locally, ranks Personal Links before entity results, and never exposes
 their URLs. Opening the panel force-refreshes that cache; scoped entity searches
 do not include Personal Links. A failed category is reported as unavailable;
-PROD never falls back to mock data. There is no raw HTTP, generic entity
-mutation, SQL, job execution, or Run Now operation.
+PROD never falls back to mock data. This search client exposes no write or
+generic HTTP operation. Personal Link changes and job triggering use separate
+fixed-endpoint clients described below; there is no arbitrary entity mutation
+or SQL interface.
 
 ### Personal Link additions
 
@@ -321,6 +333,28 @@ unavailable choices and shortcuts, and cannot make a scoped or unscoped request
 reach an unavailable endpoint. Rock controller/action permissions remain the
 authoritative server-side boundary.
 
+### Scheduled jobs
+
+`JobManager` discovers the modern Obsidian Scheduled Job List type through bounded
+`BlockTypes`, `Blocks`, and `Pages` reads. Its fixed
+`RefreshObsidianBlockInitialization` action verifies the discovered page/block pair,
+block type, and page access. Both add and delete capability flags must be true,
+which requires block Edit access. The standard Jobs page is preferred; otherwise
+exactly one accessible custom placement is required. Discovery is cached for
+60 seconds and cleared on account, credentials, origin, or context changes.
+
+Only a current Jobs search reference can prepare a two-minute, single-use draft.
+Confirmation refreshes discovery and rechecks job identity, name, placement, and
+expiry before one `RunNow` POST containing the job GUID. The client accepts only
+these two exact block actions under the discovered page/block path. Clients cannot
+provide their own route or use GET to trigger execution. Uncertain writes are
+never retried. Status reads the latest recorded job state; acceptance and an old
+Success record do not prove this request completed.
+
+The Search panel presents Run only after access succeeds and opens confirmation
+in the same panel with Cancel initially focused. CLI execution additionally
+requires the `runJobs` grant; discovery and previews remain read operations.
+
 ## Public Rock Knowledge boundary
 
 Public Knowledge search is a separate trust path from live Rock search. A
@@ -392,11 +426,20 @@ invent completion or deployment timestamps that Magnus does not expose.
 
 Search results and Personal Links cross the socket with process-local HMAC IDs.
 Only the broker can resolve those IDs. Every search category maps to a fixed
-Rock route: Person (`/Person/{Id}`), Group (`/Group/{Id}`), Workflow Type
-configuration (`/admin/general/workflows?WorkflowTypeId={Id}`), Scheduled Job
-detail (`/admin/system/jobs/{Id}`), Page (`/page/{Id}`), and Content Channel
-Item (`/ContentChannelItem/{Id}`). Personal Link targets may be relative but
-must resolve to HTTPS on the selected Rock origin; external and malformed
+Rock route:
+
+| Entity | Rock route |
+|---|---|
+| Person | `/Person/{id}` |
+| Group | `/Group/{id}` |
+| Group Type | `/admin/general/group-types?GroupTypeId={id}` |
+| Workflow Type | `/admin/general/workflows?WorkflowTypeId={id}` |
+| Scheduled Job | `/admin/system/jobs/{id}` |
+| Page | `/page/{id}` |
+| Content Channel Type | `/admin/cms/content-channel-type?ContentChannelTypeId={id}` |
+| Content Channel Item | `/ContentChannelItem/{id}` |
+
+Personal Link targets may be relative but must resolve to HTTPS on the selected Rock origin; external and malformed
 links are omitted.
 
 Successful user-requested opens and accepted mobile app build requests are
@@ -406,7 +449,7 @@ returns only another process-local opaque ID, title, and type to QML. Its
 directory is `0700`, its file is `0600`, writes are atomic, entries are
 validated on every read, and the oldest entries are removed beyond 20. The
 public list is sorted globally by its last-used timestamp, newest first, rather
-than grouping items by entity type. Each origin receives a separate store, and
+than grouping items by entity type. Each profile receives a separate store, and
 DEV returns a separate, deterministic and non-persistent Recent Links fixture;
 its clear and activation operations are no-ops. PROD never receives those
 fixtures. A Magnus Build entry cannot be opened as a URL; activation routes it

@@ -6,7 +6,7 @@ tools, profiles, and updates into one native panel—and exposes the same bounde
 capabilities through an agent-friendly terminal command.
 
 Every user signs directly into their own Rock instance. Rock Arch uses the
-native Rock session and fixed REST v1 routes; it does not require an OpenID
+native Rock session, fixed REST v1 routes, and narrowly scoped job block actions; it does not require an OpenID
 client, OAuth application, Rock MCP server, Magnus CLI, Node.js, or npm.
 
 ![Rock Arch search in the native Omarchy panel](preview.png)
@@ -111,6 +111,8 @@ probes each supported category and hides any category that is unavailable or
 unauthorized. Search never falls back to sample data during normal use.
 
 An unscoped query searches every enabled category plus matching Personal Links.
+Workflow search finds **Workflow Types** (definitions), not individual workflow
+runs. `Workflows` and `Jobs` are the corresponding category IDs in CLI settings.
 
 For Jobs, Rock Arch discovers the Obsidian Scheduled Job List block and checks
 the signed-in user's page access and block **Edit** permission. A selected job
@@ -132,16 +134,16 @@ A numeric ID or GUID is checked across all enabled categories, so `42` can
 return several entity types whose IDs overlap. Use a prefix when the type is
 known:
 
-| Category | Prefixes | Keyboard shortcut |
-|---|---|---|
-| People | `p:`, `person:`, `people:` | `Alt+P` |
-| Groups | `g:`, `group:`, `groups:` | `Alt+G` |
-| Group Types | `gt:`, `grouptype:`, `grouptypes:` | `Alt+Shift+G` |
-| Workflow Types | `w:`, `wt:`, `workflow:`, `workflowtype:` | `Alt+W` |
-| Jobs | `j:`, `job:`, `jobs:` | `Alt+J` |
-| Pages | `pg:`, `page:`, `pages:` | `Alt+Shift+P` |
-| Content Channel Types | `ct:`, `contenttype:`, `channeltype:` | `Alt+Shift+C` |
-| Content Channel Items | `c:`, `content:`, `item:` | `Alt+C` |
+| Category | Prefixes | CLI `--entity` | Keyboard shortcut |
+|---|---|---|---|
+| People | `p:`, `person:`, `people:` | `people` | `Alt+P` |
+| Groups | `g:`, `group:`, `groups:` | `groups` | `Alt+G` |
+| Group Types | `gt:`, `grouptype:`, `grouptypes:` | `group-types` | `Alt+Shift+G` |
+| Workflow Types | `w:`, `wt:`, `workflow:`, `workflowtype:` | `workflows` | `Alt+W` |
+| Jobs | `j:`, `job:`, `jobs:` | `jobs` | `Alt+J` |
+| Pages | `pg:`, `page:`, `pages:` | `pages` | `Alt+Shift+P` |
+| Content Channel Types | `ct:`, `contenttype:`, `channeltype:` | `content-types` | `Alt+Shift+C` |
+| Content Channel Items | `c:`, `content:`, `item:` | `content-items` | `Alt+C` |
 
 Examples:
 
@@ -169,13 +171,13 @@ shortcut returns to the confirmation flow—it never silently deploys. `X` or
 separate workspace, while unscoped Search can also match their title or section.
 Every target must resolve to the selected Rock instance.
 
-Links opens in **Groups** view. Click a section or press Enter to expand or
+Links opens in **Sections** view. Click a section or press Enter to expand or
 collapse it; multiple sections can stay open. Links appear indented beneath
 their section, in Rock's existing order. Expansion is remembered separately for
 each profile, including after restarting the shell. Newly discovered sections
 start collapsed; a section you create here opens automatically.
-Use the view dropdown (or press `V`) to choose a flat **Alphabetical** list.
-Returning to Groups restores the expanded sections. Both preferences are
+Use the **Sections / A–Z** toolbar (or press `V`) to choose a flat alphabetical list.
+Returning to Sections restores the expanded sections. Both preferences are
 editable through the CLI.
 
 Choose the **bookmark icon** beside a Search result, or press `Ctrl+B`, to prefill its name and
@@ -198,8 +200,8 @@ and verifies the section and its contents are gone. Shared items cannot be
 deleted here.
 
 Choose **Add → Section**, enter its name, and select **Create section** or press
-`Ctrl+S`. The private section opens in Groups with an **Add a link** action that
-preselects it. Empty private sections remain visible in Groups. An existing
+`Ctrl+S`. The private section opens in Sections with an **Add a link** action that
+preselects it. Empty private sections remain visible in Sections. An existing
 section with the same name, ignoring case, is reused. The CLI supports this
 through `rock-arch links sections add --stdin --confirm` with
 `{"name":"Projects"}`; use `--dry-run` to validate without creating it.
@@ -307,9 +309,7 @@ families into Mobile Applications, then through an application, page, blocks,
 and `content.lava`. Deploy appears only on the application row where Magnus
 advertises that capability. No build or local action runs._
 
-Alongside Personal Link creation, Rock Arch supports explicit Magnus deployment.
-The build path must
-be advertised by Magnus, contain a numeric mobile-app ID, and pass same-origin
+Rock Arch supports explicit Magnus deployment. The build path must be advertised by Magnus, contain a numeric mobile-app ID, and pass same-origin
 validation. Every initial or repeated build requires confirmation. Magnus does
 not expose a dependable completion endpoint, so Rock Arch reports the local
 acceptance time and never invents a completion or “last deployed” state.
@@ -431,9 +431,10 @@ These are future directions under consideration, not committed release dates:
 | Knowledge detail | Tab / Shift+Tab; Page Up/Down scrolls | Enter or Space | Esc walks Back history | Ctrl+F filters Model Map; Open source and Related items |
 | Personal Links | Up / Down stays in the list; Left / Right collapses or expands sections | Enter or Space toggles a section or opens a link | Backspace returns to Search | `V` focuses Sections / A–Z; `Ctrl+N` opens Add; `Delete` reviews deletion |
 | Links toolbar | Tab / Shift+Tab between view choices, Add, and list; Left / Right within choices | Enter or Space selects a view or opens Add | Esc closes Add and returns focus to its button | Toolbar stays visible while links scroll |
-| Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
+| Add bookmark / section | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | `D` download, `C` copy, `H` hash, `O` open, `R` refresh |
+| Job results / confirmation | `R` opens Run; Left / Right moves between buttons | Enter or Space on controls | Esc cancels | Run appears only after access discovery; Check status reads the latest run |
 | Confirmations | Tab / Shift+Tab | Enter or Space | Esc | — |
 | Onboarding / Settings | Tab / Shift+Tab | Enter or Space | Esc | — |
 
@@ -450,6 +451,29 @@ client of the same broker—not another login, HTTP stack, or credential store.
 The command can start the broker while the panel is closed and honors the same
 active profile, permissions, enabled categories, allowlists, and confirmations.
 
+Under **Settings → CLI and agent access**, **Read access** defaults on and
+**Allow mutations** defaults off, including upgrades. Enable the mutation gate
+and only the individual actions you want:
+
+| Control | `terminalMutationActions` value |
+|---|---|
+| Add links | `addLinks` |
+| Add sections | `addSections` |
+| Delete links | `deleteLinks` |
+| Delete sections | `deleteSections` |
+| Run jobs | `runJobs` |
+| Start Magnus builds | `buildMagnus` |
+
+All six grants start off. Read-only previews remain available while mutations
+are disabled. Creating a bookmark's first section also requires **Add sections**;
+deleting a section with `--with-links` also requires **Delete links**. Recent Links
+builds use the same build grant. Interactive panel actions retain their existing
+confirmation flows independently of CLI permissions. Local settings and shortcut
+management remain editable when CLI read access is disabled.
+
+Use `rock-arch settings schema` to discover all settings, or see the
+[permission settings and JSON examples](docs/CLI.md#terminal-and-agent-cli).
+
 ```bash
 rock-arch status
 rock-arch doctor --refresh
@@ -457,6 +481,8 @@ rock-arch capabilities --refresh
 rock-arch login
 rock-arch search --stdin
 rock-arch search 42 --entity groups
+rock-arch jobs access --refresh
+rock-arch jobs run SAFE_JOB_ID --dry-run
 rock-arch knowledge search "mm: Group Member"
 rock-arch links personal
 rock-arch links recent
