@@ -172,11 +172,13 @@ opens the Add menu. Review the name, Rock URL, and personal section, then select
 link** or press `Ctrl+S`. Escape cancels the form. The saved bookmark is selected
 in Links and also appears in your Rock account.
 
-Select or hover over one of your private links to reveal **Delete**, or press
-the `Delete` key on the selected row. Review the bookmark's name, section, and
-URL, then choose **Delete link**. Cancel is focused initially; Escape cancels.
-Private section headings also offer Delete. The confirmation names the section,
-shows its current link count from Rock, and warns that the section and **all links
+Select or hover over one of your private links to reveal the subtle **×** delete
+action, or press the `Delete` key on the selected row. Review the bookmark's name,
+section, and URL, then choose **Delete link**. Cancel and Delete sit side by side,
+with Cancel focused initially. Right arrow moves to Delete; Enter activates the
+focused button, and Escape cancels. Private section headings offer the same **×**
+action. The confirmation names the section, shows its current link count from
+Rock, and warns that the section and **all links
 inside it** will be permanently deleted. Choose **Delete section and links** for
 a populated section. If links change while the confirmation is open, Reload
 shows a fresh count before another confirmation. The broker rechecks ownership

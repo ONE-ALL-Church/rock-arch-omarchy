@@ -141,7 +141,7 @@ Column {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: Style.spacing.rowPaddingX + row.inset
-        anchors.rightMargin: Style.spacing.rowPaddingX + (deleteButton.visible ? deleteButton.width + Style.spacing.sm : 0) + (row.modelData.group ? Style.space(row.modelData.isShared ? 98 : 52) : 0)
+        anchors.rightMargin: Style.spacing.rowPaddingX + (row.deletable ? deleteButton.width + Style.spacing.sm : 0) + (row.modelData.group ? Style.space(row.modelData.isShared ? 98 : 52) : 0)
         spacing: Style.spacing.xxs
 
         Text {
@@ -170,7 +170,7 @@ Column {
       Text {
         visible: row.modelData.group
         anchors.right: parent.right
-        anchors.rightMargin: Style.spacing.rowPaddingX + (deleteButton.visible ? deleteButton.width + Style.spacing.sm : 0)
+        anchors.rightMargin: Style.spacing.rowPaddingX + (row.deletable ? deleteButton.width + Style.spacing.sm : 0)
         anchors.verticalCenter: parent.verticalCenter
         text: String(row.modelData.count) + (row.modelData.isShared ? " · Shared" : "")
         textFormat: Text.PlainText
@@ -193,10 +193,17 @@ Column {
         anchors.right: parent.right
         anchors.rightMargin: Style.spacing.rowPaddingX
         anchors.verticalCenter: parent.verticalCenter
-        visible: row.deletable && (row.rowSelected || rowHover.hovered)
-        text: "Delete"
-        tooltipText: row.modelData.group ? "Delete section and its links" : "Delete Personal Link"
-        Accessible.name: "Delete " + row.modelData.title
+        width: Style.space(28)
+        height: Style.space(28)
+        visible: row.deletable && (row.rowSelected || rowHover.hovered || activeFocus)
+        text: "×"
+        foreground: hot || activeFocus ? Color.foreground : personalPanel.dim
+        horizontalPadding: Style.spacing.xs
+        verticalPadding: Style.spacing.xs
+        tooltipText: row.modelData.group ? "Delete section and its links…" : "Delete link…"
+        Accessible.role: Accessible.Button
+        Accessible.name: (row.modelData.group ? "Delete section " : "Delete link ") + row.modelData.title
+        Accessible.onPressAction: deleteButton.clicked()
         focusable: true
         onClicked: personalPanel.controller.beginPersonalDelete(row.modelData)
       }

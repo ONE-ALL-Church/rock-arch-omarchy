@@ -9,7 +9,7 @@ Column {
   required property var controller
   required property var model
   property alias nameField: nameField
-  property alias cancelButton: cancelButton
+  readonly property Item cancelButton: model.deleting ? deleteCancelButton : formCancelButton
   readonly property string deleteLabel: model.kind === "delete-section" ? (model.linkCount > 0 ? "Delete section and links" : "Delete section") : "Delete link"
   readonly property bool inputActive: nameField.activeFocus || urlField.activeFocus || sectionField.popupOpen
   height: visible ? implicitHeight : 0
@@ -19,8 +19,9 @@ Column {
     width: parent.width
     PanelSectionHeader { text: editor.model.deleting ? (editor.model.kind === "delete-section" ? "DELETE SECTION" : "DELETE PERSONAL LINK") : editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
     Button {
-      id: cancelButton
+      id: formCancelButton
       text: "Cancel"
+      visible: !editor.model.deleting
       focusable: true
       enabled: !editor.model.saving
       onClicked: editor.model.cancel()
@@ -123,17 +124,31 @@ Column {
     width: parent.width
     Item { Layout.fillWidth: true }
     Button {
+      id: deleteCancelButton
+      text: "Cancel"
+      visible: editor.model.deleting
+      enabled: !editor.model.saving
+      focusable: true
+      KeyNavigation.right: reloadButton.visible ? reloadButton : submitButton
+      onClicked: editor.model.cancel()
+    }
+    Button {
+      id: reloadButton
       text: "Reload"
       visible: !editor.model.busy && editor.model.draftId === ""
       focusable: true
+      KeyNavigation.left: editor.model.deleting ? deleteCancelButton : null
+      KeyNavigation.right: editor.model.deleting ? submitButton : null
       onClicked: editor.model.reload()
     }
     Button {
+      id: submitButton
       text: editor.model.saving ? (editor.model.deleting ? "Deleting…" : "Saving…") : editor.model.deleting ? editor.deleteLabel : editor.model.kind === "section" ? "Create section" : "Save link"
       tooltipText: editor.model.deleting ? editor.deleteLabel : editor.model.kind === "section" ? "Create section · Ctrl+S" : "Save to Personal Links · Ctrl+S"
       focusable: true
       bordered: true
       enabled: editor.model.canSave
+      KeyNavigation.left: editor.model.deleting ? (reloadButton.visible ? reloadButton : deleteCancelButton) : null
       onClicked: editor.model.save()
     }
   }

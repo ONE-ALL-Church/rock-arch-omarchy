@@ -11,7 +11,9 @@ repository's default branch is the source used by Omarchy plugin updates.
   targets before confirmation, recheck ownership, and verify deletion without
   automatic retries. Section confirmation shows the actual link count and warns
   that all contents will be deleted; changed contents require a fresh review.
-  Cancel receives initial focus. The CLI requires `--with-links` for populated
+  A subtle × appears on hovered or selected rows; Cancel receives initial focus
+  in a compact confirmation footer, beside Delete, with Left/Right navigation.
+  The CLI requires `--with-links` for populated
   sections, supports counted dry runs, and keeps empty-only behavior without it.
 - Add an **Add → Link / Section** menu and a name-only private-section form.
   Reveal new and empty sections in Groups with an **Add a link** action.

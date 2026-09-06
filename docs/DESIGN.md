@@ -147,12 +147,16 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   and URL prefilled. Use native text fields and a private-section dropdown;
   Ctrl+S saves and Escape returns to the source view. Saving expands the section, selects and reveals
   the bookmark; success feedback clears after four seconds.
-  Eligible hovered or selected rows offer Delete, also reachable with the Delete
-  key. A focused confirmation displays the exact bookmark name, section, and URL
+  Eligible hovered, selected, or keyboard-focused rows offer a muted × in a
+  28-unit square button, with a descriptive Delete tooltip and accessible name.
+  Its space is reserved so titles and counts stay still during hover or selection.
+  The Delete key also opens confirmation. A focused confirmation displays the
+  exact bookmark name, section, and URL
   or the section name with a server-verified count of its links. Section wording
   explicitly deletes the section and all contents, including when the current
   count is zero. Populated sections use **Delete section and links**. Cancel
-  receives initial focus. Delete requires an explicit button activation;
+  sits to the left of Delete in the footer and receives initial focus. Left/Right
+  moves between adjacent actions; Tab also works. Delete requires explicit activation;
   Ctrl+S does not delete. Shared items have no Delete
   action. Changed contents require Reload and a new confirmation; invalid or
   unavailable counts never enable deletion. Cancel preserves the selected row;

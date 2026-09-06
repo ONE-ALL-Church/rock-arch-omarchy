@@ -105,6 +105,17 @@ counts, children hidden by panel filtering, failed cascade readback, and refusal
 to replay consumed drafts. QML checks require a verified count before enabling
 section deletion and pass the reviewed scope through both requests.
 
+The compact × row action was rendered in an isolated native review panel with
+synthetic data and no broker connection. Group and bookmark rows retained their
+alignment, keyboard focus visibly highlighted the square button, and activation
+opened the real confirmation component with Cancel focused. The confirmation
+footer placed Cancel immediately left of Delete. Native Left/Right navigation
+moved between them; Enter on Cancel made no request, while Right then Enter and
+Tab then Enter each made one synthetic confirmation request. When a draft needed
+Reload, Right reached Reload and reloading returned focus to Cancel. The existing
+74 Qt checks and standalone QML lint passed. No account records were used for
+this visual change.
+
 Regression tests cover distinct same-named sections, case-insensitive sorting,
 multiple open groups, Left/Right navigation, selection during refresh and removal,
 save-and-reveal behavior, per-account state, stable non-action group references,
