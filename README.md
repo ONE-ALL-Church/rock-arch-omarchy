@@ -251,6 +251,10 @@ The same structured sections are available through `rock-arch knowledge get`.
 Large or incomplete references explicitly report omitted rows.
 **Open source** opens the specific model on Rock's public Model Map when its
 public identifier is available, independently of the active Rock profile.
+For articles, videos, and issues, it prefers the original public page from the
+KB's source metadata and citations. Code references remain available when no
+original page is cited; arbitrary links in examples or body text are not treated
+as sources. The CLI uses the same source selection.
 
 Only the query is sent to the fixed, credentialless public Knowledge service.
 Rock Arch does not send the selected Rock domain, profile, cookie, credentials,

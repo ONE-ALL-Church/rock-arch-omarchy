@@ -343,7 +343,10 @@ class RockKbReadOnlyAdapter:
     def source_url(self, safe_id: str) -> str | None:
         public_id = sanitize_text(safe_id, 100)
         entry = self._registry.get(public_id)
-        if entry and entry.target_kind == "model" and entry.source_url in ("", MODEL_MAP_SOURCE):
+        if entry and (
+            (entry.target_kind == "model" and entry.source_url in ("", MODEL_MAP_SOURCE))
+            or (entry.target_kind == "result" and (not entry.source_url or _source_url_rank(entry.source_url) > 0))
+        ):
             # CLI callers can open a search hit without visiting the reader first.
             self.detail(public_id)
             entry = self._registry.get(public_id)
@@ -408,7 +411,7 @@ class RockKbReadOnlyAdapter:
         kind = _kind(row.get("kind"))
         authority = sanitize_text(row.get("authority_tier"), 60)
         claim_tier = sanitize_text(row.get("claim_tier"), 60)
-        source_url = _first_source_url(row)
+        source_url = _first_source_url(row, fallback=entry.source_url)
         self._registry[public_id] = _KnowledgeEntry(
             entry.target_kind, entry.target_id, source_url, title
         )
@@ -696,7 +699,7 @@ class RockKbReadOnlyAdapter:
         kind = _kind(row.get("kind"))
         snippet = _snippet(row.get("snippet"))
         authority = sanitize_text(row.get("authority_tier"), 60)
-        source_url = _safe_source_url(row.get("url"))
+        source_url = _first_source_url(row)
         target_kind = "result"
         target_id = result_id
         if kind == "model_map" and result_id.startswith("model_map:"):
@@ -747,6 +750,9 @@ class RockKbReadOnlyAdapter:
         ).hexdigest()[:32]
         safe_id = "kb-" + digest
         previous = self._registry.get(safe_id)
+        if previous and self._cached(self._detail_cache, safe_id) is not None:
+            # Search refreshes can contain less source metadata than the reader.
+            source_url = previous.source_url
         if previous and target_kind == "model" and source_url == MODEL_MAP_SOURCE:
             source_url = previous.source_url or source_url
         self._registry[safe_id] = _KnowledgeEntry(
@@ -1076,18 +1082,69 @@ def _safe_source_url(value: object) -> str:
         return ""
 
 
-def _first_source_url(row: dict[str, Any]) -> str:
-    direct = _safe_source_url(row.get("url"))
-    if direct:
-        return direct
+def _first_source_url(row: dict[str, Any], *, fallback: str = "") -> str:
+    """Prefer original public pages among explicit KB source citations.
+
+    Do not mine body text, examples, related issues, or arbitrary nested payloads
+    for URLs: those can point somewhere other than the source of this result.
+    """
+    candidates: list[str] = []
+
+    def append(value: object) -> None:
+        if len(candidates) >= 100:
+            return
+        safe = _safe_source_url(value)
+        if safe and safe not in candidates:
+            candidates.append(safe)
+
+    def record(value: object) -> None:
+        if not isinstance(value, dict):
+            return
+        for key in ("source_timestamp_url", "url", "source_url"):
+            append(value.get(key))
+
+    def sources(value: object) -> None:
+        if not isinstance(value, dict):
+            return
+        record(value)
+        source_urls = value.get("source_urls")
+        if isinstance(source_urls, list):
+            for url in source_urls[:50]:
+                append(url)
+        for key in ("citations", "source_refs"):
+            references = value.get(key)
+            if isinstance(references, list):
+                for reference in references[:50]:
+                    record(reference)
+
+    sources(row)
     payload = row.get("payload")
-    candidates = payload.get("source_urls") if isinstance(payload, dict) else None
-    if isinstance(candidates, list):
-        for candidate in candidates[:50]:
-            safe = _safe_source_url(candidate)
-            if safe:
-                return safe
-    return ""
+    sources(payload)
+    if isinstance(payload, dict):
+        # Approved claim citations are scoped to the returned knowledge unit.
+        # Distillation references can span other claims, so do not use those.
+        approved = payload.get("approved_claims")
+        if isinstance(approved, list):
+            for claim in approved[:20]:
+                sources(claim)
+    append(fallback)
+    return min(candidates, key=_source_url_rank) if candidates else ""
+
+
+def _source_url_rank(url: str) -> int:
+    """Keep issues/discussions and articles ahead of code or KB artifacts."""
+    parsed = urllib.parse.urlsplit(url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.lower()
+    if host == urllib.parse.urlsplit(ROCK_KB_ORIGIN).hostname:
+        return 2
+    if host == "raw.githubusercontent.com" or (
+        host == "github.com" and any(part in path for part in ("/blob/", "/tree/", "/commit/"))
+    ):
+        return 2 if path.startswith("/one-all-church/rock-agent-kb/") else 1
+    if host == "api.github.com":
+        return 1
+    return 0
 
 
 def _source_host(value: str) -> str:

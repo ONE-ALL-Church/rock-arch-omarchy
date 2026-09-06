@@ -7,6 +7,10 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Changed
 
+- Prefer original public article, video, and issue pages for Knowledge source
+  links. Read structured citations and approved-claim source references, and
+  use code or generated KB files only when no
+  original page is cited. Keep the resolved source through search refreshes.
 - Open a specific public Model Map source using its entity-type identifier,
   including related models and CLI opens directly from search results.
 - Keep a compact Links toolbar visible while bookmarks scroll. Show Sections /
