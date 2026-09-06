@@ -9,14 +9,17 @@ Column {
   required property var controller
   required property var model
   property alias nameField: nameField
+  property alias cancelButton: cancelButton
+  readonly property string deleteLabel: model.kind === "delete-section" ? "Delete section" : "Delete link"
   readonly property bool inputActive: nameField.activeFocus || urlField.activeFocus || sectionField.popupOpen
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.panelGap
 
   RowLayout {
     width: parent.width
-    PanelSectionHeader { text: editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
+    PanelSectionHeader { text: editor.model.deleting ? (editor.model.kind === "delete-section" ? "DELETE EMPTY SECTION" : "DELETE PERSONAL LINK") : editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
     Button {
+      id: cancelButton
       text: "Cancel"
       focusable: true
       enabled: !editor.model.saving
@@ -25,14 +28,39 @@ Column {
   }
   Text {
     width: parent.width
-    text: (editor.model.kind === "section" ? "Private section in " : "Save to your Rock account · ") + editor.controller.activeProfileName()
+    text: editor.model.deleting ? editor.controller.activeProfileName() : (editor.model.kind === "section" ? "Private section in " : "Save to your Rock account · ") + editor.controller.activeProfileName()
     textFormat: Text.PlainText
     color: Qt.darker(Color.foreground, 1.4)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     wrapMode: Text.WordWrap
   }
+  Text {
+    visible: editor.model.deleting && editor.model.name !== ""
+    width: parent.width
+    text: "Delete “" + editor.model.name + "”?" + (editor.model.kind === "delete-link"
+      ? "\nSection: " + editor.model.sectionName + "\nThis removes the bookmark from your Rock account."
+      : "\nThe section must still be empty when you confirm.")
+    textFormat: Text.PlainText
+    color: Color.foreground
+    font.family: Style.font.family
+    font.pixelSize: Style.font.body
+    wrapMode: Text.WordWrap
+  }
+  Text {
+    visible: editor.model.deleting && editor.model.url !== ""
+    width: parent.width
+    text: editor.model.url
+    textFormat: Text.PlainText
+    color: Qt.darker(Color.foreground, 1.4)
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    wrapMode: Text.WrapAnywhere
+    maximumLineCount: 3
+    elide: Text.ElideMiddle
+  }
   Column {
+    visible: !editor.model.deleting
     width: parent.width
     spacing: Style.spacing.labelGap
     Text {
@@ -84,7 +112,7 @@ Column {
   Text {
     width: parent.width
     visible: editor.model.notice !== "" || editor.model.busy
-    text: editor.model.busy ? (editor.model.saving ? "Saving to Rock…" : "Loading your personal sections…") : editor.model.notice
+    text: editor.model.busy ? (editor.model.saving ? (editor.model.deleting ? "Deleting from Rock…" : "Saving to Rock…") : editor.model.deleting ? "Checking this item…" : "Loading your personal sections…") : editor.model.notice
     textFormat: Text.PlainText
     color: Color.foreground
     font.family: Style.font.family
@@ -101,8 +129,8 @@ Column {
       onClicked: editor.model.reload()
     }
     Button {
-      text: editor.model.saving ? "Saving…" : editor.model.kind === "section" ? "Create section" : "Save link"
-      tooltipText: editor.model.kind === "section" ? "Create section · Ctrl+S" : "Save to Personal Links · Ctrl+S"
+      text: editor.model.saving ? (editor.model.deleting ? "Deleting…" : "Saving…") : editor.model.deleting ? editor.deleteLabel : editor.model.kind === "section" ? "Create section" : "Save link"
+      tooltipText: editor.model.deleting ? editor.deleteLabel : editor.model.kind === "section" ? "Create section · Ctrl+S" : "Save to Personal Links · Ctrl+S"
       focusable: true
       bordered: true
       enabled: editor.model.canSave

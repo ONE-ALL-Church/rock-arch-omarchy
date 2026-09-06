@@ -18,7 +18,7 @@ QtObject {
     return String(link.groupId || ("preview:" + JSON.stringify([link.section, !!link.isShared])))
   }
   function linkRow(link) {
-    return Object.assign({}, link, {group: false, key: "link:" + link.safeId + ":" + groupId(link), sectionId: groupId(link)})
+    return Object.assign({}, link, {group: false, key: "link:" + (link.deleteId || link.safeId) + ":" + groupId(link), sectionId: groupId(link)})
   }
   function grouped() {
     var result = []
@@ -56,6 +56,12 @@ QtObject {
           title: "Add a link", sectionSafeId: group.sectionSafeId})
     })
     return result
+  }
+  function deletionTarget(item) {
+    if (!item || item.empty || item.isShared) return null
+    if (item.group) return item.count === 0 && item.sectionSafeId ? {kind: "section", targetId: item.sectionSafeId} : null
+    return item.deleteId && sections.some(function(section) { return section.groupId === item.sectionId })
+      ? {kind: "link", targetId: item.deleteId} : null
   }
   function selected() { return cursor >= 0 && cursor < rows.length ? rows[cursor] : null }
   function restoreSelection(item) {

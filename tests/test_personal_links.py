@@ -49,10 +49,12 @@ class FakeRock:
         self.lose_section_response = False
         self.corrupt_section_readback = False
         self.corrupt_readback = False
+        self.keep_deleted = False
+        self.lose_delete = False
 
     @property
     def writes(self):
-        return [call for call in self.calls if call[0] == "POST"]
+        return [call for call in self.calls if call[0] in ("POST", "DELETE")]
 
     def get(self, origin, path, params, cookie):
         self.calls.append(("GET", path, copy.deepcopy(params)))
@@ -60,16 +62,24 @@ class FakeRock:
             return dict(self.person)
         if path == SECTIONS:
             sections = copy.deepcopy(self.sections)
+            match = re.fullmatch(r"Id eq (\d+)", params["$filter"])
+            if match:
+                return [s for s in sections if s["Id"] == int(match[1])]
             if self.corrupt_section_readback and self.writes:
                 sections[-1]["Name"] = "Unexpected section"
             return sections
         condition = params["$filter"]
-        match = re.search(r"and Id eq (\d+)", condition)
+        match = re.search(r"(?:^|and )Id eq (\d+)", condition)
         if match:
             rows = [dict(item) for item in self.links if item["Id"] == int(match[1])]
             if rows and self.corrupt_readback:
                 rows[0]["SectionId"] = 999
             return rows
+        match = re.fullmatch(r"SectionId eq (\d+)", condition)
+        if match:
+            return [
+                dict(item) for item in self.links if item["SectionId"] == int(match[1])
+            ][:1]
         match = re.search(r"and SectionId eq (\d+) and Url eq '(.*)'$", condition)
         return [
             dict(item)
@@ -97,6 +107,16 @@ class FakeRock:
         if self.lose_response:
             raise PersonalLinkError("personal_link_save_uncertain")
         return self.links[-1]["Id"]
+
+    def delete(self, origin, path, number, cookie):
+        self.calls.append(("DELETE", path, number))
+        if not self.keep_deleted:
+            if path == LINKS:
+                self.links = [item for item in self.links if item["Id"] != number]
+            else:
+                self.sections = [item for item in self.sections if item["Id"] != number]
+        if self.lose_delete:
+            raise PersonalLinkError("personal_delete_uncertain")
 
 
 class PersonalLinkTests(unittest.TestCase):
@@ -388,6 +408,147 @@ class PersonalLinkTests(unittest.TestCase):
         self.assertTrue(any("O''Brien" in query for query in filters))
 
 
+class PersonalDeleteTests(unittest.TestCase):
+    def setUp(self):
+        self.rock = FakeRock()
+        self.manager = PersonalLinkManager(Cookie(), self.rock)
+        self.manager.set_origin(ORIGIN)
+        self.link = {
+            "Id": 100,
+            "Name": "Page",
+            "Url": ORIGIN + "/page/42",
+            "SectionId": 7,
+            "PersonAliasId": 420,
+        }
+        self.rock.links = [dict(self.link)]
+
+    def prepare(self, kind="link"):
+        target = 100 if kind == "link" else self.manager.list_sections()[0]["safeId"]
+        return self.manager.prepare_delete(kind, target)
+
+    def test_confirmed_link_delete_uses_exact_record_and_verifies_absence(self):
+        draft = self.prepare()
+        self.assertEqual(self.rock.writes, [])
+        self.assertNotIn("PersonAliasId", json.dumps(draft))
+        with self.assertRaisesRegex(PersonalLinkError, "confirmation_required"):
+            self.manager.delete(draft["draftId"], confirmed=False)
+        result = self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertTrue(result["deleted"])
+        self.assertFalse(result["alreadyDeleted"])
+        self.assertEqual(self.rock.writes, [("DELETE", LINKS, 100)])
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.delete(draft["draftId"], confirmed=True)
+
+    def test_empty_section_deleted_only_after_unfiltered_child_recheck(self):
+        self.rock.links = []
+        draft = self.prepare("section")
+        self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertEqual(self.rock.writes, [("DELETE", SECTIONS, 7)])
+        child_reads = [call for call in self.rock.calls if call[:2] == ("GET", LINKS)]
+        self.assertEqual(len(child_reads), 2)
+        self.assertTrue(
+            all(
+                call[2] == {"$filter": "SectionId eq 7", "$select": "Id", "$top": "1"}
+                for call in child_reads
+            )
+        )
+
+    def test_nonempty_section_and_concurrent_new_link_never_delete(self):
+        with self.assertRaisesRegex(PersonalLinkError, "section_not_empty"):
+            self.prepare("section")
+        self.rock.links = []
+        draft = self.prepare("section")
+        self.rock.links = [
+            {**self.link, "PersonAliasId": 999, "Url": "https://other.example/hidden"}
+        ]
+        with self.assertRaisesRegex(PersonalLinkError, "section_not_empty"):
+            self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_changed_target_requires_fresh_review(self):
+        for field, value in (
+            ("Name", "Renamed"),
+            ("Url", ORIGIN + "/other"),
+            ("PersonAliasId", 999),
+            ("SectionId", 9),
+        ):
+            self.rock.links = [dict(self.link)]
+            draft = self.prepare()
+            self.rock.links[0][field] = value
+            with (
+                self.subTest(field=field),
+                self.assertRaisesRegex(PersonalLinkError, "target_changed"),
+            ):
+                self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_shared_foreign_and_raw_section_targets_never_delete(self):
+        for field, value in (("IsShared", True), ("PersonAliasId", 999)):
+            self.rock.sections[0][field] = value
+            with self.assertRaises(PersonalLinkError):
+                self.prepare()
+            self.rock.sections[0] = {
+                "Id": 7,
+                "Name": "Work",
+                "PersonAliasId": 420,
+                "IsShared": False,
+            }
+        self.rock.links[0]["PersonAliasId"] = 999
+        with self.assertRaisesRegex(PersonalLinkError, "not_owned"):
+            self.prepare()
+        for target in (7, "7", "link-section-forged"):
+            with self.assertRaises(PersonalLinkError):
+                self.manager.prepare_delete("section", target)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_changed_section_or_account_never_delete(self):
+        draft = self.prepare()
+        self.rock.sections[0]["Name"] = "Renamed"
+        with self.assertRaisesRegex(PersonalLinkError, "target_changed"):
+            self.manager.delete(draft["draftId"], confirmed=True)
+        self.rock.person["Id"] = 99
+        with self.assertRaisesRegex(PersonalLinkError, "account_changed"):
+            self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertFalse(self.manager._deletions)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_expired_cleared_or_creation_drafts_cannot_delete(self):
+        draft = self.prepare()
+        with (
+            patch(
+                "rock_arch_broker.personal_links.time.monotonic",
+                return_value=float("inf"),
+            ),
+            self.assertRaisesRegex(PersonalLinkError, "draft_expired"),
+        ):
+            self.manager.delete(draft["draftId"], confirmed=True)
+        create = self.manager.prepare("Page", "/page/42")
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.delete(create["draftId"], confirmed=True)
+        self.manager.clear()
+        with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+            self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertEqual(self.rock.writes, [])
+
+    def test_delete_failure_and_readback_failure_are_never_replayed(self):
+        for option in ("keep_deleted", "lose_delete"):
+            self.setUp()
+            setattr(self.rock, option, True)
+            draft = self.prepare()
+            with self.assertRaisesRegex(PersonalLinkError, "delete_uncertain"):
+                self.manager.delete(draft["draftId"], confirmed=True)
+            with self.assertRaisesRegex(PersonalLinkError, "draft_expired"):
+                self.manager.delete(draft["draftId"], confirmed=True)
+            self.assertEqual(self.rock.writes, [("DELETE", LINKS, 100)])
+
+    def test_already_missing_record_is_verified_without_delete(self):
+        draft = self.prepare()
+        self.rock.links = []
+        result = self.manager.delete(draft["draftId"], confirmed=True)
+        self.assertTrue(result["alreadyDeleted"])
+        self.assertEqual(self.rock.writes, [])
+
+
 class Response:
     def __init__(self, raw):
         self.raw = raw
@@ -424,6 +585,27 @@ class PersonalLinkHttpTests(unittest.TestCase):
             "PersonAliasId": 420,
             "Order": 0,
         }
+
+    def test_delete_only_accepts_exact_positive_ids_and_fixed_paths(self):
+        opener = Opener(raw=b"")
+        client = PersonalLinkHttpClient(opener)
+        client.delete(ORIGIN, LINKS, 100, ".ROCK=test")
+        request = opener.calls[0][0]
+        self.assertEqual(request.full_url, ORIGIN + LINKS + "/100")
+        self.assertEqual(request.get_method(), "DELETE")
+        self.assertIsNone(request.data)
+        self.assertEqual(request.get_header("Cookie"), ".ROCK=test")
+        for number in (True, "100", "1/../People/1", -1, 0, 2**31, 1.5):
+            with self.assertRaises(PersonalLinkError):
+                client.delete(ORIGIN, LINKS, number, ".ROCK=test")
+        with self.assertRaises(PersonalLinkError):
+            client.delete(ORIGIN, "/api/People", 100, ".ROCK=test")
+        self.assertEqual(len(opener.calls), 1)
+        for status in (302, 404, 500):
+            with self.assertRaisesRegex(PersonalLinkError, "delete_uncertain"):
+                PersonalLinkHttpClient(Opener(status=status)).delete(
+                    ORIGIN, LINKS, 100, ".ROCK=test"
+                )
 
     def test_fixed_post_has_cookie_header_and_strict_body(self):
         opener = Opener()
@@ -513,6 +695,75 @@ class PersonalLinkBrokerCliTests(unittest.TestCase):
         if not result["ok"]:
             raise CliError(result["error"])
         return result
+
+    def test_cli_delete_previews_then_confirms_exact_link_and_empty_section(self):
+        self.rock.links = [
+            {
+                "Id": 100,
+                "Name": "Page",
+                "Url": ORIGIN + "/page/42",
+                "SectionId": 7,
+                "PersonAliasId": 420,
+            }
+        ]
+        with self.assertRaisesRegex(CliError, "confirmation_required"):
+            _request(
+                _parser().parse_args(["links", "delete", "link-delete-test"]), self
+            )
+        self.assertEqual(self.calls, [])
+        preview = _request(
+            _parser().parse_args(["links", "delete", "link-delete-test", "--dry-run"]),
+            self,
+        )
+        self.assertEqual(preview["dryRun"]["name"], "Page")
+        self.assertFalse(preview["dryRun"]["executed"])
+        self.assertEqual(self.rock.writes, [])
+        result = _request(
+            _parser().parse_args(["links", "delete", "link-delete-test", "--confirm"]),
+            self,
+        )
+        self.assertTrue(result["personalDelete"]["deleted"])
+        self.assertNotIn("_sectionId", result["personalDelete"])
+        section = self.manager.list_sections()[0]["safeId"]
+        result = _request(
+            _parser().parse_args(["links", "sections", "delete", section, "--confirm"]),
+            self,
+        )
+        self.assertTrue(result["personalDelete"]["deleted"])
+        self.assertEqual(
+            self.rock.writes, [("DELETE", LINKS, 100), ("DELETE", SECTIONS, 7)]
+        )
+
+    def test_delete_rejects_navigation_ids_preview_and_disabled_terminal(self):
+        for target in ("rock-safe-person", "100", "link-delete-forged"):
+            with self.assertRaisesRegex(CliError, "target_invalid"):
+                self.request(
+                    {
+                        "op": "personal_delete_prepare",
+                        "kind": "link",
+                        "targetId": target,
+                    }
+                )
+        self.broker._context = Context.DEV
+        with self.assertRaisesRegex(CliError, "preview_only"):
+            self.request(
+                {
+                    "op": "personal_delete_prepare",
+                    "kind": "link",
+                    "targetId": "link-delete-test",
+                }
+            )
+        self.broker._context = Context.PROD
+        self.broker._profile_store.update_preferences({"terminalAccess": False})
+        with self.assertRaisesRegex(CliError, "terminal_access_disabled"):
+            self.request(
+                {
+                    "op": "personal_delete_prepare",
+                    "kind": "link",
+                    "targetId": "link-delete-test",
+                }
+            )
+        self.assertEqual(self.rock.calls, [])
 
     def test_cli_dry_run_resolves_source_but_never_posts(self):
         result = _request(

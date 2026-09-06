@@ -32,7 +32,8 @@ QtObject {
   function dropPersonalLinkRequests() {
     requestQueue = requestQueue.filter(function(payload) {
       return payload.op !== "personal_link_prepare" && payload.op !== "personal_link_save" &&
-        payload.op !== "personal_section_prepare" && payload.op !== "personal_section_save"
+        payload.op !== "personal_section_prepare" && payload.op !== "personal_section_save" &&
+        payload.op !== "personal_delete_prepare" && payload.op !== "personal_delete_commit"
     })
   }
 

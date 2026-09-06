@@ -245,6 +245,9 @@ class FakeLive:
     def set_profile_scope(self, profile_id):
         self.profile_scope = profile_id
 
+    def personal_link_delete_target(self, safe_id):
+        return 100 if safe_id == "link-delete-test" else None
+
     def personal_link_group_id(self, section):
         return "link-group-" + f"{int(section):032x}"
 

@@ -563,6 +563,28 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertEqual(refreshed, links)
         self.assertEqual(len(http.calls), 2)
 
+    def test_link_delete_ids_identify_records_not_urls_and_expire_with_scope(self):
+        payload = {"PersonLinksSectionList": [
+            {"Id": 7, "Name": "Work", "IsShared": False, "PersonalLinks": [
+                {"Id": 100, "Name": "A", "Url": "/page/12"}, {"Id": 101, "Name": "A", "Url": "/page/12"},
+                {"Id": True, "Name": "Invalid", "Url": "/page/12"}]},
+            {"Id": 8, "Name": "Shared", "IsShared": True, "PersonalLinks": [{"Id": 102, "Name": "Shared", "Url": "/page/12"}]},
+        ]}
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), FakeHttp({"/api/PersonalLinks/GetPersonalLinksData": payload}))
+        links = adapter.personal_links()
+        first, second = links[0]["deleteId"], links[1]["deleteId"]
+        self.assertNotEqual(first, second)
+        self.assertIsNone(adapter.resolve(first))
+        self.assertEqual(adapter.personal_link_delete_target(first), 100)
+        self.assertEqual(adapter.personal_link_delete_target(second), 101)
+        self.assertTrue(all("deleteId" not in link for link in links[2:]))
+        adapter.invalidate_personal_links()
+        self.assertIsNone(adapter.personal_link_delete_target(first))
+        adapter.personal_links()
+        adapter.set_profile_scope("other-account")
+        self.assertIsNone(adapter.personal_link_delete_target(first))
+        self.assertNotEqual(adapter.personal_links()[0]["deleteId"], first)
+
     def test_all_category_failures_are_stable(self):
         http = FakeHttp(failures={spec.path for spec in SEARCH_SPECS})
         cookie_provider = FakeCookieProvider()

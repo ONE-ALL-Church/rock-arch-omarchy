@@ -30,6 +30,10 @@ function accept(root, ui, line) {
       root.personalLink.accept(response.personalLink)
       return
     }
+    if (response && response.personalDelete) {
+      root.personalLink.accept(response.personalDelete)
+      return
+    }
     if (response && response.personalSection) {
       root.personalLink.accept(response.personalSection)
       return

@@ -99,6 +99,7 @@ Column {
       required property var modelData
       required property int index
       readonly property bool rowSelected: row.index === personalPanel.controller.linkCursor
+      readonly property bool deletable: !!personalPanel.controller.linkView.deletionTarget(modelData)
       readonly property bool nested: personalPanel.controller.preferencePersonalLinksView === "groups" && !modelData.group
       readonly property real inset: nested ? Style.spacing.lg : 0
 
@@ -140,7 +141,7 @@ Column {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: Style.spacing.rowPaddingX + row.inset
-        anchors.rightMargin: Style.spacing.rowPaddingX + (row.modelData.group ? Style.space(row.modelData.isShared ? 98 : 52) : 0)
+        anchors.rightMargin: Style.spacing.rowPaddingX + (deleteButton.visible ? deleteButton.width + Style.spacing.sm : 0) + (row.modelData.group ? Style.space(row.modelData.isShared ? 98 : 52) : 0)
         spacing: Style.spacing.xxs
 
         Text {
@@ -169,7 +170,7 @@ Column {
       Text {
         visible: row.modelData.group
         anchors.right: parent.right
-        anchors.rightMargin: Style.spacing.rowPaddingX
+        anchors.rightMargin: Style.spacing.rowPaddingX + (deleteButton.visible ? deleteButton.width + Style.spacing.sm : 0)
         anchors.verticalCenter: parent.verticalCenter
         text: String(row.modelData.count) + (row.modelData.isShared ? " · Shared" : "")
         textFormat: Text.PlainText
@@ -178,6 +179,7 @@ Column {
         font.pixelSize: Style.font.caption
       }
 
+      HoverHandler { id: rowHover }
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
@@ -185,6 +187,18 @@ Column {
           personalPanel.controller.selectPersonalLink(row.index)
           personalPanel.controller.linkView.activate(row.index)
         }
+      }
+      Button {
+        id: deleteButton
+        anchors.right: parent.right
+        anchors.rightMargin: Style.spacing.rowPaddingX
+        anchors.verticalCenter: parent.verticalCenter
+        visible: row.deletable && (row.rowSelected || rowHover.hovered)
+        text: "Delete"
+        tooltipText: row.modelData.group ? "Delete empty section" : "Delete Personal Link"
+        Accessible.name: "Delete " + row.modelData.title
+        focusable: true
+        onClicked: personalPanel.controller.beginPersonalDelete(row.modelData)
       }
     }
   }

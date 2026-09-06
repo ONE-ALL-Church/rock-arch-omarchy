@@ -147,6 +147,12 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   and URL prefilled. Use native text fields and a private-section dropdown;
   Ctrl+S saves and Escape returns to the source view. Saving expands the section, selects and reveals
   the bookmark; success feedback clears after four seconds.
+  Eligible hovered or selected rows offer Delete, also reachable with the Delete
+  key. A focused confirmation displays the exact bookmark name, section, and URL
+  or the empty section name. Cancel receives initial focus. Delete requires an
+  explicit button activation; Ctrl+S does not delete. Shared items and populated
+  section headings have no Delete action. Cancel preserves the selected row;
+  a successful deletion refreshes Links and leaves the remaining section visible.
 - **Magnus:** breadcrumb/task title plus Refresh, a shared list treatment, and a
   bounded preview. Deploy keeps a
   dedicated production confirmation.

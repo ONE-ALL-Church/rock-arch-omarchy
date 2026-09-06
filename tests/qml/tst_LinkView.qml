@@ -20,6 +20,30 @@ TestCase {
     expanded.clear()
     added.clear()
   }
+  function test_duplicate_url_rows_keep_distinct_selection_for_deletion() {
+    model.sections = [{groupId: "work", safeId: "private-work", name: "Work"}]
+    var first = {safeId: "same-url", deleteId: "first", title: "Page", section: "Work", groupId: "work"}
+    var second = Object.assign({}, first, {deleteId: "second"})
+    model.replace([first, second], null)
+    model.expand("work", true)
+    verify(model.rows[1].key !== model.rows[2].key)
+    model.cursor = 2
+    model.replace([second, first], null)
+    compare(model.selected().deleteId, "second")
+    compare(model.deletionTarget(model.selected()).targetId, "second")
+  }
+  function test_delete_targets_require_owned_catalog_and_never_target_shared_or_child_actions() {
+    model.sections = [{groupId: "work", safeId: "private-work", name: "Work"}, {groupId: "empty", safeId: "private-empty", name: "Empty"}]
+    compare(model.deletionTarget(model.rows[0]), null)
+    compare(model.deletionTarget(model.rows[1]), null)
+    compare(model.deletionTarget(model.rows[2]), {kind: "section", targetId: "private-empty"})
+    model.links = [{safeId: "open", deleteId: "delete", title: "Page", section: "Work", groupId: "work", isShared: false}]
+    model.expand("work", true)
+    compare(model.deletionTarget(model.rows[1]), {kind: "link", targetId: "delete"})
+    model.sections = []
+    compare(model.deletionTarget(model.rows[1]), null)
+    compare(model.deletionTarget({empty: true}), null)
+  }
   function test_groups_default_collapsed_and_same_names_remain_distinct() {
     compare(model.rows.length, 2)
     compare(model.rows[0].count, 2)

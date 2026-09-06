@@ -7,6 +7,9 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Delete individual private bookmarks and empty private sections from Links or
+  the CLI. Review exact targets before confirmation, recheck ownership and
+  section contents, and verify deletion without automatic retries.
 - Add an **Add → Link / Section** menu and a name-only private-section form.
   Reveal new and empty sections in Groups with an **Add a link** action.
   Support `links sections add --stdin --confirm` and `--dry-run` in the CLI,

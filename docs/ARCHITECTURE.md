@@ -246,13 +246,32 @@ sections are supported; the limit is checked before creating another section.
 Each endpoint remains subject to Rock's REST action
 permissions. Names obey Rock's 100 UTF-16-unit limit; URLs are bounded,
 canonicalized HTTPS targets on the active origin. No shared-link writes, edits,
-deletes, or arbitrary entity writes are exposed.
+or arbitrary entity writes are exposed.
 
 Before creating a link, an exact section/owner/URL query detects duplicates.
 After creation, a bounded read-back checks the returned ID, owner, section,
 name, and URL. The draft is consumed before a POST. An ambiguous response never
 causes a POST retry; a subsequent explicit attempt repeats the duplicate check.
 Successful saves invalidate the existing Personal Links cache.
+
+Deletion uses a separate bounded mapping of opaque `deleteId`s to the exact
+personal bookmark record. It never resolves a navigation URL into a delete
+target, so same-URL bookmarks remain distinct. The map clears on profile changes
+and link-cache invalidation. Section targets use the owned catalog's `safeId`.
+Prepare reads the exact record, derives the current account and private section,
+and stores a separate single-use draft with a snapshot of the reviewed
+fields. Confirmation repeats those checks, rejects changes, consumes the draft,
+sends one fixed DELETE, and reads back absence. A previously removed record is
+reported as already deleted without sending DELETE.
+
+Section emptiness is checked both during prepare and immediately before DELETE
+using an unfiltered-by-owner `PersonalLinks` query on SectionId with `$top=1`.
+This catches links hidden by URL validation or panel limits. Rock's standard
+[`ApiController.Delete`](https://github.com/SparkDevNetwork/Rock/blob/a51094b052a501983dfb746c45d441b59b67d2bb/Rock.Rest/ApiController.cs)
+does not provide a conditional delete or transaction spanning these requests;
+the Personal Link model enables cascade deletion. An addition by another client
+between the final check and DELETE could therefore be cascaded. Atomic
+empty-only deletion would require a corresponding Rock server endpoint.
 
 `RockArchLinkView.qml` derives section headers, expanded child rows, and a flat
 alphabetical list from the allowlisted links and an owned-section catalog. Rock's

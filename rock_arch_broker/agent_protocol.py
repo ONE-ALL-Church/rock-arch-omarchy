@@ -112,6 +112,10 @@ def protocol_schema() -> dict[str, Any]:
         "personalLinks": {
             "sections": "rock-arch links sections",
             "addSection": "rock-arch links sections add --stdin --confirm",
+            "deleteLink": "rock-arch links delete DELETE_ID --confirm",
+            "deleteSection": "rock-arch links sections delete SECTION_SAFE_ID --confirm",
+            "deleteIds": "Use a link deleteId from links personal or a section safeId from links sections; navigation and group IDs cannot delete.",
+            "deleteScope": "Own private links and empty private sections only. Dry run reviews without deleting; confirmation rechecks ownership, contents, and exact fields. No automatic retries.",
             "sectionInput": {"name": "private section name, at most 100 UTF-16 units"},
             "add": "rock-arch links add --stdin --confirm",
             "saveResult": "rock-arch links add --from SAFE_ID --confirm",

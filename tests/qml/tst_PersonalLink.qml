@@ -19,6 +19,45 @@ TestCase {
     model.accept({requestId: model.requestId, draftId: "draft", name: "Directory",
       url: "https://rock.example.org/page/42", sectionId: "section", sections: [{safeId: "section", name: "Work"}]})
   }
+  function test_delete_reviews_exact_target_then_sends_only_confirmed_draft() {
+    var result = null
+    model.deleted.connect(function(kind, groupId) { result = {kind: kind, groupId: groupId} })
+    model.beginDelete("link", "opaque-delete")
+    compare(requests[0].op, "personal_delete_prepare")
+    compare(requests[0].targetId, "opaque-delete")
+    verify(!model.canSave)
+    model.accept({requestId: model.requestId, draftId: "draft", name: "Page", section: "Work", url: "https://rock.example.org/page/42", sections: []})
+    verify(model.deleting)
+    verify(model.canSave)
+    compare(model.sectionName, "Work")
+    compare(requests.length, 1)
+    model.save()
+    compare(requests[1], {op: "personal_delete_commit", draftId: "draft", confirmed: true, requestId: model.requestId})
+    model.save()
+    compare(requests.length, 2)
+    model.accept({requestId: model.requestId, deleted: true, groupId: "work"})
+    compare(result, {kind: "link", groupId: "work"})
+    verify(!model.editing)
+    compare(model.deleteTarget, "")
+  }
+  function test_delete_cancellation_and_interruption_never_repeat_mutation() {
+    model.beginDelete("section", "opaque-section")
+    model.cancel()
+    compare(requests.length, 1)
+    model.beginDelete("section", "opaque-section")
+    model.accept({requestId: model.requestId, draftId: "draft", name: "Work", sections: []})
+    model.save()
+    model.interrupted()
+    verify(model.notice.indexOf("may have deleted") >= 0)
+    model.save()
+    compare(requests.length, 3)
+    model.reload()
+    compare(requests[3].op, "personal_delete_prepare")
+    compare(requests[3].targetId, "opaque-section")
+    model.accept({requestId: model.requestId, error: "personal_section_not_empty"})
+    verify(!model.canSave)
+    verify(model.notice.indexOf("still has links") >= 0)
+  }
   function test_begin_prefills_source_without_saving() {
     model.begin("rock-result")
     compare(requests[0].op, "personal_link_prepare")

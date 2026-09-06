@@ -310,6 +310,7 @@ class RockRestReadOnlyAdapter:
         self._group_key = profile_scope.encode() if profile_scope else self._key
         self._registry: OrderedDict[str, _RegistryEntry] = OrderedDict()
         self._family_contexts: OrderedDict[str, _FamilyContext] = OrderedDict()
+        self._personal_link_deletions: dict[str, int] = {}
         self._personal_links_cache: list[dict[str, Any]] = []
         self._personal_links_cache_deadline = 0.0
         self._personal_links_loaded = False
@@ -334,6 +335,7 @@ class RockRestReadOnlyAdapter:
     def clear(self) -> None:
         self._registry.clear()
         self._family_contexts.clear()
+        self._personal_link_deletions.clear()
         self._personal_links_cache = []
         self._personal_links_cache_deadline = 0.0
         self._personal_links_loaded = False
@@ -342,6 +344,7 @@ class RockRestReadOnlyAdapter:
         self._search_capabilities_loaded = False
 
     def invalidate_personal_links(self) -> None:
+        self._personal_link_deletions.clear()
         self._personal_links_loaded = False
         self._personal_links_cache = []
         self._personal_links_cache_deadline = 0.0
@@ -507,6 +510,7 @@ class RockRestReadOnlyAdapter:
         if not isinstance(sections, list):
             raise RockRestError("invalid_rock_response")
 
+        self._personal_link_deletions.clear()
         flattened: list[tuple[int, int, dict[str, Any]]] = []
         seen = 0
         for section_index, section in enumerate(sections[:50]):
@@ -547,6 +551,11 @@ class RockRestReadOnlyAdapter:
                     },
                     ALLOWED_LINK_KEYS,
                 )
+                number = self._field(link, "Id")
+                if not shared and type(number) is int and 0 < number <= 2_147_483_647:
+                    delete_id = "link-delete-" + hmac.new(self._key, self._group_key + b"\0" + f"{self.origin}:{number}".encode(), hashlib.sha256).hexdigest()[:32]
+                    self._personal_link_deletions[delete_id] = int(number)
+                    public["deleteId"] = delete_id
                 link_order = self._integer(self._field(link, "Order"), 0)
                 flattened.append((section_order, link_order, public))
         flattened.sort(key=lambda item: (item[0], item[1], item[2]["title"]))
@@ -557,6 +566,9 @@ class RockRestReadOnlyAdapter:
         )
         self._personal_links_loaded = True
         return result
+
+    def personal_link_delete_target(self, safe_id: str) -> int | None:
+        return self._personal_link_deletions.get(safe_id)
 
     def personal_link_group_id(self, section: int | str) -> str:
         return "link-group-" + hmac.new(

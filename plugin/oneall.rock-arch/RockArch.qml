@@ -558,6 +558,16 @@ Panel {
     personalLinkModel.begin(safeId || "", preferredSection || "")
     panelFlick.contentY = 0
   }
+  function beginPersonalDelete(item) {
+    if (!rockConfigured || contextName !== "PROD" || personalLinkModel.editing) return
+    var target = linkViewModel.deletionTarget(item)
+    if (!target) return
+    personalLinkReturnView = "personal"
+    feedbackText = ""
+    broker.dropPersonalLinkRequests()
+    personalLinkModel.beginDelete(target.kind, target.targetId)
+    panelFlick.contentY = 0
+  }
   function beginPersonalSection() {
     if (!rockConfigured || contextName !== "PROD" || personalLinkModel.saving) return
     personalLinkReturnView = viewMode
@@ -1235,6 +1245,7 @@ Panel {
     focusSearch()
   }
   function deleteCurrentItem() {
+    if (viewMode === "personal") { beginPersonalDelete(linkViewModel.selected()); return }
     if (viewMode === "search" && showRecentLinks && quickReturns.length)
       clearRecentLinks()
   }
@@ -1330,10 +1341,14 @@ Panel {
     id: personalLinkModel
     onRequested: function(payload) { root.request(payload) }
     onFocusRequested: Qt.callLater(function() {
-      if (personalLinkModel.editing) personalLinkEditor.nameField.forceActiveFocus(Qt.TabFocusReason)
+      if (personalLinkModel.editing) {
+        if (personalLinkModel.deleting) personalLinkEditor.cancelButton.forceActiveFocus(Qt.TabFocusReason)
+        else personalLinkEditor.nameField.forceActiveFocus(Qt.TabFocusReason)
+      }
     })
-    onCancelled: {
+    onCancelled: function(wasDeleting) {
       broker.dropPersonalLinkRequests()
+      if (wasDeleting) { Qt.callLater(function() { keyCatcher.forceActiveFocus() }); return }
       if (root.personalLinkReturnView === "search") root.focusSearch()
       else { root.selectPersonalLink(0); Qt.callLater(function() { personalPanel.addButton.forceActiveFocus(Qt.TabFocusReason) }) }
     }
@@ -1343,6 +1358,13 @@ Panel {
       root.refreshPersonalLinks()
       root.feedbackText = alreadySaved ? "Already in Personal Links" : "Saved to Personal Links"
       personalLinkNoticeTimer.restart()
+    }
+    onDeleted: function(kind, groupId) {
+      if (kind === "section") linkViewModel.expand(groupId, false)
+      root.refreshPersonalLinks()
+      root.feedbackText = kind === "section" ? "Section deleted" : "Link deleted"
+      personalLinkNoticeTimer.restart()
+      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
     onSavedSection: function(alreadySaved, name, groupId) {
       if (root.preferencePersonalLinksView !== "groups") root.setLinkView("groups")
@@ -1381,7 +1403,7 @@ Panel {
   Timer {
     id: personalLinkNoticeTimer
     interval: 4000
-    onTriggered: if (["Saved to Personal Links", "Already in Personal Links", "Section created", "Section already exists"].indexOf(root.feedbackText) >= 0) root.feedbackText = ""
+    onTriggered: if (["Saved to Personal Links", "Already in Personal Links", "Section created", "Section already exists", "Section deleted", "Link deleted"].indexOf(root.feedbackText) >= 0) root.feedbackText = ""
   }
   Timer { id: knowledgeSearchTimer; interval: 400; onTriggered: root.refreshKnowledgeSearch() }
   Timer {
@@ -1453,7 +1475,7 @@ Panel {
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
   Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalPanel.openAddMenu() }
-  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && (personalLinkModel.editing || root.viewMode === "search"); onActivated: { if (personalLinkModel.editing) personalLinkModel.save(); else root.saveSearchLink() } }
+  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && ((personalLinkModel.editing && !personalLinkModel.deleting) || root.viewMode === "search"); onActivated: { if (personalLinkModel.editing) personalLinkModel.save(); else root.saveSearchLink() } }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(0) }
   Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(1) }

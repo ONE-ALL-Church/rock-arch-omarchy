@@ -21,7 +21,7 @@ to isolate against arbitrary code already executing as that same user, a
 compromised Quickshell process, a compromised Python runtime, or a malicious
 Rock server that returns semantically deceptive but structurally valid display
 text. Rock permissions remain the authorization boundary for tenant data,
-Personal Link creation, and the mobile-app build action. Rock Arch probes only
+Personal Link creation and deletion, and the mobile-app build action. Rock Arch probes only
 its eight fixed read endpoints after login, hides denied categories, and independently enforces the
 detected allowlist in the broker before search requests are issued.
 
@@ -57,6 +57,17 @@ section creation accepts only a name and fixes the authenticated owner and
 and verifies the returned section's ID, name, ownership, and private status.
 Link and section drafts cannot be used interchangeably. A first private Links
 section can also be created as part of an explicit bookmark save.
+
+Deletion uses separate opaque per-record references and expiring, single-use
+confirmation drafts. Navigation IDs, raw record IDs, shared items, and foreign
+owners cannot delete. Before DELETE the broker rechecks the account, exact
+record fields, and private section ownership. Empty-section checks query all
+children rather than relying on displayed counts. The fixed delete client
+accepts only positive integer IDs under the two Personal Links endpoints and
+verifies absence afterward. Uncertain responses are never retried automatically.
+Rock's section DELETE cascades to children and has no conditional empty-only
+operation; a concurrent addition after the final check remains a server-side
+race. Rock Arch cannot make the separate read and DELETE atomic.
 
 ## Secret handling
 

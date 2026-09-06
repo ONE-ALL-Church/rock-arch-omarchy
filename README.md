@@ -172,6 +172,13 @@ opens the Add menu. Review the name, Rock URL, and personal section, then select
 link** or press `Ctrl+S`. Escape cancels the form. The saved bookmark is selected
 in Links and also appears in your Rock account.
 
+Select or hover over one of your private links to reveal **Delete**, or press
+the `Delete` key on the selected row. Review the bookmark's name, section, and
+URL, then choose **Delete link**. Cancel is focused initially; Escape cancels.
+Empty private sections offer the same flow with **Delete section**. The broker
+rechecks the record and section contents before deleting and verifies that the
+record is gone. Shared items cannot be deleted here.
+
 Choose **Add → Section**, enter its name, and select **Create section** or press
 `Ctrl+S`. The private section opens in Groups with an **Add a link** action that
 preselects it. Empty private sections remain visible in Groups. An existing
@@ -388,7 +395,7 @@ These are future directions under consideration, not committed release dates:
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
-| Personal Links | Up / Down; Left / Right collapses or expands groups | Enter or Space toggles a group or opens a link | Backspace returns to Search | `V` changes view; `Ctrl+N` opens Add |
+| Personal Links | Up / Down; Left / Right collapses or expands groups | Enter or Space toggles a group or opens a link | Backspace returns to Search | `V` changes view; `Ctrl+N` opens Add; `Delete` reviews deletion |
 | Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | `D` download, `C` copy, `H` hash, `O` open, `R` refresh |
@@ -429,7 +436,7 @@ prompt; there is no password argument. Results return process-local opaque
 `safeId` values. Inspect one with `rock-arch describe SAFE_ID`, then use it in a
 follow-up action.
 
-Saving a Personal Link, opening, copying, downloading, clearing history, signing out, removing a
+Saving or deleting a Personal Link or section, opening, copying, downloading, clearing history, signing out, removing a
 profile, installing an update, and starting a build require `--confirm`.
 `--dry-run` validates the target and describes expected effects without running
 the action. There is no arbitrary endpoint, raw HTTP, SQL, generic mutation,
@@ -457,7 +464,7 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
 - The broker socket and local state are owner-only. The current Unix account is
   the terminal client's OS trust boundary.
 - Production never falls back to preview data. Personal Link and private-section
-  creation, and Magnus builds, require explicit confirmation. These are the only
+  creation, private-link and empty-section deletion, and Magnus builds require explicit confirmation. These are the only
   supported server mutations.
 
 The experimental OpenID implementation was removed in version 0.14. Rock Arch

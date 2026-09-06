@@ -300,7 +300,7 @@ def _parser() -> argparse.ArgumentParser:
     knowledge_open.add_argument("safe_id")
     _confirmation(knowledge_open)
 
-    links = commands.add_parser("links", help="list, save, or activate Rock links")
+    links = commands.add_parser("links", help="list, save, delete, or activate Rock links")
     link_commands = links.add_subparsers(dest="links_command", required=True)
     link_commands.add_parser("personal", help="list Personal Links")
     link_commands.add_parser("recent", help="list Recent Links")
@@ -309,6 +309,12 @@ def _parser() -> argparse.ArgumentParser:
     section_add = section_commands.add_parser("add", help="create a private Personal Link section")
     section_add.add_argument("--stdin", action="store_true", required=True, help="read a JSON object with a name")
     _confirmation(section_add)
+    section_delete = section_commands.add_parser("delete", help="delete an empty private section")
+    section_delete.add_argument("safe_id", help="section safeId from links sections")
+    _confirmation(section_delete)
+    link_delete = link_commands.add_parser("delete", help="delete one of your private Personal Links")
+    link_delete.add_argument("safe_id", help="deleteId from links personal")
+    _confirmation(link_delete)
     link_add = link_commands.add_parser("add", help="save a Personal Link to your Rock account")
     link_input = link_add.add_mutually_exclusive_group(required=True)
     link_input.add_argument("--stdin", action="store_true", help="read name, URL or safeId, and optional sectionId as JSON")
@@ -600,10 +606,14 @@ def _knowledge_request(
 
 def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
     if args.links_command == "sections":
+        if args.sections_command == "delete":
+            return _delete_personal_item(args, client, "section")
         if args.sections_command == "add":
             return _add_personal_section(args, client)
         response = client.request({"op": "personal_section_list"})["personalSection"]
         return {"ok": True, "sections": response["sections"], "defaultSectionId": response["defaultSectionId"]}
+    if args.links_command == "delete":
+        return _delete_personal_item(args, client, "link")
     if args.links_command == "add":
         return _add_personal_link(args, client)
     if args.links_command in {"personal", "recent"}:
@@ -620,6 +630,17 @@ def _links_request(args: argparse.Namespace, client: BrokerClient) -> dict[str, 
     return client.request(
         {"op": "activate_recent", "safeId": args.safe_id, "confirmed": True}
     )
+
+
+def _delete_personal_item(args: argparse.Namespace, client: BrokerClient, kind: str) -> dict[str, Any]:
+    if not args.dry_run:
+        _require_confirmation(args)
+    draft = client.request({"op": "personal_delete_prepare", "kind": kind, "targetId": args.safe_id})["personalDelete"]
+    if args.dry_run:
+        return {"ok": True, "dryRun": {"action": "deletePersonalLink" if kind == "link" else "deletePersonalSection",
+            "name": draft["name"], "section": draft["section"], "url": draft["url"], "confirmationRequired": True,
+            "sideEffects": ["deletes_personal_bookmark_in_rock" if kind == "link" else "deletes_empty_private_section_in_rock"], "executed": False}}
+    return client.request({"op": "personal_delete_commit", "draftId": draft["draftId"], "confirmed": True})
 
 
 def _read_personal_input() -> dict[str, str]:

@@ -212,6 +212,35 @@ save returns `personal_link_save_uncertain`; check `links personal` before an
 explicit retry. The client never repeats a POST automatically. Shared sections,
 other owners, edits, and deletes are outside this command's scope.
 
+Delete one private bookmark or an empty private section:
+
+```bash
+rock-arch links personal
+rock-arch links delete DELETE_ID --dry-run
+rock-arch links delete DELETE_ID --confirm
+rock-arch links sections
+rock-arch links sections delete SECTION_SAFE_ID --dry-run
+rock-arch links sections delete SECTION_SAFE_ID --confirm
+```
+
+Use the bookmark's `deleteId` from `links personal`, or the section's `safeId`
+from `links sections`. Navigation `safeId`s, group IDs, raw Rock IDs, and URLs
+are not deletion targets. Each bookmark has its own delete ID even if several
+point to the same URL. Refresh the list after a mutation or broker restart.
+Dry run reads the exact target and makes no write. Confirmation rechecks the
+account, owner, private section, and fields reviewed by the draft. Section
+deletion checks all child links, including ones omitted from the panel.
+`personal_section_not_empty` refuses deletion of a populated section.
+`personal_delete_target_changed` requires a fresh review; `personal_delete_uncertain`
+requires checking the list before an explicit retry. No DELETE is repeated
+automatically. Successful responses contain `personalDelete.deleted: true`;
+`alreadyDeleted: true` means the draft's record was already absent.
+
+Rock's REST API does not offer an atomic "delete only if empty" operation.
+The broker checks immediately before DELETE, but another Rock client could add
+a link between that check and the server deletion. See the
+[architecture limitation](ARCHITECTURE.md#personal-link-additions).
+
 The first two search forms read at most 8 KiB from stdin. With no query, an
 interactive terminal prompts for it; redirected stdin is read automatically.
 This is preferred for person names and other private terms because the query

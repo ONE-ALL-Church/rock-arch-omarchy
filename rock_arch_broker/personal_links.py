@@ -46,9 +46,11 @@ class LinkClient(Protocol):
         self, origin: str, path: str, body: dict[str, Any], cookie: str
     ) -> int: ...
 
+    def delete(self, origin: str, path: str, number: int, cookie: str) -> None: ...
+
 
 class PersonalLinkHttpClient:
-    """Only the four reads and two creates needed for personal bookmarks."""
+    """Bounded reads, creates, and exact-record deletes for personal bookmarks."""
 
     def __init__(self, opener: Any = None) -> None:
         self._opener = opener
@@ -81,6 +83,11 @@ class PersonalLinkHttpClient:
             raise PersonalLinkError("personal_link_save_uncertain")
         return value
 
+    def delete(self, origin: str, path: str, number: int, cookie: str) -> None:
+        if path not in {LINKS, SECTIONS} or not _positive_id(number):
+            raise PersonalLinkError("personal_link_request_invalid")
+        self._request(origin, f"{path}/{number}", {}, cookie, method="DELETE")
+
     def _request(
         self,
         origin: str,
@@ -88,6 +95,8 @@ class PersonalLinkHttpClient:
         params: dict[str, str],
         cookie: str,
         body: dict[str, Any] | None = None,
+        *,
+        method: str | None = None,
     ) -> Any:
         try:
             safe_cookie = validate_rock_cookie_header(cookie)
@@ -103,11 +112,13 @@ class PersonalLinkHttpClient:
                 "Cookie": safe_cookie,
                 "User-Agent": HTTP_USER_AGENT,
             },
-            method="POST" if body is not None else "GET",
+            method=method or ("POST" if body is not None else "GET"),
         )
         failure = (
-            "personal_link_save_uncertain"
-            if body is not None
+            "personal_delete_uncertain"
+            if method == "DELETE"
+            else "personal_link_save_uncertain"
+            if body is not None or method == "DELETE"
             else "personal_links_unavailable"
         )
         try:
@@ -117,16 +128,22 @@ class PersonalLinkHttpClient:
                 raw = response.read(MAX_RESPONSE + 1)
             if len(raw) > MAX_RESPONSE:
                 raise PersonalLinkError(failure)
+            if method == "DELETE":
+                return None
             return decode_bounded_json(raw)
         except urllib.error.HTTPError as error:
             status = error.code
             error.close()
+            if method == "DELETE" and status == 404:
+                raise PersonalLinkError(failure) from error
             if status in {401, 403, 404, 405}:
                 raise PersonalLinkError("personal_links_not_authorized") from error
             if status == 400:
                 raise PersonalLinkError(
-                    "personal_link_rejected"
-                    if body is not None
+                    "personal_delete_rejected"
+                    if method == "DELETE"
+                    else "personal_link_rejected"
+                    if body is not None or method == "DELETE"
                     else "personal_links_unavailable"
                 ) from error
             raise PersonalLinkError(failure) from error
@@ -176,6 +193,16 @@ class _Draft:
     kind: str = "link"
 
 
+@dataclass(frozen=True)
+class _DeleteDraft:
+    person_id: int
+    alias_id: int
+    kind: str
+    record: dict[str, Any]
+    section: dict[str, Any]
+    deadline: float
+
+
 class PersonalLinkManager:
     """Profile-scoped, single-use drafts for explicitly confirmed additions."""
 
@@ -186,10 +213,12 @@ class PersonalLinkManager:
         self._client = client or PersonalLinkHttpClient()
         self._origin = ""
         self._drafts: dict[str, _Draft] = {}
+        self._deletions: dict[str, _DeleteDraft] = {}
         self._secret = secrets.token_bytes(32)
 
     def clear(self) -> None:
         self._drafts.clear()
+        self._deletions.clear()
         self._secret = secrets.token_bytes(32)
 
     def set_origin(self, origin: str | None) -> None:
@@ -330,12 +359,148 @@ class PersonalLinkManager:
             raise PersonalLinkError("personal_link_draft_expired")
         return draft
 
-    def _check_account(self, draft: _Draft, cookie: str) -> tuple[int, int]:
+    def _check_account(
+        self, draft: _Draft | _DeleteDraft, cookie: str
+    ) -> tuple[int, int]:
         person, alias = self._identity(cookie)
         if (person, alias) != (draft.person_id, draft.alias_id):
             self.clear()
             raise PersonalLinkError("personal_link_account_changed")
         return person, alias
+
+    def _delete_record(
+        self, kind: str, number: int, cookie: str
+    ) -> dict[str, Any] | None:
+        fields = LINK_FIELDS if kind == "link" else "Id,Name,PersonAliasId,IsShared"
+        rows = self._client.get(
+            self._origin,
+            LINKS if kind == "link" else SECTIONS,
+            {"$filter": f"Id eq {number}", "$select": fields, "$top": "2"},
+            cookie,
+        )
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise PersonalLinkError("personal_delete_target_changed")
+        if not rows:
+            return None
+        row = rows[0]
+        if (
+            not isinstance(row, dict)
+            or type(row.get("Id")) is not int
+            or row["Id"] != number
+            or any(key not in row for key in fields.split(","))
+        ):
+            raise PersonalLinkError("personal_delete_target_changed")
+        return {key: row[key] for key in fields.split(",")}
+
+    def _require_empty(self, number: int, cookie: str) -> None:
+        # Query all children, without an owner or URL filter. Displayed counts
+        # can omit unauthorized, invalid-URL, or truncated links.
+        rows = self._client.get(
+            self._origin,
+            LINKS,
+            {"$filter": f"SectionId eq {number}", "$select": "Id", "$top": "1"},
+            cookie,
+        )
+        if not isinstance(rows, list):
+            raise PersonalLinkError("personal_delete_target_changed")
+        if rows:
+            raise PersonalLinkError("personal_section_not_empty")
+
+    def prepare_delete(self, kind: object, target: object) -> dict[str, Any]:
+        if kind not in ("link", "section"):
+            raise PersonalLinkError("personal_delete_target_invalid")
+        if not self._origin:
+            raise PersonalLinkError("rock_login_required")
+        with self._session.authenticated_cookie() as cookie:
+            person, alias = self._identity(cookie)
+            sections = self._sections(person, alias, cookie)
+            selected = (
+                next((s for s in sections if s["safeId"] == target), None)
+                if kind == "section"
+                else None
+            )
+            if kind == "section" and selected is None:
+                raise PersonalLinkError("personal_delete_target_invalid")
+            number = selected["id"] if selected else target
+            if not isinstance(number, int) or not _positive_id(number):
+                raise PersonalLinkError("personal_delete_target_invalid")
+            record = self._delete_record(str(kind), number, cookie)
+            if record is None:
+                raise PersonalLinkError("personal_delete_target_missing")
+            section_number = record.get("SectionId") if kind == "link" else number
+            section = next((s for s in sections if s["id"] == section_number), None)
+            if (
+                section is None
+                or type(record["PersonAliasId"]) is not int
+                or record["PersonAliasId"] != alias
+                or (kind == "section" and record["IsShared"] is not False)
+            ):
+                raise PersonalLinkError("personal_delete_not_owned")
+            name = _name(record["Name"])
+            if kind == "section":
+                self._require_empty(number, cookie)
+        now = time.monotonic()
+        self._deletions = {
+            key: value for key, value in self._deletions.items() if value.deadline > now
+        }
+        if len(self._deletions) >= 16:
+            del self._deletions[next(iter(self._deletions))]
+        draft_id = secrets.token_urlsafe(24)
+        self._deletions[draft_id] = _DeleteDraft(
+            person, alias, str(kind), record, section, now + DRAFT_SECONDS
+        )
+        return {
+            "draftId": draft_id,
+            "kind": "delete-" + str(kind),
+            "name": name,
+            "section": section["name"],
+            "url": self._url(record["Url"]) if kind == "link" else "",
+            "sections": [],
+            "expiresInSeconds": DRAFT_SECONDS,
+        }
+
+    def delete(self, draft_id: object, *, confirmed: bool) -> dict[str, Any]:
+        if confirmed is not True:
+            raise PersonalLinkError("personal_link_confirmation_required")
+        draft = self._deletions.get(draft_id) if isinstance(draft_id, str) else None
+        if draft is None or draft.deadline <= time.monotonic():
+            raise PersonalLinkError("personal_link_draft_expired")
+        with self._session.authenticated_cookie() as cookie:
+            person, alias = self._check_account(draft, cookie)
+            record = self._delete_record(draft.kind, draft.record["Id"], cookie)
+            already_deleted = record is None
+            if record is not None:
+                sections = self._sections(person, alias, cookie)
+                section = next(
+                    (s for s in sections if s["id"] == draft.section["id"]), None
+                )
+                if record != draft.record or section != draft.section:
+                    raise PersonalLinkError("personal_delete_target_changed")
+                if draft.kind == "section":
+                    self._require_empty(record["Id"], cookie)
+            del self._deletions[str(draft_id)]
+            if not already_deleted:
+                self._client.delete(
+                    self._origin,
+                    LINKS if draft.kind == "link" else SECTIONS,
+                    draft.record["Id"],
+                    cookie,
+                )
+                try:
+                    if (
+                        self._delete_record(draft.kind, draft.record["Id"], cookie)
+                        is not None
+                    ):
+                        raise PersonalLinkError("personal_delete_uncertain")
+                except PersonalLinkError as error:
+                    raise PersonalLinkError("personal_delete_uncertain") from error
+        return {
+            "deleted": True,
+            "alreadyDeleted": already_deleted,
+            "kind": draft.kind,
+            "name": draft.record["Name"],
+            "_sectionId": draft.section["id"],
+        }
 
     def save_section(
         self, draft_id: object, name: object, *, confirmed: bool

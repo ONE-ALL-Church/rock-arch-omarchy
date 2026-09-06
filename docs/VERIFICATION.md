@@ -6,8 +6,8 @@ Personal Link and section creation acceptance below. Historical feature changes 
 
 ## Unreleased Personal Link creation
 
-On 2026-09-05, the feature branch passed 270 Python tests and 57 Qt behavioral
-tests (69 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
+On 2026-09-05, the feature branch passed 283 Python tests and 61 Qt behavioral
+tests (73 Qt results including fixture setup and cleanup), Ruff, ty, bytecode
 compilation, Omarchy manifest validation, and `git diff --check`. Standalone
 `qmllint` exited successfully with expected warnings for shell-provided imports.
 
@@ -61,6 +61,25 @@ confirmed all three records absent and the original 16 bookmarks and two
 sections restored. The temporary plugin was removed and the shell restarted;
 the original bar layout and canonical profile file were preserved byte for byte.
 The submitted main branch and installed public release remain unchanged.
+
+The deletion follow-up used four newly created, tracked records: a private
+section and bookmark for each of the UI and CLI paths. Enter on the UI's initially
+focused Cancel left the record intact and preserved selection. Delete then opened
+an exact-name, section, and URL confirmation; explicit button activation removed
+only the selected bookmark. Its empty section remained available and was deleted
+through its own confirmation. Both CLI dry runs made no writes; confirmed CLI
+commands deleted the other bookmark and its empty section. Attempting to delete
+a populated section was refused before any DELETE was issued.
+
+Each successful deletion checked exact-ID absence. The refreshed list matched
+the original bookmarks and sections, all four tracked records were gone, and the
+review plugin was removed. Original profile metadata and bar layout were preserved;
+the shell was restarted and no review-plugin runtime errors were recorded.
+Additional tests cover duplicate-URL record identity and selection, scoped delete
+references, raw-ID and shared/foreign-owner rejection, expiry and draft misuse,
+account and record changes, links added after preparation, missing records,
+failed readback, and interrupted deletions without replay. Tests do not establish
+atomic empty-only deletion; that Rock API limitation is described in architecture.
 
 Regression tests cover distinct same-named sections, case-insensitive sorting,
 multiple open groups, Left/Right navigation, selection during refresh and removal,

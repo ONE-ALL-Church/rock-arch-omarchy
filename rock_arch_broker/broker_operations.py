@@ -87,6 +87,8 @@ class BrokerOperations:
             "activate_recent": self._activate_recent,
             "personal_link_prepare": self._personal_link,
             "personal_link_save": self._personal_link,
+            "personal_delete_prepare": self._personal_link,
+            "personal_delete_commit": self._personal_link,
             "personal_section_list": self._personal_link,
             "personal_section_prepare": self._personal_link,
             "personal_section_save": self._personal_link,
@@ -1027,13 +1029,27 @@ class BrokerOperations:
     def _personal_link(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
         request_id = sanitize_text(raw.get("requestId"), 80)
-        envelope = "personalSection" if raw["op"].startswith("personal_section_") else "personalLink"
+        envelope = "personalDelete" if raw["op"].startswith("personal_delete_") else "personalSection" if raw["op"].startswith("personal_section_") else "personalLink"
         try:
             if broker._context is not Context.PROD:
                 raise PersonalLinkError("personal_links_preview_only")
             if not broker._origin or not broker._session.status()["configured"]:
                 raise PersonalLinkError("rock_login_required")
-            if raw["op"] == "personal_section_list":
+            if raw["op"] == "personal_delete_prepare":
+                kind = raw.get("kind")
+                target = raw.get("targetId")
+                if not isinstance(target, str):
+                    raise PersonalLinkError("personal_delete_target_invalid")
+                if kind == "link":
+                    target = broker._live.personal_link_delete_target(target)
+                    if target is None:
+                        raise PersonalLinkError("personal_delete_target_invalid")
+                result = broker._personal_links.prepare_delete(kind, target)
+            elif raw["op"] == "personal_delete_commit":
+                result = broker._personal_links.delete(raw.get("draftId"), confirmed=raw.get("confirmed") is True)
+                result["groupId"] = broker._live.personal_link_group_id(result.pop("_sectionId"))
+                broker._live.invalidate_personal_links()
+            elif raw["op"] == "personal_section_list":
                 sections = broker._public_link_sections()
                 default = next((item["safeId"] for item in sections if item["name"] == "Links"), sections[0]["safeId"] if sections else None)
                 result = {"sections": sections, "defaultSectionId": default}
