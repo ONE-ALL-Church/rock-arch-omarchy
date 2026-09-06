@@ -23,7 +23,7 @@ RowLayout {
       text: tab.modelData.label
       tooltipText: tab.modelData.label + " · " + tab.modelData.shortcut
       selected: navigation.controller.viewMode === tab.modelData.key
-      fontSize: Style.font.caption
+      fontSize: Style.font.bodySmall
       horizontalPadding: Style.spacing.lg
       verticalPadding: Style.spacing.xs
       focusable: false

@@ -5,6 +5,14 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+### Changed
+
+- Keep a compact Links toolbar visible while bookmarks scroll. Show Sections /
+  A–Z choices at the left and an Add menu at the right, without a repeated heading.
+  Tab reaches the toolbar, arrow keys stay within Links, and closing Add restores
+  its button's focus. Use `sections` in the settings CLI, with compatibility for
+  saved `groups` preferences and scripts.
+
 ### Added
 
 - Delete private bookmarks and sections from Links or the CLI. Review exact
@@ -16,7 +24,7 @@ repository's default branch is the source used by Omarchy plugin updates.
   The CLI requires `--with-links` for populated
   sections, supports counted dry runs, and keeps empty-only behavior without it.
 - Add an **Add → Link / Section** menu and a name-only private-section form.
-  Reveal new and empty sections in Groups with an **Add a link** action.
+  Reveal new and empty sections in Sections with an **Add a link** action.
   Support `links sections add --stdin --confirm` and `--dry-run` in the CLI,
   with case-insensitive duplicate protection and verified private ownership.
 - Default Links to collapsible sections with indented bookmarks and link counts.

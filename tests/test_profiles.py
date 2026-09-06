@@ -105,7 +105,7 @@ class ProfileStoreTests(unittest.TestCase):
         preferences = ProfileStore(self.path, self.instance).preferences()
         self.assertEqual(preferences["tabOrder"], ["search", "personal", "knowledge", "magnus"])
         self.assertFalse(preferences["recentLinks"])
-        self.assertEqual(preferences["personalLinksView"], "groups")
+        self.assertEqual(preferences["personalLinksView"], "sections")
         self.assertEqual(preferences["personalLinksExpandedGroups"], {})
 
     def test_link_views_and_account_expansion_survive_restart_and_profile_removal(self):
@@ -119,6 +119,25 @@ class ProfileStoreTests(unittest.TestCase):
         self.assertEqual(reloaded.preferences()["personalLinksExpandedGroups"], groups)
         reloaded.remove(first.profile_id)
         self.assertEqual(reloaded.preferences()["personalLinksExpandedGroups"], {second.profile_id: groups[second.profile_id]})
+
+    def test_legacy_groups_view_becomes_sections_without_losing_preferences(self):
+        store = ProfileStore(self.path, self.instance)
+        profile = store.add("Primary", DEFAULT_ROCK_ORIGIN)
+        expanded = {profile.profile_id: ["link-group-" + "a" * 32]}
+        store.update_preferences({"personalLinksExpandedGroups": expanded, "recentLinks": False})
+        saved = json.loads(self.path.read_text())
+        saved["preferences"]["personalLinksView"] = "groups"
+        self.path.write_text(json.dumps(saved))
+
+        reloaded = ProfileStore(self.path, self.instance)
+        self.assertEqual(reloaded.preferences()["personalLinksView"], "sections")
+        self.assertEqual(reloaded.preferences()["personalLinksExpandedGroups"], expanded)
+        self.assertFalse(reloaded.preferences()["recentLinks"])
+        for value in ("sections", "alpha", "groups"):
+            reloaded.update_preferences({"personalLinksView": value})
+            actual = ProfileStore(self.path, self.instance).preferences()
+            self.assertEqual(actual["personalLinksView"], "alpha" if value == "alpha" else "sections")
+            self.assertEqual(actual["personalLinksExpandedGroups"], expanded)
 
     def test_invalid_link_view_or_expansion_batch_preserves_preferences(self):
         store = ProfileStore(self.path, self.instance)

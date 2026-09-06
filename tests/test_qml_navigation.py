@@ -426,7 +426,7 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('tooltipText: "Clear Recent Links · X"', source)
         self.assertIn("onDeleteRequested: root.deleteCurrentItem()", source)
         self.assertIn("event.key === Qt.Key_Delete", key_catcher)
-        self.assertIn('text: "PERSONAL LINKS"', source)
+        self.assertIn("RockArchLinksToolbar {", source)
         self.assertIn("if (changedView) panelFlick.contentY = 0", source)
 
     def test_magnus_preview_actions_are_tabbable_and_keep_shortcuts(self):

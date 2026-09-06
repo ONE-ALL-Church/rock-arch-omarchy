@@ -30,7 +30,7 @@ Panel {
   property alias personalLinks: linkViewModel.links
   property alias personalLinkSections: linkViewModel.sections
   property alias linkView: linkViewModel
-  property string preferencePersonalLinksView: "groups"
+  property string preferencePersonalLinksView: "sections"
   property var preferenceExpandedLinkGroups: ({})
   property var quickReturns: []
   property var profiles: []
@@ -439,7 +439,7 @@ Panel {
       magnusBack()
       return
     }
-    if (!clearScope()) close()
+    if (viewMode !== "search" || !clearScope()) close()
   }
 
   readonly property var responseUi: ({
@@ -997,6 +997,11 @@ Panel {
     else selectResult(index)
   }
   function moveTab(direction) {
+    if (viewMode === "personal" && !personalLinkModel.editing) {
+      if (direction < 0) personalToolbar.focusLast()
+      else personalToolbar.focusView()
+      return
+    }
     if (direction >= 0) {
       if (viewMode === "search" && searchField.activeFocus && searchHints.visible)
         searchHints.focusFirst()
@@ -1047,7 +1052,7 @@ Panel {
   }
   function moveCursor(dx, dy) {
     if (dx !== 0) {
-      if (viewMode === "personal" && linkViewModel.horizontal(dx)) return
+      if (viewMode === "personal") { linkViewModel.horizontal(dx); return }
       moveTab(dx)
       return
     }
@@ -1098,14 +1103,14 @@ Panel {
       return
     }
     if (!navigationCount) {
-      openAdjacentTab(dy < 0 ? -1 : 1)
+      personalToolbar.focusView()
       return
     }
     var nextLink = linkCursor < 0 ? (dy > 0 ? 0 : navigationCount - 1) : linkCursor + dy
     if (nextLink < 0) {
-      openAdjacentTab(-1)
+      personalToolbar.focusView()
     } else if (nextLink >= navigationCount) {
-      openAdjacentTab(1)
+      selectPersonalLink(navigationCount - 1)
     } else {
       selectPersonalLink(nextLink)
     }
@@ -1350,7 +1355,7 @@ Panel {
       broker.dropPersonalLinkRequests()
       if (wasDeleting) { Qt.callLater(function() { keyCatcher.forceActiveFocus() }); return }
       if (root.personalLinkReturnView === "search") root.focusSearch()
-      else { root.selectPersonalLink(0); Qt.callLater(function() { personalPanel.addButton.forceActiveFocus(Qt.TabFocusReason) }) }
+      else { root.selectPersonalLink(0); Qt.callLater(function() { personalToolbar.addButton.forceActiveFocus(Qt.TabFocusReason) }) }
     }
     onSaved: function(alreadySaved, name, section) {
       root.pendingPersonalLinkSelection = {name: name, section: section}
@@ -1367,7 +1372,7 @@ Panel {
       Qt.callLater(function() { keyCatcher.forceActiveFocus() })
     }
     onSavedSection: function(alreadySaved, name, groupId) {
-      if (root.preferencePersonalLinksView !== "groups") root.setLinkView("groups")
+      if (root.preferencePersonalLinksView !== "sections") root.setLinkView("sections")
       root.pendingPersonalLinkSelection = {kind: "section", name: name, groupId: groupId}
       root.selectPersonalLink(0)
       root.refreshPersonalLinks()
@@ -1474,7 +1479,7 @@ Panel {
   Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Items"); onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
-  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalPanel.openAddMenu() }
+  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalToolbar.openAddMenu() }
   Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && ((personalLinkModel.editing && !personalLinkModel.deleting) || root.viewMode === "search"); onActivated: { if (personalLinkModel.editing) personalLinkModel.save(); else root.saveSearchLink() } }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(0) }
@@ -1508,7 +1513,7 @@ Panel {
         root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null ||
         (root.viewMode === "knowledge" && root.knowledgeDetail !== null)
       commandMode: root.magnusPreviewCommandsEnabled
-      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive || personalPanel.inputActive ||
+      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive || personalToolbar.inputActive ||
         finishSetupPanel.inputActive || settingsPanel.inputActive || magnusPanel.inputActive ||
         knowledgePanel.queryField.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 ||
@@ -1520,7 +1525,7 @@ Panel {
       onActivateRequested: root.activateCursor()
       onDeleteRequested: root.deleteCurrentItem()
       onTextKey: function(value) {
-        if (root.viewMode === "personal" && value.toLowerCase() === "v") personalPanel.openViewMenu()
+        if (root.viewMode === "personal" && value.toLowerCase() === "v") personalToolbar.focusView()
         else root.handleMagnusKey(value)
       }
       onBackspaceRequested: {
@@ -1672,6 +1677,16 @@ Panel {
             focusable: true
             onClicked: root.openSettings(root.profiles.length === 0)
           }
+        }
+
+        RockArchLinksToolbar {
+          id: personalToolbar
+          Layout.fillWidth: true
+          // This toolbar belongs to the list below it, so use the row gap.
+          Layout.bottomMargin: Style.spacing.rowGap - Style.spacing.panelGap
+          visible: !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing
+          controller: root
+          onListFocusRequested: root.selectPersonalLink(Math.max(0, root.linkCursor))
         }
 
         Flickable {

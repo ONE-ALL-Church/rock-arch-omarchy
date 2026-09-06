@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 
@@ -10,46 +9,10 @@ Column {
 
   required property var controller
   property alias repeater: personalLinkRepeater
-  property alias addButton: addDropdown
-  readonly property bool inputActive: viewDropdown.popupOpen || addDropdown.popupOpen
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
-  function openViewMenu() { viewDropdown.open() }
-  function openAddMenu() { addDropdown.open() }
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
-
-  RowLayout {
-    width: parent.width
-    PanelSectionHeader { text: "PERSONAL LINKS"; Layout.fillWidth: true }
-    Dropdown {
-      id: viewDropdown
-      Layout.preferredWidth: Style.space(132)
-      label: "Links view"
-      showLabel: false
-      value: personalPanel.controller.preferencePersonalLinksView
-      options: [{value: "groups", label: "Groups"}, {value: "alpha", label: "Alphabetical"}]
-      Accessible.name: "Links view"
-      onChanged: function(value) { personalPanel.controller.setLinkView(value) }
-    }
-    Dropdown {
-      id: addDropdown
-      Layout.preferredWidth: Style.space(88)
-      value: "Add"
-      showLabel: false
-      label: "Add link or section"
-      Accessible.name: "Add link or section"
-      options: [{value: "link", label: "Link"}, {value: "section", label: "Section"}]
-      visible: personalPanel.controller.rockConfigured && personalPanel.controller.contextName === "PROD"
-      onChanged: function(value) {
-        addDropdown.value = "Add"
-        if (value === "section") personalPanel.controller.beginPersonalSection()
-        else personalPanel.controller.beginPersonalLink("")
-      }
-      Keys.onReturnPressed: open()
-      Keys.onSpacePressed: open()
-    }
-  }
 
   Column {
     visible: personalPanel.controller.linkView.rows.length === 0
@@ -100,7 +63,7 @@ Column {
       required property int index
       readonly property bool rowSelected: row.index === personalPanel.controller.linkCursor
       readonly property bool deletable: !!personalPanel.controller.linkView.deletionTarget(modelData)
-      readonly property bool nested: personalPanel.controller.preferencePersonalLinksView === "groups" && !modelData.group
+      readonly property bool nested: personalPanel.controller.preferencePersonalLinksView === "sections" && !modelData.group
       readonly property real inset: nested ? Style.spacing.lg : 0
 
       width: personalPanel.width

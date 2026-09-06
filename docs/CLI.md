@@ -145,12 +145,14 @@ rock-arch links clear --confirm
 Choose the Links panel view:
 
 ```bash
-rock-arch settings set personalLinksView '"groups"'
+rock-arch settings set personalLinksView '"sections"'
 rock-arch settings set personalLinksView '"alpha"'
 ```
 
-`groups` is the default: collapsible Rock sections with the existing section and
-link order. `alpha` shows one case-insensitive alphabetical list. The setting
+`sections` is the default: collapsible Rock sections with the existing section and
+link order. `alpha` shows one case-insensitive alphabetical list, labeled A–Z in
+the toolbar. The previous `groups` value remains accepted and normalizes to
+`sections`; saved preferences keep their selected view and expanded sections. The setting
 changes the panel presentation; `links personal` continues to return all links
 as a flat machine-readable list, including section names and stable `groupId`s.
 
@@ -178,7 +180,7 @@ anything. An existing private section with the same case-insensitive name is
 returned with `alreadySaved: true`. A successful result includes a `sectionId`
 for `links add` and a stable `groupId` for display preferences.
 `links sections` includes empty private sections without creating a draft or
-a default section. Empty sections appear in the panel's Groups view, where
+a default section. Empty sections appear in the panel's Sections view, where
 **Add a link** opens the link form with that section selected. After an uncertain
 save, check `links sections` before explicitly retrying.
 

@@ -29,7 +29,7 @@ def settings_schema() -> dict[str, Any]:
         "default": list(DEFAULT_TAB_ORDER),
     }
     fields["personalLinksView"] = {
-        "type": "string", "enum": list(PERSONAL_LINK_VIEWS), "default": "groups",
+        "type": "string", "enum": list(PERSONAL_LINK_VIEWS), "default": "sections",
         "description": "Links panel: collapsible sections or a flat alphabetical list.",
     }
     fields["personalLinksExpandedGroups"] = {

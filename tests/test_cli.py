@@ -68,7 +68,7 @@ class RockArchCliTests(unittest.TestCase):
         schema = _request(_parser().parse_args(["settings", "schema"]), client)["schema"]
         self.assertIn("tabOrder", schema["fields"])
         self.assertNotIn("onboardingSetupCompleted", schema["fields"])
-        self.assertEqual(schema["fields"]["personalLinksView"]["enum"], ["groups", "alpha"])
+        self.assertEqual(schema["fields"]["personalLinksView"]["enum"], ["sections", "alpha"])
         self.assertIn("personalLinksExpandedGroups", schema["fields"])
         for raw in ("not json", "[]", "{}", '{"unknown":true}', "[" * 20000, "\udcff"):
             with self.subTest(raw=raw[:40]), patch("sys.stdin", io.StringIO(raw)), self.assertRaises(CliError):

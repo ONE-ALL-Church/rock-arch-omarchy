@@ -133,16 +133,22 @@ The supporting desktop guidance is intentionally narrow and authoritative:
 - **Personal Links:** collapsible section rows with counts, retaining Rock's
   section and bookmark order. Expanded links sit on a subtly recessed, indented
   surface. Multiple sections may be open; expansion persists per profile.
-  A compact native dropdown switches between Groups and a flat Alphabetical list.
-  Enter/Space toggles a section, Left/Right collapses or expands it, and V opens
-  the view selector. This follows the show/hide heading model in the
+  A fixed toolbar below the main tabs exposes Sections / A–Z as a compact choice
+  group at the left and Add at the right. The selected Links tab provides context;
+  there is no repeated PERSONAL LINKS heading. Native small-body text and a
+  minimum native control height keep controls compact while respecting text scaling.
+  Enter/Space toggles a section, Left/Right collapses or expands it, and V focuses
+  the view selector. Arrows stay in the list; Up from its first row reaches the
+  toolbar. Tab/Shift+Tab cycles the view group, Add, and list. The view group uses
+  Left/Right and Enter/Space. This follows the show/hide heading model in the
   [WAI accordion pattern](https://www.w3.org/WAI/ARIA/apg/patterns/accordion/),
   adapted to Omarchy's existing list and workspace keyboard navigation.
-  One **Add** dropdown in the header offers **Link** and **Section**; Ctrl+N opens
-  it. Choosing Section opens a name-only form for a private section in the active
-  account. Saving switches to Groups and opens the section with an indented
+  One **Add** menu button offers **Link…** and **Section…**; Ctrl+N opens
+  it. Its menu is content-sized and aligned to the button's right edge. Escape
+  closes the menu and returns focus to Add. Choosing Section opens a name-only
+  form for a private section in the active account. Saving switches to Sections and opens the section with an indented
   **Add a link** action that preselects it. Empty private sections remain visible
-  in Groups; Alphabetical stays a flat list of links.
+  in Sections; A–Z stays a flat list of links.
   Save on a Search result opens a focused form with name
   and URL prefilled. Use native text fields and a private-section dropdown;
   Ctrl+S saves and Escape returns to the source view. Saving expands the section, selects and reveals

@@ -397,11 +397,12 @@ These are future directions under consideration, not committed release dates:
 
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
-| Workspaces | Tab / Shift+Tab | — | `Esc` closes | `Ctrl+1`–`Ctrl+4` follow visible tab order; `Ctrl+,` Settings |
+| Workspaces | `Ctrl+1`–`Ctrl+4` follow visible tab order | — | `Esc` closes | `Ctrl+,` Settings |
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
-| Personal Links | Up / Down; Left / Right collapses or expands groups | Enter or Space toggles a group or opens a link | Backspace returns to Search | `V` changes view; `Ctrl+N` opens Add; `Delete` reviews deletion |
+| Personal Links | Up / Down stays in the list; Left / Right collapses or expands sections | Enter or Space toggles a section or opens a link | Backspace returns to Search | `V` focuses Sections / A–Z; `Ctrl+N` opens Add; `Delete` reviews deletion |
+| Links toolbar | Tab / Shift+Tab between view choices, Add, and list; Left / Right within choices | Enter or Space selects a view or opens Add | Esc closes Add and returns focus to its button | Toolbar stays visible while links scroll |
 | Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |
 | Magnus folders | Up / Down | Enter or Space | Backspace or Esc | `R` refresh, `B` deploy selected app |
 | Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | `D` download, `C` copy, `H` hash, `O` open, `R` refresh |

@@ -21,7 +21,7 @@ PROFILE_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 PROFILE_STORE_VERSION = 2
 VERSION_2_CATEGORIES = ("Group Types", "Content Channel Types")
 DEFAULT_TAB_ORDER = ("search", "personal", "knowledge", "magnus")
-PERSONAL_LINK_VIEWS = ("groups", "alpha")
+PERSONAL_LINK_VIEWS = ("sections", "alpha")
 LINK_GROUP_PATTERN = re.compile(r"^link-group-[a-f0-9]{32}$")
 DEFAULT_PREFERENCES: dict[str, Any] = {
     "showPersonContext": True,
@@ -34,7 +34,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "onboardingSetupCompleted": False,
     "enabledCategories": list(CATEGORIES),
     "tabOrder": list(DEFAULT_TAB_ORDER),
-    "personalLinksView": "groups",
+    "personalLinksView": "sections",
     "personalLinksExpandedGroups": {},
 }
 EDITABLE_PREFERENCES = (
@@ -217,9 +217,12 @@ class ProfileStore:
                 updates["tabOrder"], "invalid_preferences"
             )
         if "personalLinksView" in updates:
-            if updates["personalLinksView"] not in PERSONAL_LINK_VIEWS:
+            link_view = updates["personalLinksView"]
+            if link_view == "groups":
+                link_view = "sections"
+            if link_view not in PERSONAL_LINK_VIEWS:
                 raise ProfileError("invalid_preferences")
-            preferences["personalLinksView"] = updates["personalLinksView"]
+            preferences["personalLinksView"] = link_view
         if "personalLinksExpandedGroups" in updates:
             preferences["personalLinksExpandedGroups"] = self._validated_link_groups(
                 updates["personalLinksExpandedGroups"], state["profiles"], "invalid_preferences"
@@ -374,7 +377,9 @@ class ProfileStore:
             preferences.get("tabOrder", list(DEFAULT_TAB_ORDER)),
             "profile_store_unavailable",
         )
-        link_view = preferences.get("personalLinksView", "groups")
+        link_view = preferences.get("personalLinksView", "sections")
+        if link_view == "groups":
+            link_view = "sections"
         if link_view not in PERSONAL_LINK_VIEWS:
             raise ProfileError("profile_store_unavailable")
         clean_preferences["personalLinksView"] = link_view
