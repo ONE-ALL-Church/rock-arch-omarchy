@@ -7,6 +7,7 @@
 function accept(root, ui, line) {
     var response
     try { response = JSON.parse(line) } catch (e) {
+      if (root.job) root.job.interrupted()
       if (root.personalLink) root.personalLink.interrupted()
       root.finishSetup()
       root.onboardingInProgress = false
@@ -20,6 +21,14 @@ function accept(root, ui, line) {
       root.knowledgeSearchInFlightQuery = ""
       root.magnusActionBusy = false
       root.feedbackText = "Rock Arch couldn't read Rock's response. Try again."
+      return
+    }
+    if (response && response.jobAccess) {
+      root.job.acceptAccess(response.jobAccess)
+      return
+    }
+    if (response && response.jobAction) {
+      root.job.accept(response.jobAction)
       return
     }
     if (response && response.shortcut) {

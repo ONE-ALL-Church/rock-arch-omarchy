@@ -28,6 +28,8 @@ function results(root, ui, response, frame) {
       }) : -1
       root.resultCursor = preservedCursor >= 0 ? preservedCursor : (root.results.length ? 0 : -1)
       root.resultsQuery = frame.completedSearchQuery
+      if (root.job && root.contextName === "PROD" && root.results.some(function(item) { return item.category === "Jobs" }))
+        root.job.refreshAccess()
       root.recentCursor = -1
       if (preservedCursor < 0) ui.panelFlick.contentY = 0
       Qt.callLater(function() {

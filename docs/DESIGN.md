@@ -99,6 +99,10 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   focus must never be indicated by color alone or hidden behind clipped content.
 - No essential action is available only through hover or a tooltip. Shortcut
   hints may supplement, but never replace, a visible label.
+- Selected Jobs expose Run only after block discovery and edit-access checks.
+  R opens an in-panel confirmation; Enter on the result still opens Rock.
+  Cancel is initially focused, with Run now next to it and Left/Right navigation.
+  Accepted requests and latest recorded job status are labeled separately.
 
 ### Copy and states
 

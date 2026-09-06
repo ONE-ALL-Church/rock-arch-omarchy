@@ -21,7 +21,7 @@ to isolate against arbitrary code already executing as that same user, a
 compromised Quickshell process, a compromised Python runtime, or a malicious
 Rock server that returns semantically deceptive but structurally valid display
 text. Rock permissions remain the authorization boundary for tenant data,
-Personal Link creation and deletion, and the mobile-app build action. Rock Arch probes only
+Personal Link creation and deletion, scheduled jobs, and the mobile-app build action. Rock Arch probes only
 its eight fixed read endpoints after login, hides denied categories, and independently enforces the
 detected allowlist in the broker before search requests are issued.
 
@@ -44,6 +44,21 @@ Magnus build tracking records only that the action endpoint accepted a request.
 Receipts are profile-scoped, owner-only local files without endpoint URLs and
 never claim server-side completion. Rock Arch does not synthesize deployment
 status when Magnus does not expose a dependable status endpoint.
+
+Job triggering uses a separate fixed-endpoint client. Read-only discovery follows
+the known Obsidian Scheduled Job List type to an actual page/block pair. A bounded
+initialization action verifies that exact type and page/block access; Rock Arch
+also requires the block's Edit permission, even when Rock's RunNow action would
+permit a viewer. The standard Jobs page is preferred, with a unique accessible
+custom placement as fallback. Discovery failures and ambiguous placements disable
+the action. Access caches and drafts are cleared on account/context changes.
+Only an existing Jobs search reference can create a two-minute, single-use draft.
+Confirmation rechecks access, placement, and the job's GUID/name before one
+RunNow POST with its GUID. GET cannot trigger jobs, clients cannot supply page or
+block GUIDs, and uncertain writes are never retried. The UI drops unsent job
+requests on close, profile changes, and connection failure. Status is a bounded
+read of the latest job record, not proof that this request completed. Permission
+checks and POST are separate requests; Rock's own authorization remains final.
 
 Personal Link additions use a separate bounded client. It derives the person
 and primary alias from the authenticated session, offers only non-shared

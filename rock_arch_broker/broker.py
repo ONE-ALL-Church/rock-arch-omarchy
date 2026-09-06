@@ -22,6 +22,7 @@ from .contracts import (
     sanitize_text,
 )
 from .instance import InstanceStore, default_instance_path
+from .jobs import JobManager
 from .magnus_adapter import MagnusBuildOutcome, MagnusError, MagnusReadOnlyAdapter
 from .mock_adapter import MockAdapter
 from .navigation import NavigationTarget, open_rock_url
@@ -166,6 +167,7 @@ class Broker:
         magnus: MagnusStatusProvider | None = None,
         live: LiveReadAdapter | None = None,
         personal_links: PersonalLinkManager | None = None,
+        jobs: JobManager | None = None,
         knowledge: KnowledgeProvider | None = None,
         quick_returns: QuickReturnStore | None = None,
         build_receipts: BuildReceiptStore | None = None,
@@ -220,6 +222,8 @@ class Broker:
         self._live.set_profile_scope(self._active_profile_id)
         self._personal_links = personal_links or PersonalLinkManager(self._session)
         self._personal_links.set_origin(self._origin)
+        self._jobs = jobs or JobManager(self._session)
+        self._jobs.set_origin(self._origin)
         self._knowledge = knowledge or RockKbReadOnlyAdapter()
         self._quick_root = (
             state_file.parent
@@ -536,6 +540,7 @@ class Broker:
 
     def _activate_profile(self, profile: RockProfile | None) -> None:
         self._personal_links.set_origin(profile.origin if profile else None)
+        self._jobs.set_origin(profile.origin if profile else None)
         self._live.set_profile_scope(profile.profile_id if profile else "")
         if profile is None:
             self._active_profile_id = ""
@@ -680,11 +685,19 @@ class Broker:
         if target is None:
             raise ValueError("not_found")
         action = "build" if target.kind == "Magnus Build" else "open"
+        actions = [action]
+        job_resolver = getattr(self._live, "job_id", None)
+        if (self._context is Context.PROD and target.kind == "Scheduled Job"
+                and callable(job_resolver) and job_resolver(candidate) is not None
+                and self._session.status().get("configured")
+                and "Jobs" in self._profile_store.preferences()["enabledCategories"]
+                and self._jobs.access()["available"]):
+            actions.append("runJob")
         return {
             "safeId": candidate,
             "title": target.title,
             "kind": target.kind,
-            "actions": [action],
+            "actions": actions,
             "expires": "broker_restart",
         }
 

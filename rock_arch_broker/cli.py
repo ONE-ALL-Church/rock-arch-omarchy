@@ -285,6 +285,16 @@ def _parser() -> argparse.ArgumentParser:
     person = commands.add_parser("person", help="show bounded person context")
     person.add_argument("safe_id")
 
+    jobs = commands.add_parser("jobs", help="discover job-run access, trigger a job, or read its status")
+    job_commands = jobs.add_subparsers(dest="jobs_command", required=True)
+    job_access = job_commands.add_parser("access", help="discover the Jobs block and check edit access")
+    job_access.add_argument("--refresh", action="store_true")
+    job_status = job_commands.add_parser("status", help="read the job's latest recorded status")
+    job_status.add_argument("safe_id", help="safeId from a current Jobs search result")
+    job_run = job_commands.add_parser("run", help="request one run of an existing scheduled job")
+    job_run.add_argument("safe_id", help="safeId from a current Jobs search result")
+    _confirmation(job_run)
+
     knowledge = commands.add_parser("knowledge", help="search public Rock knowledge")
     knowledge_commands = knowledge.add_subparsers(
         dest="knowledge_command", required=True
@@ -492,6 +502,18 @@ def _request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
         return client.request({"op": "search", "query": query})
     if args.command == "person":
         return client.request({"op": "person_quick_look", "safeId": args.safe_id})
+    if args.command == "jobs":
+        if args.jobs_command == "access":
+            return client.request({"op": "job_access", "refresh": args.refresh})
+        if args.jobs_command == "status":
+            return client.request({"op": "job_status", "safeId": args.safe_id})
+        if not args.dry_run:
+            _require_confirmation(args)
+        draft = client.request({"op": "job_prepare", "safeId": args.safe_id})["jobAction"]
+        if args.dry_run:
+            return {"ok": True, "dryRun": {"action": "runJob", "target": draft["title"],
+                    "confirmationRequired": True, "executed": False, "sideEffects": ["requests_scheduled_job_run"]}}
+        return client.request({"op": "job_run", "draftId": draft["draftId"], "confirmed": True})
     if args.command == "knowledge":
         return _knowledge_request(args, client)
     if args.command == "links":

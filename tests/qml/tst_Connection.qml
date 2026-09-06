@@ -72,6 +72,29 @@ TestCase {
     compare(connection.requestQueue.length, 0)
   }
 
+  function test_job_trigger_is_not_queued_offline_or_replayed_after_disconnect() {
+    connection.request({op: "job_run", draftId: "one-use", confirmed: true})
+    compare(connection.requestQueue.length, 0)
+    socket.connected = true
+    compare(socket.messages.length, 0)
+    connection.request({op: "job_run", draftId: "one-use", confirmed: true})
+    socket.connected = false
+    connection.failed()
+    socket.connected = true
+    compare(socket.messages.length, 1)
+    compare(connection.requestQueue.length, 0)
+  }
+
+  function test_job_requests_are_purged_when_profile_or_panel_changes() {
+    connection.request({op: "job_access"})
+    connection.request({op: "job_prepare", safeId: "old-profile"})
+    connection.request({op: "job_status", safeId: "old-profile"})
+    connection.request({op: "status"})
+    connection.dropJobRequests()
+    socket.connected = true
+    compare(socket.messages, [{op: "status"}])
+  }
+
   function test_cancelling_a_link_discards_unsent_forms_and_saves() {
     connection.request({op: "personal_link_prepare", name: "private"})
     connection.request({op: "personal_link_save", draftId: "one-use", confirmed: true})

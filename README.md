@@ -112,6 +112,18 @@ unauthorized. Search never falls back to sample data during normal use.
 
 An unscoped query searches every enabled category plus matching Personal Links.
 
+For Jobs, Rock Arch discovers the Obsidian Scheduled Job List block and checks
+the signed-in user's page access and block **Edit** permission. A selected job
+shows **Run** only after that check passes. Press **R** on a selected job or
+choose Run, then review its name and confirm **Run now**. Cancel receives initial
+focus; Left/Right moves between the confirmation buttons. Enter on a search
+result continues to open its Rock page.
+
+Access and the job's identity are checked again before sending one run request.
+Rock Arch reports acceptance separately from completion and offers **Check
+status** for the latest recorded run. Unsupported blocks, denied access, and
+ambiguous placements hide the trigger. No GUID configuration is needed.
+
 When Search is empty, static category hints appear beneath the field. Select
 `p: People` or `g: Groups` to insert a prefix, or **More** for other enabled,
 accessible categories. The hints disappear while typing. Tab reaches the hints;
@@ -458,10 +470,11 @@ prompt; there is no password argument. Results return process-local opaque
 follow-up action.
 
 Saving or deleting a Personal Link or section, opening, copying, downloading, clearing history, signing out, removing a
-profile, installing an update, and starting a build require `--confirm`.
+profile, installing an update, starting a job, and starting a build require `--confirm`.
 `--dry-run` validates the target and describes expected effects without running
 the action. There is no arbitrary endpoint, raw HTTP, SQL, generic mutation,
-job-run, Magnus upload, or Magnus delete command.
+Magnus upload, or Magnus delete command. Job runs use the bounded `jobs run`
+command with a current Jobs search result.
 
 See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
 
@@ -474,7 +487,9 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
 - Usernames and passwords live in desktop Secret Service under a random profile
   ID; they are never returned to QML or placed in process arguments.
 - Entity search uses eight fixed REST v1 routes with fixed projections and
-  bounded responses. There is no REST v2 or arbitrary endpoint transport.
+  bounded responses. Job discovery uses bounded metadata reads and the exact
+  Obsidian block initialization action. The only job write is a confirmed
+  `RunNow` POST to the discovered page/block; no arbitrary endpoint is accepted.
 - Cookies are attached only to exact-origin HTTPS requests. Cross-origin
   redirects and malformed targets are rejected.
 - QML receives display fields and process-local opaque IDs, not raw Rock IDs,
@@ -485,7 +500,7 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
 - The broker socket and local state are owner-only. The current Unix account is
   the terminal client's OS trust boundary.
 - Production never falls back to preview data. Personal Link and private-section
-  creation, private-link and section deletion, and Magnus builds require explicit confirmation. These are the only
+  creation, private-link and section deletion, scheduled job runs, and Magnus builds require explicit confirmation. These are the only
   supported server mutations.
 
 The experimental OpenID implementation was removed in version 0.14. Rock Arch

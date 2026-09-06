@@ -9,6 +9,7 @@ QtObject {
   signal interrupted()
 
   function request(payload) {
+    if (payload.op === "job_run" && !transport.connected) { interrupted(); return }
     var next = []
     var coalesce = payload.op === "search" || payload.op === "knowledge_search" ||
       payload.op === "search_capabilities" || payload.op === "status" || payload.op === "navigation_status"
@@ -47,11 +48,16 @@ QtObject {
     transport.flush()
   }
 
+  function dropJobRequests() {
+    requestQueue = requestQueue.filter(function(payload) { return payload.op.indexOf("job_") !== 0 })
+  }
+
   function retry() {
     if (requestQueue.length) reconnectTimer.restart()
   }
 
   function failed() {
+    dropJobRequests()
     interrupted()
     retry()
   }

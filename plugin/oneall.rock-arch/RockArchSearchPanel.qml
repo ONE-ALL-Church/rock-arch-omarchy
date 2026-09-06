@@ -14,13 +14,22 @@ Column {
   property alias quickReturnRepeater: quickReturnRepeater
   property alias clearButton: clearRecentButton
   property alias buildConfirmButton: recentBuildConfirmButton
+  property alias jobCancelButton: jobPanel.cancelButton
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
 
+  RockArchJobPanel {
+    id: jobPanel
+    model: searchPanel.controller.job
+    visible: model.editing
+    width: searchPanel.width
+    height: visible ? implicitHeight : 0
+  }
+
   Column {
-    visible: !searchPanel.controller.showRecentLinks
+    visible: !searchPanel.controller.showRecentLinks && !searchPanel.controller.job.editing
     width: searchPanel.width
     height: visible ? implicitHeight : 0
     spacing: Style.spacing.rowGap
@@ -51,7 +60,7 @@ Column {
 
         Column {
           anchors.left: parent.left
-          anchors.right: saveButton.visible ? saveButton.left : (openButton.visible ? openButton.left : parent.right)
+          anchors.right: runButton.visible ? runButton.left : (saveButton.visible ? saveButton.left : (openButton.visible ? openButton.left : parent.right))
           anchors.verticalCenter: parent.verticalCenter
           anchors.leftMargin: Style.spacing.rowPaddingX
           anchors.rightMargin: Style.spacing.rowPaddingX
@@ -93,6 +102,20 @@ Column {
             searchPanel.controller.resultCursor = resultRow.index
             searchPanel.controller.activateResult(resultRow.index)
           }
+        }
+
+        Button {
+          id: runButton
+          visible: saveButton.visible && resultRow.modelData.category === "Jobs" && searchPanel.controller.job.available
+          anchors.right: saveButton.left
+          anchors.rightMargin: Style.spacing.xs
+          anchors.verticalCenter: parent.verticalCenter
+          text: "Run"
+          tooltipText: "Run now · R"
+          fontSize: Style.font.caption
+          focusable: true
+          z: 2
+          onClicked: searchPanel.controller.beginJob(resultRow.index)
         }
 
         Button {

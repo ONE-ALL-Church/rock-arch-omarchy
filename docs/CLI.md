@@ -55,6 +55,33 @@ Search results, Knowledge results, links, files, and build descriptors use
 opaque `safeId` values. Use the ID returned by one command in the follow-up
 command. IDs are intentionally invalidated when the broker restarts.
 
+## Scheduled jobs
+
+```bash
+rock-arch jobs access --refresh
+rock-arch search --entity jobs "Process"
+rock-arch jobs run SAFE_ID --dry-run
+rock-arch jobs run SAFE_ID --confirm
+rock-arch jobs status SAFE_ID
+```
+
+Discovery follows the known Obsidian Scheduled Job List block type to its
+instances and their pages. It verifies the exact block type and the user's
+page access and block Edit permission through a read-only initialization action.
+The standard Jobs Administration page is preferred; otherwise a unique accessible
+placement is required. Multiple equally valid placements, unsupported versions,
+or inaccessible metadata leave the capability unavailable. Access is cached for
+60 seconds and discarded on profile, credentials, or context changes.
+
+`run` accepts only an opaque ID from a current Jobs search. Dry runs prepare
+the target without triggering it. Confirmation consumes a single-use draft
+(valid for two minutes), repeats discovery/access checks, rereads the job, and
+rejects changed identity, name, or placement before sending a single POST.
+`requested` means the request was accepted, not that execution completed.
+`status` reports Rock's latest recorded run and does not attribute it to a
+particular request. Never automatically retry an uncertain request; inspect
+status and Rock's job history first.
+
 ## Login and profiles
 
 Login normally uses a masked prompt. Agents can use `login --stdin` or
@@ -323,7 +350,8 @@ dependable completion-status endpoint, so each receipt explicitly returns
 `"statusSource": "local"` and `"completionVerifiable": false`.
 
 Rock Arch still exposes no Magnus write, upload, delete, mkdir, touch, arbitrary
-endpoint, SQL, job-run, or generic Rock mutation command.
+endpoint, SQL, or generic Rock mutation command. Scheduled jobs use the separate,
+confirmed `jobs run` command described above.
 
 ## Updates
 

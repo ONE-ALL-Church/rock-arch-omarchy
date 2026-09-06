@@ -53,6 +53,26 @@ class FakeConnection:
 
 
 class RockArchCliTests(unittest.TestCase):
+    def test_jobs_require_confirmation_and_dry_run_never_triggers(self):
+        class JobClient(FakeClient):
+            def request(self, payload):
+                self.calls.append(payload)
+                return {"ok": True, "jobAction": {"draftId": "draft", "title": "Test job"}}
+
+        client = JobClient()
+        with self.assertRaisesRegex(CliError, "confirmation_required"):
+            _request(_parser().parse_args(["jobs", "run", "safe"]), client)
+        self.assertEqual(client.calls, [])
+        value = _request(_parser().parse_args(["jobs", "run", "safe", "--dry-run"]), client)
+        self.assertFalse(value["dryRun"]["executed"])
+        self.assertEqual([c["op"] for c in client.calls], ["job_prepare"])
+        _request(_parser().parse_args(["jobs", "run", "safe", "--confirm"]), client)
+        self.assertEqual(client.calls[-1], {"op": "job_run", "draftId": "draft", "confirmed": True})
+        _request(_parser().parse_args(["jobs", "access", "--refresh"]), client)
+        self.assertEqual(client.calls[-1], {"op": "job_access", "refresh": True})
+        _request(_parser().parse_args(["jobs", "status", "safe"]), client)
+        self.assertEqual(client.calls[-1], {"op": "job_status", "safeId": "safe"})
+
     @patch("rock_arch_broker.cli._omarchy_shell")
     def test_settings_values_and_atomic_json_batch_use_the_broker(self, refresh):
         client = FakeClient()

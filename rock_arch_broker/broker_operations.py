@@ -11,6 +11,7 @@ from .contracts import (
     parse_search_query,
     sanitize_text,
 )
+from .jobs import JobError
 from .magnus_adapter import MagnusError
 from .origin import OriginError, validate_rock_origin
 from .personal_links import PersonalLinkError, prefill_name
@@ -78,6 +79,10 @@ class BrokerOperations:
             "magnus_builds": self._magnus_builds,
             "magnus_build_status": self._magnus_build_status,
             "search": self._search,
+            "job_access": self._job,
+            "job_prepare": self._job,
+            "job_run": self._job,
+            "job_status": self._job,
             "knowledge_search": self._knowledge_search,
             "knowledge_result": self._knowledge_result,
             "knowledge_open_source": self._knowledge_open_source,
@@ -323,6 +328,7 @@ class BrokerOperations:
         broker._store_context()
         broker._live.clear()
         broker._personal_links.clear()
+        broker._jobs.clear()
         return broker._ok(
             context=broker._context.value,
             developerMode=broker._developer_mode,
@@ -426,6 +432,7 @@ class BrokerOperations:
             return broker._error(str(error))
         broker._live.clear()
         broker._personal_links.clear()
+        broker._jobs.clear()
         return broker._ok(
             instance=broker._instance_status(),
             rock=broker._session.status(),
@@ -472,6 +479,7 @@ class BrokerOperations:
             return broker._error(str(error))
         broker._live.clear()
         broker._personal_links.clear()
+        broker._jobs.clear()
         return broker._profile_response(refreshLive=True)
 
     def _profile_test(self, _raw: dict[str, Any]) -> dict[str, Any]:
@@ -496,6 +504,7 @@ class BrokerOperations:
             return broker._error(str(error))
         broker._live.clear()
         broker._personal_links.clear()
+        broker._jobs.clear()
         return broker._profile_response(connection="signed_out")
 
     def _profile_remove(self, raw: dict[str, Any]) -> dict[str, Any]:
@@ -958,6 +967,34 @@ class BrokerOperations:
             magnus=broker._magnus.status(),
             searchCapabilities=capabilities,
         )
+
+    def _job(self, raw: dict[str, Any]) -> dict[str, Any]:
+        broker = self.broker
+        operation = raw["op"]
+        envelope = "jobAccess" if operation == "job_access" else "jobAction"
+        request_id = sanitize_text(raw.get("requestId"), 100)
+        try:
+            if (broker._context is not Context.PROD or not broker._origin
+                    or not broker._session.status().get("configured")
+                    or "Jobs" not in broker._profile_store.preferences()["enabledCategories"]):
+                raise JobError("job_access_unavailable")
+            if operation == "job_access":
+                result = broker._jobs.access(refresh=raw.get("refresh") is True)
+            elif operation == "job_run":
+                result = broker._jobs.run(raw.get("draftId"), raw.get("confirmed") is True)
+            else:
+                safe_id = sanitize_text(raw.get("safeId"), 100)
+                resolver = getattr(broker._live, "job_id", None)
+                number = resolver(safe_id) if callable(resolver) else None
+                if number is None:
+                    raise JobError("job_not_found")
+                result = (broker._jobs.prepare(number) if operation == "job_prepare"
+                          else broker._jobs.status(number))
+            return broker._ok(**{envelope: {**result, "requestId": request_id}})
+        except (JobError, RockSessionError) as error:
+            code = str(error) if isinstance(error, JobError) else "job_access_unavailable"
+            return {**broker._error(code), envelope: {"state": "error", "available": False,
+                                                     "error": code, "requestId": request_id}}
 
     def _knowledge_result(self, raw: dict[str, Any]) -> dict[str, Any]:
         if self.broker._context is Context.DEV:

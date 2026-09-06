@@ -21,6 +21,12 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Discover Scheduled Job List placements and verify page access plus block Edit
+  permission before showing Run on job results. Confirm an exact, short-lived
+  job draft with Cancel initially focused, recheck access and identity before
+  the RunNow request, and never replay uncertain writes. Add jobs access/run/status
+  CLI commands with dry-run support and distinguish accepted requests from
+  the latest recorded status and verified completion.
 - Read Model Map properties, flags, reference values, and method signatures
   directly inside Knowledge. Single-click results to read; filter with Ctrl+F,
   collapse detail sections, scroll with Page Up/Down, and follow related models

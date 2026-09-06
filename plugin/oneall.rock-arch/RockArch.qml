@@ -46,6 +46,7 @@ Panel {
   property bool preferenceOnboardingSetupCompleted: false
   property alias shortcut: shortcutModel
   property alias personalLink: personalLinkModel
+  property alias job: jobModel
   property string personalLinkReturnView: "personal"
   property var pendingPersonalLinkSelection: null
   property bool onboardingSetupPending: false
@@ -162,7 +163,7 @@ Panel {
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
-    !onboardingFlowActive && !onboardingForm.inputActive &&
+    !jobModel.editing && !onboardingFlowActive && !onboardingForm.inputActive &&
     !finishSetupPanel.inputActive && !settingsPanel.inputActive
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
     rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
@@ -398,6 +399,7 @@ Panel {
   }
 
   function escapePanel() {
+    if (jobModel.editing) { jobModel.cancel(); return }
     if (personalLinkModel.editing) { personalLinkModel.cancel(); return }
     if (searchHints.visible && searchHints.inputActive) {
       if (searchHints.expanded) searchHints.expanded = false
@@ -847,6 +849,11 @@ Panel {
       root.revealItem(searchPanel.resultRepeater.itemAt(root.resultCursor))
     })
   }
+  function beginJob(index) {
+    if (!opened || viewMode !== "search" || !resultsAreCurrent || index < 0 || index >= results.length) return
+    jobModel.begin(results[index])
+    if (jobModel.editing) Qt.callLater(function() { searchPanel.jobCancelButton.forceActiveFocus(Qt.TabFocusReason) })
+  }
   function selectRecent(index) {
     if (!quickReturns.length) {
       focusSearch()
@@ -1121,6 +1128,7 @@ Panel {
     }
   }
   function activateResult(index) {
+    if (jobModel.editing) return
     if (!resultsAreCurrent || index < 0 || index >= results.length) return
     var item = results[index]
     if (item.canOpen === true)
@@ -1325,6 +1333,8 @@ Panel {
       shortcutModel.refresh(true)
     }
     else {
+      jobModel.reset()
+      broker.dropJobRequests()
       shortcutModel.closed()
       personalLinkModel.closed()
       pendingPersonalLinkSelection = null
@@ -1342,10 +1352,26 @@ Panel {
     }
   }
 
-  onActiveProfileIdChanged: { personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
-  onRockConfiguredChanged: if (!rockConfigured) { personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
-  onViewModeChanged: if (viewMode !== "personal") { personalLinkModel.closed(); broker.dropPersonalLinkRequests() }
-  onContextNameChanged: { personalLinkModel.closed(); personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  RockArchJobState {
+    id: jobModel
+    onRequested: function(payload) { root.request(payload) }
+    onConfirmationReady: Qt.callLater(function() {
+      if (jobModel.editing) searchPanel.jobCancelButton.forceActiveFocus(Qt.TabFocusReason)
+    })
+    onDismissed: {
+      broker.dropJobRequests()
+      root.focusSearch()
+      if (root.contextName === "PROD" && root.rockConfigured) jobModel.refreshAccess()
+    }
+  }
+
+  onActiveProfileIdChanged: { jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onRockConfiguredChanged: if (!rockConfigured) { jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onViewModeChanged: {
+    if (viewMode !== "search") { jobModel.close(); broker.dropJobRequests() }
+    if (viewMode !== "personal") { personalLinkModel.closed(); broker.dropPersonalLinkRequests() }
+  }
+  onContextNameChanged: { jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
 
   RockArchPersonalLinkState {
     id: personalLinkModel
@@ -1404,6 +1430,7 @@ Panel {
     socketPath: root.socketPath
     onReceived: function(line) { root.accept(line) }
     onInterrupted: {
+      jobModel.interrupted(); broker.dropJobRequests()
       AccountResponses.interrupted(root); shortcutModel.interrupted()
       personalLinkModel.interrupted(); broker.dropPersonalLinkRequests()
     }
@@ -1514,7 +1541,7 @@ Panel {
     RockArchKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings" || personalLinkModel.editing ||
+      formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings" || personalLinkModel.editing || jobModel.editing ||
         root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null ||
         (root.viewMode === "knowledge" && root.knowledgeDetail !== null)
       commandMode: root.magnusPreviewCommandsEnabled
@@ -1530,7 +1557,8 @@ Panel {
       onActivateRequested: root.activateCursor()
       onDeleteRequested: root.deleteCurrentItem()
       onTextKey: function(value) {
-        if (root.viewMode === "personal" && value.toLowerCase() === "v") personalToolbar.focusView()
+        if (root.viewMode === "search" && value.toLowerCase() === "r") root.beginJob(root.resultCursor)
+        else if (root.viewMode === "personal" && value.toLowerCase() === "v") personalToolbar.focusView()
         else root.handleMagnusKey(value)
       }
       onBackspaceRequested: {
@@ -1559,8 +1587,8 @@ Panel {
           TextField {
             id: searchField
             Layout.fillWidth: true
-            enabled: root.contextName === "DEV" ||
-              (root.statusLoaded && root.rockConfigured && root.searchCapabilitiesReady)
+            enabled: !jobModel.editing && (root.contextName === "DEV" ||
+              (root.statusLoaded && root.rockConfigured && root.searchCapabilitiesReady))
             maximumLength: 120
             Accessible.name: "Search Rock"
             placeholderText: root.contextName === "PROD" && root.statusLoaded && !root.rockConfigured

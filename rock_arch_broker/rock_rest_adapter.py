@@ -173,6 +173,7 @@ class SearchCapabilities:
 class _RegistryEntry:
     target: NavigationTarget | None
     person: dict[str, Any] | None
+    job_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -899,11 +900,15 @@ class RockRestReadOnlyAdapter:
         safe_id = (
             "rock-" + hmac.new(self._key, message, hashlib.sha256).hexdigest()[:32]
         )
-        self._registry[safe_id] = _RegistryEntry(target, person)
+        self._registry[safe_id] = _RegistryEntry(target, person, int(identity) if namespace == "Jobs" else None)
         self._registry.move_to_end(safe_id)
         while len(self._registry) > MAX_TARGETS:
             self._registry.popitem(last=False)
         return safe_id
+
+    def job_id(self, safe_id: str) -> int | None:
+        entry = self._registry.get(safe_id)
+        return entry.job_id if entry else None
 
     def _invalidate_cookie(self) -> None:
         invalidator = getattr(
