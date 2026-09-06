@@ -39,6 +39,7 @@ RowLayout {
     else controller.beginPersonalLink("")
   }
   onVisibleChanged: if (!visible) { addMenu.restoreFocus = false; addMenu.close() }
+  onCanAddChanged: if (!canAdd) { addMenu.restoreFocus = false; addMenu.close() }
 
   FocusScope {
     id: viewChoice
@@ -74,6 +75,9 @@ RowLayout {
           fontSize: Style.font.bodySmall
           height: Math.max(Style.spacing.controlHeight, implicitHeight)
           bordered: true
+          focusable: true
+          activeFocusOnTab: false
+          focus: viewChoice.cursor === index
           selected: toolbar.controller.preferencePersonalLinksView === modelData.value
           hasCursor: viewChoice.activeFocus && viewChoice.cursor === index
           tooltipText: modelData.description

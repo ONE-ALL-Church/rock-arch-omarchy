@@ -299,7 +299,7 @@ the Rock origin, and the section ID; they do not enter the navigation registry
 and are not action tokens. Only these references and view preferences persist in
 the owner-only profile store, not section names or bookmark URLs. Same-named
 sections stay distinct. Expansion settings are removed when a profile is deleted.
-Creating a section switches to Groups, opens it, and selects its heading.
+Creating a section switches to Sections, opens it, and selects its heading.
 No creation-date metadata is requested or stored.
 
 The contract was checked against the official Rock source at
