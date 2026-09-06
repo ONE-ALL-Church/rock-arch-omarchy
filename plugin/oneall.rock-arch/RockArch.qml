@@ -713,6 +713,11 @@ Panel {
     feedbackText = "Opening source…"
     request({op: "knowledge_open_source", safeId: knowledgeDetail.safeId})
   }
+  function scrollKnowledgeDetail(direction) {
+    panelFlick.contentY = Math.max(0, Math.min(
+      panelFlick.contentHeight - panelFlick.height,
+      panelFlick.contentY + direction * panelFlick.height * 0.8))
+  }
   function revealFocusedControl(control) {
     if (!control || !control.activeFocus) return
     Qt.callLater(function() { root.revealItem(control) })

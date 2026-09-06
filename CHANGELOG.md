@@ -15,6 +15,11 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Read Model Map properties, flags, reference values, and method signatures
+  directly inside Knowledge. Single-click results to read; filter with Ctrl+F,
+  collapse detail sections, scroll with Page Up/Down, and follow related models
+  with Back/Esc. Expose the same bounded details through the CLI; keep Open source
+  a separate action and report incomplete source snapshots.
 - Delete private bookmarks and sections from Links or the CLI. Review exact
   targets before confirmation, recheck ownership, and verify deletion without
   automatic retries. Section confirmation shows the actual link count and warns

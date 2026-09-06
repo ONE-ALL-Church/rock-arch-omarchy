@@ -17,6 +17,7 @@ from typing import Any, Protocol
 
 from .contracts import ALLOWED_RESULT_KEYS, allowlist, sanitize_text
 from .http_security import HttpSecurityError, decode_bounded_json, redirect_free_opener
+from .model_map_detail import model_sections
 from .version import HTTP_USER_AGENT
 
 ROCK_KB_ORIGIN = "https://rock-agent-kb.oneandall.church"
@@ -425,7 +426,13 @@ class RockKbReadOnlyAdapter:
         self, public_id: str, entry: _KnowledgeEntry
     ) -> dict[str, Any]:
         payload = self._http.model(entry.target_id)
-        if not isinstance(payload, dict) or not isinstance(payload.get("model"), dict):
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema") != "rock-kb-model-map-model-result-v1"
+            or payload.get("status") != "ok"
+            or not isinstance(payload.get("model"), dict)
+            or payload["model"].get("schema") != "rock-kb-agent-model-map-digest-v1"
+        ):
             raise RockKbError("invalid_knowledge_response")
         model = payload["model"]
         identity = model.get("identity")
@@ -449,13 +456,12 @@ class RockKbReadOnlyAdapter:
             ]
         lines = [
             "Category: " + (sanitize_text(identity.get("model_category"), 80) or "Uncategorized"),
-            "Rock version: " + (sanitize_text(identity.get("rock_version"), 30) or "Not specified"),
-            "Properties: " + str(_safe_count(counts.get("properties"))),
-            "Database properties: " + str(_safe_count(counts.get("database_properties"))),
-            "Lava properties: " + str(_safe_count(counts.get("lava_properties"))),
-            "Relationships: " + str(_safe_count(counts.get("relationships"))),
-            "Methods: " + str(_safe_count(counts.get("methods"))),
+            str(_safe_count(counts.get("properties"))) + " properties · "
+            + str(_safe_count(counts.get("methods"))) + " methods · "
+            + str(_safe_count(counts.get("relationships"))) + " relationships",
         ]
+        if identity.get("is_obsolete") is True:
+            lines.extend(["", "Obsolete: " + (sanitize_text(identity.get("obsolete_message"), 500) or "This model is obsolete.")])
         if required_names:
             lines.extend(["", "Required fields", " · ".join(required_names)])
         links: list[dict[str, Any]] = []
@@ -492,6 +498,7 @@ class RockKbReadOnlyAdapter:
             "canOpenSource": True,
             "attribution": ROCK_KB_ATTRIBUTION,
             "links": links,
+            "modelSections": model_sections(model),
         }
 
     def _lava_detail(
@@ -734,10 +741,11 @@ class RockKbReadOnlyAdapter:
             hashlib.sha256,
         ).hexdigest()[:32]
         safe_id = "kb-" + digest
+        previous = self._registry.get(safe_id)
         self._registry[safe_id] = _KnowledgeEntry(
             target_kind,
             target_id,
-            source_url,
+            source_url or (previous.source_url if previous else ""),
             sanitize_text(title, 160),
         )
         self._registry.move_to_end(safe_id)
@@ -763,6 +771,9 @@ class RockKbReadOnlyAdapter:
         def append(target_kind: str, target_id: str, title: str, kind: str, subtitle: str) -> None:
             if len(links) >= MAX_RELATED_LINKS:
                 return
+            if target_kind == "result" and target_id.startswith("model_map:"):
+                target_kind, target_id = "model", target_id.rsplit(":", 1)[-1]
+                kind = "Model Map"
             try:
                 safe_target = _validate_result_id(target_id) if target_kind == "result" else _validate_target_id(target_id)
             except RockKbError:

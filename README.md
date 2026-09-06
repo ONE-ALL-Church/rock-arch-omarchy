@@ -242,6 +242,14 @@ _A result opens as bounded text inside Rock Arch. Structured references become
 selectable Related items, so a model, issue, Lava context, recipe, or guide can
 lead to the records it cites._
 
+Click a result or press Enter to read it in the same panel. Model Map details
+include property descriptions, Required/Database/Lava flags, reference values,
+method signatures, and related models. Expand or collapse Properties and Methods;
+use **Ctrl+F** to filter their names, flags, and descriptions. **Page Up/Down**
+scrolls the reader, and **Back / Esc** returns through related models to results.
+The same structured sections are available through `rock-arch knowledge get`.
+Large or incomplete references explicitly report omitted rows.
+
 Only the query is sent to the fixed, credentialless public Knowledge service.
 Rock Arch does not send the selected Rock domain, profile, cookie, credentials,
 Personal Links, Recent Links, or entity results. **Open source** validates and

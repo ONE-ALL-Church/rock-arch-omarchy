@@ -19,6 +19,14 @@ Column {
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.panelGap
 
+  Keys.onPressed: function(event) {
+    if (knowledgePanel.controller.knowledgeDetail !== null &&
+        (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp)) {
+      knowledgePanel.controller.scrollKnowledgeDetail(event.key === Qt.Key_PageDown ? 1 : -1)
+      event.accepted = true
+    }
+  }
+
   TextField {
     id: knowledgeField
     visible: knowledgePanel.controller.knowledgeDetail === null
@@ -189,8 +197,7 @@ Column {
           anchors.fill: parent
           anchors.rightMargin: readButton.visible ? readButton.width + Style.spacing.sm : 0
           cursorShape: Qt.PointingHandCursor
-          onClicked: knowledgePanel.controller.selectKnowledgeResult(resultRow.index)
-          onDoubleClicked: knowledgePanel.controller.activateKnowledgeResult(resultRow.index)
+          onClicked: knowledgePanel.controller.activateKnowledgeResult(resultRow.index)
         }
 
         Button {
@@ -337,6 +344,13 @@ Column {
       wrapMode: Text.WordWrap
     }
 
+    RockArchModelMapReader {
+      width: parent.width
+      visible: knowledgePanel.controller.knowledgeDetail !== null &&
+        Array.isArray(knowledgePanel.controller.knowledgeDetail.modelSections)
+      controller: knowledgePanel.controller
+    }
+
     Column {
       visible: knowledgePanel.controller.knowledgeDetail &&
         Array.isArray(knowledgePanel.controller.knowledgeDetail.links) &&
@@ -344,7 +358,10 @@ Column {
       width: parent.width
       spacing: Style.spacing.rowGap
 
-      PanelSectionHeader { text: "RELATED" }
+      PanelSectionHeader {
+        text: knowledgePanel.controller.knowledgeDetail &&
+          knowledgePanel.controller.knowledgeDetail.kind === "Model Map" ? "RELATED MODELS" : "RELATED"
+      }
 
       Repeater {
         id: knowledgeLinkRepeater

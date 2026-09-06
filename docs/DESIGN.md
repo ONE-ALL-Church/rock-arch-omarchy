@@ -130,6 +130,14 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   Enter opens a plain-text detail with trust/version context, Back, and Open
   source. Typed related items continue within the panel, and Back unwinds that
   detail history before returning to results.
+  Model Map is an in-panel reference reader: a single click opens the model,
+  Properties and Methods expand in place, Ctrl+F filters their contents, and
+  Page Up/Down scrolls long references. Only Open source leaves the panel.
+  Use wrapped plain text for signatures and descriptions; label source-snapshot
+  values and any omitted content. This is a Rock Arch design decision, not an
+  Omarchy requirement: the [Omarchy manual](https://omarchy.org/manual/shell-plugins/)
+  supports multiple surface types, and HEY demonstrates both in-panel Back
+  navigation for settings and external destinations for full email work.
 - **Personal Links:** collapsible section rows with counts, retaining Rock's
   section and bookmark order. Expanded links sit on a subtly recessed, indented
   surface. Multiple sections may be open; expansion persists per profile.

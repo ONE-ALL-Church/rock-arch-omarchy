@@ -139,8 +139,11 @@ class ScopedFakeHttp(FakeHttp):
     def model(self, model_slug):
         self.model_calls.append(model_slug)
         return {
+            "schema": "rock-kb-model-map-model-result-v1",
+            "status": "ok",
             "matched_model": {"model_slug": model_slug},
             "model": {
+                "schema": "rock-kb-agent-model-map-digest-v1",
                 "identity": {
                     "model_slug": model_slug,
                     "model_name": "Group" if model_slug == "group" else "Group Member",
@@ -155,6 +158,11 @@ class ScopedFakeHttp(FakeHttp):
                     "methods": 55,
                 },
                 "required_fields": [{"name": "Name"}],
+                "property_groups": {"database": [{
+                    "name": "Name", "description": "The group name.",
+                    "flags": {"required": True, "database": True, "lava": True},
+                }]},
+                "methods": [{"signature": "ToString()", "description": "Returns the name."}],
                 "relationships": [
                     {
                         "property_name": "GroupMembers",
@@ -392,11 +400,63 @@ class RockKbAdapterTests(unittest.TestCase):
         self.assertEqual(detail["kind"], "Model Map")
         self.assertIn("Required fields\nName", detail["body"])
         self.assertEqual(detail["links"][0]["title"], "Group Member")
+        self.assertEqual(detail["modelSections"][0]["rows"][0]["body"], "The group name.")
+        self.assertEqual(detail["modelSections"][1]["rows"][0]["title"], "ToString()")
         self.assertNotIn("group-member", json.dumps(detail["links"]))
 
         related = adapter.detail(detail["links"][0]["safeId"])
         self.assertEqual(related["title"], "Group Member")
         self.assertEqual(http.model_calls, ["group", "group-member"])
+
+    def test_generic_model_search_reads_the_same_structured_detail(self):
+        http = ScopedFakeHttp()
+        http.search = lambda *args: {"schema": "rock-kb-search-result-v3", "results": [{
+            "id": "model_map:stable:group", "kind": "model_map", "title": "Group Model Map"
+        }]}
+        adapter = RockKbReadOnlyAdapter(http)
+        generic = adapter.search("Group Model Map")[0]
+        scoped = adapter.search("mm: group")[0]
+        self.assertEqual(generic["safeId"], scoped["safeId"])
+        self.assertEqual(adapter.detail(generic["safeId"])["kind"], "Model Map")
+        self.assertEqual(http.model_calls, ["group"])
+        self.assertEqual(http.result_calls, [])
+
+    def test_invalid_model_response_never_becomes_a_browser_fallback(self):
+        for payload in ({}, {"model": {}}, {
+            "schema": "rock-kb-model-map-model-result-v1", "status": "not_found", "model": {}
+        }):
+            http = ScopedFakeHttp()
+            http.model = lambda slug, payload=payload: payload
+            adapter = RockKbReadOnlyAdapter(http)
+            with self.assertRaisesRegex(RockKbError, "invalid_knowledge_response"):
+                adapter.detail(adapter.search("mm: group")[0]["safeId"])
+
+    def test_related_result_ids_route_model_maps_to_typed_detail(self):
+        http = ScopedFakeHttp()
+        original_result = http.result
+        def result(result_id):
+            payload = original_result(result_id)
+            payload["result"]["payload"]["related_result_ids"] = ["model_map:stable:group"]
+            return payload
+        http.result = result
+        adapter = RockKbReadOnlyAdapter(http)
+        detail = adapter.detail(adapter.search("check-in labels")[0]["safeId"])
+        related = next(link for link in detail["links"] if link["kind"] == "Model Map")
+        model = adapter.detail(related["safeId"])
+        self.assertEqual(model["title"], "Group")
+        self.assertEqual(http.model_calls, ["group"])
+
+    def test_revisiting_related_model_preserves_its_explicit_source_action(self):
+        http = ScopedFakeHttp()
+        adapter = RockKbReadOnlyAdapter(http)
+        safe_id = adapter.search("mm: group")[0]["safeId"]
+        adapter.detail(safe_id)
+        source = adapter.source_url(safe_id)
+        self.assertTrue(source)
+        # A relationship registers the same target without a source URL.
+        adapter._link("model", "group", "Group", "Model Map", "Related")
+        self.assertTrue(adapter.detail(safe_id)["canOpenSource"])
+        self.assertEqual(adapter.source_url(safe_id), source)
 
     def test_lava_concept_and_issue_areas_use_their_bounded_routes(self):
         http = ScopedFakeHttp()
