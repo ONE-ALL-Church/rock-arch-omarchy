@@ -398,8 +398,8 @@ These are future directions under consideration, not committed release dates:
 
 - **People:** Send email or SMS and run permission-aware person actions, such
   as triggering a workflow.
-- **Knowledge Base:** Improve the response reader and connect Model Map
-  references to the full entity view.
+- **Knowledge Base:** Connect public Model Map references to authorized Rock
+  entity searches.
 
 ## Keyboard map
 
@@ -408,7 +408,7 @@ These are future directions under consideration, not committed release dates:
 | Workspaces | `Ctrl+1`–`Ctrl+4` follow visible tab order | — | `Esc` closes | `Ctrl+,` Settings |
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
-| Knowledge detail | Tab / Shift+Tab | Enter or Space | Esc walks Back history | Open source and Related items |
+| Knowledge detail | Tab / Shift+Tab; Page Up/Down scrolls | Enter or Space | Esc walks Back history | Ctrl+F filters Model Map; Open source and Related items |
 | Personal Links | Up / Down stays in the list; Left / Right collapses or expands sections | Enter or Space toggles a section or opens a link | Backspace returns to Search | `V` focuses Sections / A–Z; `Ctrl+N` opens Add; `Delete` reviews deletion |
 | Links toolbar | Tab / Shift+Tab between view choices, Add, and list; Left / Right within choices | Enter or Space selects a view or opens Add | Esc closes Add and returns focus to its button | Toolbar stays visible while links scroll |
 | Add Personal Link | Tab / Shift+Tab | Enter or Space on controls | Esc cancels | `Ctrl+S` saves |

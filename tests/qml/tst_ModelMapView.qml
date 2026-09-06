@@ -32,6 +32,8 @@ TestCase {
     view.filter = "people"
     verify(view.isExpanded("properties"))
     verify(view.isExpanded("methods"))
+    view.setExpanded("methods", false)
+    verify(!view.isExpanded("methods"))
     view.filter = ""
     verify(!view.isExpanded("properties"))
     verify(view.isExpanded("methods"))

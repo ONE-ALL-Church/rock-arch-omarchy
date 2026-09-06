@@ -6,6 +6,7 @@ QtObject {
   property var detail: null
   property string filter: ""
   property var expanded: ["properties"]
+  property var filteredExpanded: ["properties", "methods"]
   readonly property bool filtering: filter.trim().length > 0
   readonly property var sections: {
     var source = detail && Array.isArray(detail.modelSections) ? detail.modelSections : []
@@ -23,8 +24,11 @@ QtObject {
     filter = ""
     expanded = ["properties"]
   }
-  function isExpanded(key) { return filtering || expanded.indexOf(key) >= 0 }
+  onFilterChanged: filteredExpanded = ["properties", "methods"]
+  function isExpanded(key) { return (filtering ? filteredExpanded : expanded).indexOf(key) >= 0 }
   function setExpanded(key, open) {
-    expanded = expanded.filter(function(item) { return item !== key }).concat(open ? [key] : [])
+    var next = (filtering ? filteredExpanded : expanded).filter(function(item) { return item !== key }).concat(open ? [key] : [])
+    if (filtering) filteredExpanded = next
+    else expanded = next
   }
 }

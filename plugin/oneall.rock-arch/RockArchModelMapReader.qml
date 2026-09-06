@@ -56,7 +56,7 @@ Column {
         leftAlign: true
         text: (section.expanded ? "▾ " : "▸ ") + section.modelData.title + " · " +
           (modelView.filtering ? section.modelData.rows.length + " / " : "") + section.modelData.total
-        tooltipText: modelView.filtering ? "Clear the filter to collapse sections" : "Expand or collapse · Enter"
+        tooltipText: "Expand or collapse · Enter"
         fontSize: Style.font.bodySmall
         bordered: false
         focusable: true
