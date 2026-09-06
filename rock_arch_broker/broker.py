@@ -449,7 +449,10 @@ class Broker:
         return self._ok(knowledgeDetail=detail)
 
     def _open_knowledge_source(self, safe_id: str) -> dict[str, Any]:
-        source_url = self._knowledge.source_url(safe_id)
+        try:
+            source_url = self._knowledge.source_url(safe_id)
+        except RockKbError as error:
+            return self._error(str(error))
         if not source_url:
             return self._error("knowledge_source_not_found")
         try:

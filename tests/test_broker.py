@@ -696,6 +696,24 @@ class BrokerContractTests(unittest.TestCase):
             {"ok": False, "error": "knowledge_source_not_found"},
         )
 
+    def test_model_source_lookup_failure_does_not_open_the_index(self):
+        from rock_arch_broker.rock_kb_adapter import RockKbError
+
+        knowledge = FakeKnowledge()
+        opened = []
+        def unavailable(safe_id):
+            raise RockKbError("knowledge_unavailable")
+        knowledge.source_url = unavailable
+        broker = Broker(
+            self.state, session=FakeSession(False), magnus=FakeMagnus(False),
+            live=FakeLive(), knowledge=knowledge,
+            url_opener=lambda url: opened.append(url) is None,
+            instance_file=self.instance,
+        )
+        self.assertEqual(broker.handle({"op": "knowledge_open_source", "safeId": "kb-safe-result"}),
+                         {"ok": False, "error": "knowledge_unavailable"})
+        self.assertEqual(opened, [])
+
     def test_person_quick_look_is_privacy_minimal(self):
         person = self.broker.handle(
             {"op": "person_quick_look", "safeId": "mock-person-ada"}

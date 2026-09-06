@@ -14,6 +14,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+from uuid import UUID
 
 from .contracts import ALLOWED_RESULT_KEYS, allowlist, sanitize_text
 from .http_security import HttpSecurityError, decode_bounded_json, redirect_free_opener
@@ -340,7 +341,12 @@ class RockKbReadOnlyAdapter:
         return dict(detail)
 
     def source_url(self, safe_id: str) -> str | None:
-        entry = self._registry.get(sanitize_text(safe_id, 100))
+        public_id = sanitize_text(safe_id, 100)
+        entry = self._registry.get(public_id)
+        if entry and entry.target_kind == "model" and entry.source_url in ("", MODEL_MAP_SOURCE):
+            # CLI callers can open a search hit without visiting the reader first.
+            self.detail(public_id)
+            entry = self._registry.get(public_id)
         return entry.source_url if entry and entry.source_url else None
 
     def describe(self, safe_id: str) -> dict[str, Any]:
@@ -483,9 +489,8 @@ class RockKbReadOnlyAdapter:
                 links.append(self._link("model", target, title_value or _humanize_slug(target), "Model Map", "via " + via if via else "Related model"))
                 if len(links) >= MAX_RELATED_LINKS:
                     break
-        self._registry[public_id] = _KnowledgeEntry(
-            "model", slug, MODEL_MAP_SOURCE, title
-        )
+        source_url = _model_source_url(identity)
+        self._registry[public_id] = _KnowledgeEntry("model", slug, source_url, title)
         return {
             "safeId": public_id,
             "title": title,
@@ -494,7 +499,7 @@ class RockKbReadOnlyAdapter:
             "trust": "Source confirmed",
             "claimTier": "Structured reference",
             "version": "Rock " + (sanitize_text(identity.get("rock_version"), 30) or "version not specified"),
-            "sourceHost": _source_host(MODEL_MAP_SOURCE),
+            "sourceHost": _source_host(source_url),
             "canOpenSource": True,
             "attribution": ROCK_KB_ATTRIBUTION,
             "links": links,
@@ -742,6 +747,8 @@ class RockKbReadOnlyAdapter:
         ).hexdigest()[:32]
         safe_id = "kb-" + digest
         previous = self._registry.get(safe_id)
+        if previous and target_kind == "model" and source_url == MODEL_MAP_SOURCE:
+            source_url = previous.source_url or source_url
         self._registry[safe_id] = _KnowledgeEntry(
             target_kind,
             target_id,
@@ -974,6 +981,19 @@ def _first_root_source(roots: list[Any]) -> str:
             if source:
                 return source
     return ""
+
+
+def _model_source_url(identity: dict[str, Any]) -> str:
+    value = identity.get("entity_type_guid")
+    if isinstance(value, str) and len(value) <= 36:
+        try:
+            entity_type = UUID(value)
+        except ValueError:
+            pass
+        else:
+            if entity_type.int:
+                return MODEL_MAP_SOURCE + "?EntityType=" + str(entity_type)
+    return MODEL_MAP_SOURCE
 
 
 def validate_public_source_url(value: object) -> str:

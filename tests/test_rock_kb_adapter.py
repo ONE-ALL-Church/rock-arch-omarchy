@@ -6,6 +6,7 @@ from rock_arch_broker.contracts import ALLOWED_RESULT_KEYS
 from rock_arch_broker.rock_kb_adapter import (
     DETAIL_RESPONSE_LIMIT,
     HTTP_TIMEOUT_SECONDS,
+    MODEL_MAP_SOURCE,
     ROCK_KB_ORIGIN,
     SEARCH_RESPONSE_LIMIT,
     RockKbError,
@@ -146,6 +147,8 @@ class ScopedFakeHttp(FakeHttp):
                 "schema": "rock-kb-agent-model-map-digest-v1",
                 "identity": {
                     "model_slug": model_slug,
+                    "entity_type_guid": "9bbfda11-0d22-40d5-902f-60adfbc88987" if model_slug == "group"
+                    else "49668b95-fedc-43dd-8085-d2b0d6343c48",
                     "model_name": "Group" if model_slug == "group" else "Group Member",
                     "model_category": "Groups",
                     "rock_version": "19.2.0",
@@ -457,6 +460,38 @@ class RockKbAdapterTests(unittest.TestCase):
         adapter._link("model", "group", "Group", "Model Map", "Related")
         self.assertTrue(adapter.detail(safe_id)["canOpenSource"])
         self.assertEqual(adapter.source_url(safe_id), source)
+
+    def test_model_source_opens_exact_model_even_without_reading_first(self):
+        http = ScopedFakeHttp()
+        adapter = RockKbReadOnlyAdapter(http)
+        safe_id = adapter.search("mm: group")[0]["safeId"]
+        self.assertEqual(adapter.source_url(safe_id), MODEL_MAP_SOURCE + "?EntityType=9bbfda11-0d22-40d5-902f-60adfbc88987")
+        related = adapter.detail(safe_id)["links"][0]["safeId"]
+        self.assertEqual(adapter.source_url(related), MODEL_MAP_SOURCE + "?EntityType=49668b95-fedc-43dd-8085-d2b0d6343c48")
+        self.assertEqual(http.model_calls, ["group", "group-member"])
+
+    def test_search_refresh_does_not_replace_exact_source_with_index(self):
+        adapter = RockKbReadOnlyAdapter(ScopedFakeHttp())
+        safe_id = adapter.search("mm: group")[0]["safeId"]
+        source = adapter.source_url(safe_id)
+        adapter.search("mm: gro")  # Another query registers the same model again.
+        self.assertEqual(adapter.source_url(safe_id), source)
+        self.assertIn("?EntityType=", source)
+
+    def test_invalid_model_identifiers_fall_back_without_forwarding_arbitrary_urls(self):
+        for value in (None, {}, "", "../../private", "?EntityType=bad&next=https://example.com",
+                      "00000000-0000-0000-0000-000000000000"):
+            http = ScopedFakeHttp()
+            original = http.model
+            def model(slug, original=original, value=value):
+                payload = original(slug)
+                payload["model"]["identity"]["entity_type_guid"] = value
+                payload["model"]["identity"]["source_url"] = "https://example.com/not-the-source"
+                return payload
+            http.model = model
+            adapter = RockKbReadOnlyAdapter(http)
+            with self.subTest(value=value):
+                self.assertEqual(adapter.source_url(adapter.search("mm: group")[0]["safeId"]), MODEL_MAP_SOURCE)
 
     def test_lava_concept_and_issue_areas_use_their_bounded_routes(self):
         http = ScopedFakeHttp()

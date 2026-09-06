@@ -7,6 +7,8 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Changed
 
+- Open a specific public Model Map source using its entity-type identifier,
+  including related models and CLI opens directly from search results.
 - Keep a compact Links toolbar visible while bookmarks scroll. Show Sections /
   A–Z choices at the left and an Add menu at the right, without a repeated heading.
   Tab reaches the toolbar, arrow keys stay within Links, and closing Add restores
