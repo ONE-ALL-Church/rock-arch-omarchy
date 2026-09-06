@@ -60,7 +60,7 @@ Column {
 
         Column {
           anchors.left: parent.left
-          anchors.right: runButton.visible ? runButton.left : (saveButton.visible ? saveButton.left : (openButton.visible ? openButton.left : parent.right))
+          anchors.right: runButton.visible ? runButton.left : (bookmarkButton.visible ? bookmarkButton.left : (openButton.visible ? openButton.left : parent.right))
           anchors.verticalCenter: parent.verticalCenter
           anchors.leftMargin: Style.spacing.rowPaddingX
           anchors.rightMargin: Style.spacing.rowPaddingX
@@ -106,8 +106,8 @@ Column {
 
         Button {
           id: runButton
-          visible: saveButton.visible && resultRow.modelData.category === "Jobs" && searchPanel.controller.job.available
-          anchors.right: saveButton.left
+          visible: bookmarkButton.visible && resultRow.modelData.category === "Jobs" && searchPanel.controller.job.available
+          anchors.right: bookmarkButton.left
           anchors.rightMargin: Style.spacing.xs
           anchors.verticalCenter: parent.verticalCenter
           text: "Run"
@@ -119,13 +119,18 @@ Column {
         }
 
         Button {
-          id: saveButton
+          id: bookmarkButton
           visible: openButton.visible && searchPanel.controller.resultsAreCurrent
           anchors.right: openButton.left
           anchors.rightMargin: Style.spacing.xs
           anchors.verticalCenter: parent.verticalCenter
-          text: "Save"
-          tooltipText: "Save to Personal Links · Ctrl+S"
+          iconText: "\uf097" // Nerd Font: bookmark outline
+          iconSize: Style.font.body
+          Accessible.role: Accessible.Button
+          Accessible.name: "Add bookmark"
+          Accessible.description: "Add to Personal Links · Ctrl+B"
+          Accessible.onPressAction: clicked()
+          tooltipText: "Add to Personal Links · Ctrl+B"
           fontSize: Style.font.caption
           focusable: true
           z: 2

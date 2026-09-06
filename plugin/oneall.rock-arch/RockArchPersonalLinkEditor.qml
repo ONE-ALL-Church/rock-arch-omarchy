@@ -17,7 +17,7 @@ Column {
 
   RowLayout {
     width: parent.width
-    PanelSectionHeader { text: editor.model.deleting ? (editor.model.kind === "delete-section" ? "DELETE SECTION" : "DELETE PERSONAL LINK") : editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD PERSONAL LINK"; Layout.fillWidth: true }
+    PanelSectionHeader { text: editor.model.deleting ? (editor.model.kind === "delete-section" ? "DELETE SECTION" : "DELETE PERSONAL LINK") : editor.model.kind === "section" ? "ADD PERSONAL SECTION" : "ADD BOOKMARK"; Layout.fillWidth: true }
     Button {
       id: formCancelButton
       text: "Cancel"
@@ -29,7 +29,7 @@ Column {
   }
   Text {
     width: parent.width
-    text: editor.model.deleting ? editor.controller.activeProfileName() : (editor.model.kind === "section" ? "Private section in " : "Save to your Rock account · ") + editor.controller.activeProfileName()
+    text: editor.model.deleting ? editor.controller.activeProfileName() : (editor.model.kind === "section" ? "Private section in " : "Personal Links · ") + editor.controller.activeProfileName()
     textFormat: Text.PlainText
     color: Qt.darker(Color.foreground, 1.4)
     font.family: Style.font.family

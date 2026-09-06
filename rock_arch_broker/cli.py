@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 from .agent_protocol import PROTOCOL_VERSION, protocol_schema, settings_schema
+from .cli_permissions import MUTATION_ACTIONS
 from .http_security import HttpSecurityError, decode_bounded_json
 from .profiles import EDITABLE_PREFERENCES
 from .terminal_access import CLI_CLIENT
@@ -41,10 +42,11 @@ ENTITY_PREFIXES = {
 
 
 class CliError(Exception):
-    def __init__(self, code: str, exit_code: int = 4) -> None:
+    def __init__(self, code: str, exit_code: int = 4, required_action: str = "") -> None:
         super().__init__(code)
         self.code = code
         self.exit_code = exit_code
+        self.required_action = required_action
 
 
 def default_socket_path() -> Path:
@@ -87,7 +89,10 @@ class BrokerClient:
             code = str(response.get("error") or "request_failed")
             raise CliError(
                 code,
-                3 if code in {"broker_unavailable", "terminal_access_disabled"} else 4,
+                3 if code in {"broker_unavailable", "terminal_access_disabled",
+                              "terminal_mutations_disabled", "terminal_mutation_action_disabled"} else 4,
+                required_action=(response.get("requiredAction", "")
+                                 if response.get("requiredAction") in MUTATION_ACTIONS else ""),
             )
         return response
 
@@ -985,7 +990,8 @@ def run(argv: list[str] | None = None) -> int:
         return 130
     except CliError as error:
         _emit(
-            {"ok": False, "error": error.code},
+            {"ok": False, "error": error.code,
+             **({"requiredAction": error.required_action} if error.required_action else {})},
             pretty=args.pretty,
             stream=sys.stderr,
         )

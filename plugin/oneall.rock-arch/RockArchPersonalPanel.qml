@@ -41,7 +41,7 @@ Column {
       text: personalPanel.controller.contextName !== "PROD"
         ? "Return to Search to browse preview data."
         : personalPanel.controller.rockConfigured
-          ? "Add a link here or save a Search result. Bookmarks saved in Rock also appear here."
+          ? "Add a link here or bookmark a Search result. Bookmarks saved in Rock also appear here."
           : "Open Settings to sign in."
       textFormat: Text.PlainText
       color: personalPanel.dim

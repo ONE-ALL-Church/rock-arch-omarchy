@@ -7,13 +7,46 @@ store, Rock client, or Magnus client. A source checkout cannot repoint the
 managed launcher. If an unrelated `rock-arch` command already exists, Rock
 Arch does not overwrite it and reports the conflict in Settings.
 
-Terminal and agent access is enabled by default and can be disabled in
-**Settings**. It is intentionally not another onboarding decision: enabling it
-does not open a TCP port or allow another OS user through the owner-only socket.
-When disabled, Rock commands return `terminal_access_disabled`. Local settings
-and shortcut management remain available, including
-`rock-arch settings set terminalAccess true` to restore access. Settings reads
-return preferences only, without profile identities or Rock data.
+CLI **Read access** defaults on. **Allow mutations** and every individual action
+default off, including when upgrading an existing installation. Configure these
+under **Settings → CLI and agent access**, or use the same local settings API:
+
+```bash
+# Allow only bookmark creation in existing sections.
+rock-arch settings set --stdin <<'JSON'
+{"terminalMutationAccess":true,"terminalMutationActions":["addLinks"]}
+JSON
+
+# Disable all CLI mutations; retain individual choices for later.
+rock-arch settings set terminalMutationAccess false
+```
+
+`terminalAccess` controls read access and is required for all Rock commands.
+`terminalMutationAccess` is the additional gate for Rock and Magnus writes.
+`terminalMutationActions` replaces the entire list of grants:
+
+| Action ID | Permission |
+| --- | --- |
+| `addLinks` | Add private bookmarks |
+| `addSections` | Create private sections, including the first Links section for a bookmark |
+| `deleteLinks` | Delete private bookmarks |
+| `deleteSections` | Delete private sections; `--with-links` also requires `deleteLinks`, even if empty |
+| `runJobs` | Trigger discovered, authorized scheduled jobs |
+| `buildMagnus` | Start Magnus builds, including builds launched from Recent Links |
+
+Read-only previews remain available while mutations are disabled. Mutation
+permissions are checked again when committing a draft; enabling an action does
+not replace `--confirm` or Rock's own authorization. Interactive panel actions
+use their existing confirmation flows independently of CLI permissions.
+
+Disabled read access returns `terminal_access_disabled`; disabled mutations return
+`terminal_mutations_disabled`. A denied individual action returns
+`terminal_mutation_action_disabled` with `requiredAction`. All exit with code 3.
+Local settings and shortcut management remain available for recovery, including
+`rock-arch settings set terminalAccess true`. Settings reads contain no profile
+identities or Rock data. Local configuration, browser opens, clipboard actions,
+downloads, and plugin updates retain their existing controls and confirmations.
+These mutation grants cover changes to Rock records, job triggers, and Magnus builds.
 
 The local Unix account remains the security boundary. The preference controls
 the supported CLI, not hostile software already running as that same account.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .cli_permissions import MUTATION_ACTIONS
 from .contracts import CATEGORIES
 from .profiles import (
     DEFAULT_PREFERENCES,
@@ -18,6 +19,17 @@ def settings_schema() -> dict[str, Any]:
         key: {"type": "boolean", "default": DEFAULT_PREFERENCES[key]}
         for key in EDITABLE_PREFERENCES
         if isinstance(DEFAULT_PREFERENCES[key], bool)
+    }
+    fields["terminalAccess"]["description"] = "Read access for Rock CLI commands; required for previews and mutations. Local settings and shortcuts remain editable."
+    fields["terminalMutationAccess"]["description"] = "Allow CLI changes to Rock and Magnus, restricted to terminalMutationActions. Defaults off, including existing installations."
+    fields["terminalMutationActions"] = {
+        "type": "array", "items": list(MUTATION_ACTIONS), "uniqueItems": True,
+        "default": [],
+        "description": "Explicit mutation grants. Replaces the complete list; an empty list allows no mutations. Requires terminalAccess and terminalMutationAccess. Local configuration, browser opens, clipboard, downloads, and plugin updates retain their existing controls.",
+        "dependencies": {
+            "addLinks": "Creating the first Links section also requires addSections.",
+            "deleteSections": "--with-links also requires deleteLinks, including an empty section.",
+        },
     }
     fields["enabledCategories"] = {
         "type": "array", "items": list(CATEGORIES), "uniqueItems": True,
@@ -44,7 +56,7 @@ def settings_schema() -> dict[str, Any]:
         "write": "rock-arch settings set KEY JSON_VALUE",
         "batchWrite": "rock-arch settings set --stdin",
         "batchInput": "JSON object containing editable setting names and values; applied atomically",
-        "terminalAccess": "Rock commands can be disabled; owner-local settings remain available for recovery.",
+        "terminalAccess": "Read access defaults on. Mutations and individual action grants default off. Owner-local settings remain available for recovery.",
         "shortcuts": "Use rock-arch shortcuts status|check|set|remove; set and remove require --confirm.",
     }
 
@@ -63,7 +75,7 @@ def protocol_schema() -> dict[str, Any]:
         "exitCodes": {
             "0": "success",
             "2": "invalid input, missing confirmation, or cancelled dry-run",
-            "3": "broker, socket, or terminal-access failure",
+            "3": "broker, socket, or CLI permission failure",
             "4": "bounded operation failure",
             "130": "interactive input cancelled",
         },

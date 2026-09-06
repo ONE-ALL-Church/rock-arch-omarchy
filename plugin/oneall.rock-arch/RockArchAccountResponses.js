@@ -44,6 +44,8 @@ function profiles(root, ui, response, frame) {
       root.preferenceCloseAfterOpen = preferences.closeAfterOpen === true
       root.preferenceShowMenuBar = preferences.showMenuBar !== false
       root.preferenceTerminalAccess = preferences.terminalAccess !== false
+      root.preferenceTerminalMutationAccess = preferences.terminalMutationAccess === true
+      root.preferenceTerminalMutationActions = Array.isArray(preferences.terminalMutationActions) ? preferences.terminalMutationActions : []
       root.preferenceAutomaticUpdates = preferences.automaticUpdates === true
       root.preferenceOnboardingSetupCompleted = preferences.onboardingSetupCompleted === true
       root.preferencePersonalLinksView = preferences.personalLinksView === "alpha" ? "alpha" : "sections"

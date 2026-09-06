@@ -7,6 +7,12 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Changed
 
+- Replace Search's Save label with an accessible outline bookmark icon and use
+  Ctrl+B to open Add bookmark. Keep Ctrl+S for saving the completed form.
+- Separate CLI read access from an additional mutation gate and six individual
+  grants. Mutations default off for new and existing installations. Enforce
+  combined section/link permissions and cover builds launched from Recent Links.
+
 - Prefer original public article, video, and issue pages for Knowledge source
   links. Read structured citations and approved-claim source references, and
   use code or generated KB files only when no
@@ -48,7 +54,7 @@ repository's default branch is the source used by Omarchy plugin updates.
   Remember expanded sections per account, and offer a flat Alphabetical view.
   Expose both view and expansion preferences through the CLI.
 - Add Personal Links directly from Links, or prefill a bookmark from Search.
-  Use Ctrl+N for the Add menu and Ctrl+S to prepare or save a bookmark. Select and reveal
+  Use Ctrl+N for the Add menu, Ctrl+B to prepare a bookmark, and Ctrl+S to save. Select and reveal
   the saved link after refreshing.
 - Expose personal sections and confirmed additions through the JSON CLI, with
   private stdin input, search-result prefilling, and a read-only dry run.

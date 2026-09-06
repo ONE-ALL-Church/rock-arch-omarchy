@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from .cli_permissions import CliMutationError, require_mutation
 from .contracts import (
     CATEGORIES,
     KNOWLEDGE_CATEGORY,
@@ -113,7 +114,23 @@ class BrokerOperations:
             if not enabled:
                 return self.broker._error("terminal_access_disabled")
         handler = self._handlers.get(operation)
-        return handler(raw) if handler else self.broker._error("unsupported_operation")
+        try:
+            if operation in {"personal_link_save", "personal_section_save", "personal_delete_commit",
+                             "job_run", "magnus_build"}:
+                self._cli_mutations(raw)
+            return handler(raw) if handler else self.broker._error("unsupported_operation")
+        except CliMutationError as error:
+            return {**self.broker._error(str(error)), "requiredAction": error.action}
+        except ProfileError as error:
+            return self.broker._error(str(error))
+
+    def _cli_mutations(self, raw: dict[str, Any]) -> frozenset[str] | None:
+        if raw.get("client") != CLI_CLIENT:
+            return None
+        preferences = self.broker._profile_store.preferences()
+        if not preferences["terminalMutationAccess"]:
+            raise ProfileError("terminal_mutations_disabled")
+        return frozenset(preferences["terminalMutationActions"])
 
     def _status(self, raw: dict[str, Any]) -> dict[str, Any]:
         broker = self.broker
@@ -774,6 +791,7 @@ class BrokerOperations:
         return broker._open_target(target)
 
     def _magnus_build(self, raw: dict[str, Any]) -> dict[str, Any]:
+        require_mutation(self._cli_mutations(raw), "buildMagnus")
         broker = self.broker
         if broker._context is Context.DEV:
             if raw.get("confirmed") is not True:
@@ -981,6 +999,7 @@ class BrokerOperations:
             if operation == "job_access":
                 result = broker._jobs.access(refresh=raw.get("refresh") is True)
             elif operation == "job_run":
+                require_mutation(self._cli_mutations(raw), "runJobs")
                 result = broker._jobs.run(raw.get("draftId"), raw.get("confirmed") is True)
             else:
                 safe_id = sanitize_text(raw.get("safeId"), 100)
@@ -1083,7 +1102,7 @@ class BrokerOperations:
                         raise PersonalLinkError("personal_delete_target_invalid")
                 result = broker._personal_links.prepare_delete(kind, target, with_links=raw.get("withLinks", False))
             elif raw["op"] == "personal_delete_commit":
-                result = broker._personal_links.delete(raw.get("draftId"), confirmed=raw.get("confirmed") is True, with_links=raw.get("withLinks", False))
+                result = broker._personal_links.delete(raw.get("draftId"), confirmed=raw.get("confirmed") is True, with_links=raw.get("withLinks", False), allowed_actions=self._cli_mutations(raw))
                 result["groupId"] = broker._live.personal_link_group_id(result.pop("_sectionId"))
                 broker._live.invalidate_personal_links()
             elif raw["op"] == "personal_section_list":
@@ -1093,6 +1112,7 @@ class BrokerOperations:
             elif raw["op"] == "personal_section_prepare":
                 result = broker._personal_links.prepare_section(raw.get("name", ""))
             elif raw["op"] == "personal_section_save":
+                require_mutation(self._cli_mutations(raw), "addSections")
                 result = broker._personal_links.save_section(raw.get("draftId"), raw.get("name"), confirmed=raw.get("confirmed") is True)
                 result["groupId"] = broker._live.personal_link_group_id(result.pop("_sectionId"))
                 broker._live.invalidate_personal_links()
@@ -1111,6 +1131,7 @@ class BrokerOperations:
                 result = broker._personal_links.save(
                     raw.get("draftId"), raw.get("name"), raw.get("url"),
                     raw.get("sectionId"), confirmed=raw.get("confirmed") is True,
+                    allowed_actions=self._cli_mutations(raw),
                 )
                 broker._live.invalidate_personal_links()
             return broker._ok(**{envelope: {**result, "requestId": request_id}})
@@ -1125,6 +1146,11 @@ class BrokerOperations:
         return self.broker._open_navigation(sanitize_text(raw.get("safeId"), 100))
 
     def _activate_recent(self, raw: dict[str, Any]) -> dict[str, Any]:
+        safe_id = sanitize_text(raw.get("safeId"), 100)
+        target = self.broker._quick_returns.resolve(safe_id)
+        if ((target is not None and target.kind == "Magnus Build")
+                or (self.broker._context is Context.DEV and self.broker._mock.is_recent_build(safe_id))):
+            require_mutation(self._cli_mutations(raw), "buildMagnus")
         return self.broker._activate_recent(
             sanitize_text(raw.get("safeId"), 100),
             raw.get("confirmed") is True,

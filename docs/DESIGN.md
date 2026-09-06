@@ -161,7 +161,7 @@ The supporting desktop guidance is intentionally narrow and authoritative:
   form for a private section in the active account. Saving switches to Sections and opens the section with an indented
   **Add a link** action that preselects it. Empty private sections remain visible
   in Sections; A–Z stays a flat list of links.
-  Save on a Search result opens a focused form with name
+  The outline bookmark action (Ctrl+B) on a Search result opens Add bookmark with name
   and URL prefilled. Use native text fields and a private-section dropdown;
   Ctrl+S saves and Escape returns to the source view. Saving expands the section, selects and reveals
   the bookmark; success feedback clears after four seconds.
@@ -274,3 +274,8 @@ Native control reuse and an accessible input name are useful foundations;
 they do not establish full screen-reader accessibility, larger-font coverage,
 or contrast compliance for every user-supplied theme. Avoid claiming these
 without direct testing.
+
+CLI access settings separate the default-on read gate from the default-off
+mutation gate. Enabling mutations reveals indented action toggles, all initially
+off. Turning the gate off preserves those choices. These use the same native
+Toggle component and keyboard focus/reveal behavior as other settings.

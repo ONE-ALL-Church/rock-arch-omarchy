@@ -40,6 +40,17 @@ side-effect-free dry-run path, and diagnostics omit tenant identity, local
 paths, queries, and secrets. Native UI handoffs store query text only in broker
 memory, consume it once, and erase an unclaimed handoff after 30 seconds.
 
+CLI read access defaults on; mutations and all per-action grants default off,
+including upgrades. The broker enforces the mutation gate and an explicit
+allowlist for link/section creation and deletion, job runs, and Magnus builds.
+Draft commits check the current grants. Section deletion uses the stored draft's
+kind and scope; `--with-links` requires both deletion grants. Creating a bookmark's
+first section also requires section creation permission. Builds launched from
+Recent Links use the same build grant. Local settings remain editable through
+the CLI, and interactive panel actions retain their own confirmation flows.
+These preferences control the supported client, not other software running as
+the same Unix user.
+
 Magnus build tracking records only that the action endpoint accepted a request.
 Receipts are profile-scoped, owner-only local files without endpoint URLs and
 never claim server-side completion. Rock Arch does not synthesize deployment

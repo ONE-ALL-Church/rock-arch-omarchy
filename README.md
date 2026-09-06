@@ -178,7 +178,7 @@ Use the view dropdown (or press `V`) to choose a flat **Alphabetical** list.
 Returning to Groups restores the expanded sections. Both preferences are
 editable through the CLI.
 
-Choose **Save** beside a Search result, or press `Ctrl+S`, to prefill its name and
+Choose the **bookmark icon** beside a Search result, or press `Ctrl+B`, to prefill its name and
 URL. In **Links**, choose **Add → Link** to enter a bookmark manually; `Ctrl+N`
 opens the Add menu. Review the name, Rock URL, and personal section, then select **Save
 link** or press `Ctrl+S`. Escape cancels the form. The saved bookmark is selected
@@ -337,7 +337,9 @@ Settings also lets you:
 - Show or hide person context
 - Enable or disable Recent Links
 - Choose whether the panel closes after opening an item (enabled by default)
-- Enable or disable terminal and agent access (enabled by default)
+- Control CLI read access (on by default) and mutations (off by default), with
+  separate grants for adding/deleting links and sections, running jobs, and
+  starting Magnus builds
 - Enable only the accessible entity categories the user wants searched
 - Check for, install, or automatically install Rock Arch updates
 
@@ -424,7 +426,7 @@ These are future directions under consideration, not committed release dates:
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
 | Workspaces | `Ctrl+1`–`Ctrl+4` follow visible tab order | — | `Esc` closes | `Ctrl+,` Settings |
-| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+S` saves a Search result; `X` or Delete clears recents |
+| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+B` bookmarks a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab; Page Up/Down scrolls | Enter or Space | Esc walks Back history | Ctrl+F filters Model Map; Open source and Related items |
 | Personal Links | Up / Down stays in the list; Left / Right collapses or expands sections | Enter or Space toggles a section or opens a link | Backspace returns to Search | `V` focuses Sections / A–Z; `Ctrl+N` opens Add; `Delete` reviews deletion |

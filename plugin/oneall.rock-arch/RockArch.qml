@@ -42,6 +42,8 @@ Panel {
   property bool preferenceCloseAfterOpen: true
   property bool preferenceShowMenuBar: true
   property bool preferenceTerminalAccess: true
+  property bool preferenceTerminalMutationAccess: false
+  property var preferenceTerminalMutationActions: []
   property bool preferenceAutomaticUpdates: false
   property bool preferenceOnboardingSetupCompleted: false
   property alias shortcut: shortcutModel
@@ -579,8 +581,8 @@ Panel {
     personalLinkModel.beginSection()
     panelFlick.contentY = 0
   }
-  function saveSearchLink() {
-    if (viewMode !== "search" || !resultsAreCurrent || !results.length) return
+  function bookmarkSearchResult() {
+    if (jobModel.editing || viewMode !== "search" || !resultsAreCurrent || !results.length) return
     var result = results[resultCursor >= 0 ? resultCursor : 0]
     if (result.canOpen === true) beginPersonalLink(result.safeId)
   }
@@ -741,6 +743,18 @@ Panel {
   function toggleTerminalAccessPreference() {
     preferenceTerminalAccess = !preferenceTerminalAccess
     updatePreference("terminalAccess", preferenceTerminalAccess)
+  }
+  function toggleTerminalMutationAccessPreference() {
+    preferenceTerminalMutationAccess = !preferenceTerminalMutationAccess
+    updatePreference("terminalMutationAccess", preferenceTerminalMutationAccess)
+  }
+  function toggleTerminalMutationAction(action) {
+    var actions = preferenceTerminalMutationActions.slice()
+    var index = actions.indexOf(action)
+    if (index >= 0) actions.splice(index, 1)
+    else actions.push(action)
+    preferenceTerminalMutationActions = actions
+    updatePreference("terminalMutationActions", actions)
   }
   function toggleAutomaticUpdatesPreference() {
     preferenceAutomaticUpdates = !preferenceAutomaticUpdates
@@ -1512,7 +1526,8 @@ Panel {
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
   Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalToolbar.openAddMenu() }
-  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && ((personalLinkModel.editing && !personalLinkModel.deleting) || root.viewMode === "search"); onActivated: { if (personalLinkModel.editing) personalLinkModel.save(); else root.saveSearchLink() } }
+  Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && root.viewMode === "search" && !jobModel.editing; onActivated: root.bookmarkSearchResult() }
+  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && personalLinkModel.editing && !personalLinkModel.deleting; onActivated: personalLinkModel.save() }
   Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
   Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(0) }
   Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(1) }

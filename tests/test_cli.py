@@ -53,6 +53,24 @@ class FakeConnection:
 
 
 class RockArchCliTests(unittest.TestCase):
+    def test_mutation_denials_preserve_allowlisted_action_in_cli_json(self):
+        response = {"ok": False, "error": "terminal_mutation_action_disabled", "requiredAction": "runJobs"}
+        connection = FakeConnection(json.dumps(response).encode() + b"\n")
+        with patch.object(BrokerClient, "_connect", return_value=connection):
+            output = io.StringIO()
+            with redirect_stderr(output):
+                result = run(["--no-start", "status"])
+        self.assertEqual(result, 3)
+        self.assertEqual(json.loads(output.getvalue())["requiredAction"], "runJobs")
+        self.assertTrue(connection.closed)
+        response["requiredAction"] = "untrusted server detail"
+        connection = FakeConnection(json.dumps(response).encode() + b"\n")
+        with patch.object(BrokerClient, "_connect", return_value=connection):
+            output = io.StringIO()
+            with redirect_stderr(output):
+                run(["--no-start", "status"])
+        self.assertNotIn("requiredAction", json.loads(output.getvalue()))
+
     def test_jobs_require_confirmation_and_dry_run_never_triggers(self):
         class JobClient(FakeClient):
             def request(self, payload):

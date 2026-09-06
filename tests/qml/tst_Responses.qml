@@ -79,6 +79,18 @@ TestCase {
     wait(1) // Run the real Qt.callLater focus and refresh callbacks.
   }
 
+  function test_cli_grants_refresh_and_missing_preferences_fail_closed() {
+    accept({ok: true, profiles: {activeProfileId: "", profiles: [], preferences: {
+      terminalAccess: true, terminalMutationAccess: true, terminalMutationActions: ["addLinks"]
+    }}})
+    compare(state.preferenceTerminalMutationAccess, true)
+    compare(state.preferenceTerminalMutationActions, ["addLinks"])
+    accept({ok: true, profiles: {activeProfileId: "", profiles: [], preferences: {}}})
+    compare(state.preferenceTerminalAccess, true)
+    compare(state.preferenceTerminalMutationAccess, false)
+    compare(state.preferenceTerminalMutationActions, [])
+  }
+
   function test_stale_search_never_replaces_current_results() {
     state.query = "new"
     state.searchInFlightQuery = "old"

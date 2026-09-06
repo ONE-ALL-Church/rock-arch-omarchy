@@ -229,10 +229,15 @@ plugin or assert that the interactive Omarchy shell lifecycle was tested.
   owned with no group/other access. Requests are capped at 16 KiB and responses
   at 5 MiB. A missing broker may be started through fixed module arguments;
   `--no-start` refuses that behavior.
-- Terminal access defaults on, is configured in Settings rather than onboarding,
+- CLI read access defaults on, is configured in Settings rather than onboarding,
   and marked Rock CLI requests fail with `terminal_access_disabled` when it is
   off. Local settings and shortcut management stay available for recovery.
   The Unix account remains the OS trust boundary.
+- Mutations and individual grants default off for new and existing stores.
+  Synthetic tests cover every write entry point, draft-based deletion scope,
+  combined section/link grants, implicit first-section creation, permission
+  changes after preview, Recent Links builds, and independent interactive actions.
+  Settings changes remain available while Rock CLI access is disabled.
 - The launcher is installed atomically in `~/.local/bin`, refuses unsafe shapes
   and unrelated existing commands, and contains no credentials or profile data.
 - `rock-arch login` reads the password from a masked prompt or a bounded JSON

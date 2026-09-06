@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from .cli_permissions import MUTATION_ACTIONS
 from .contracts import CATEGORIES, sanitize_text
 from .instance import InstanceStore
 from .origin import OriginError, validate_rock_origin
@@ -29,6 +30,8 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
     "closeAfterOpen": True,
     "showMenuBar": True,
     "terminalAccess": True,
+    "terminalMutationAccess": False,
+    "terminalMutationActions": [],
     "automaticUpdates": False,
     "automaticUpdatesPrompted": False,
     "onboardingSetupCompleted": False,
@@ -39,7 +42,7 @@ DEFAULT_PREFERENCES: dict[str, Any] = {
 }
 EDITABLE_PREFERENCES = (
     "showPersonContext", "recentLinks", "closeAfterOpen", "showMenuBar",
-    "terminalAccess", "automaticUpdates", "enabledCategories", "tabOrder",
+    "terminalAccess", "terminalMutationAccess", "terminalMutationActions", "automaticUpdates", "enabledCategories", "tabOrder",
     "personalLinksView", "personalLinksExpandedGroups",
 )
 
@@ -176,6 +179,15 @@ class ProfileStore:
             self.legacy_instance.clear()
         return profile
 
+    @staticmethod
+    def _validated_mutation_actions(value: object, error: str) -> list[str]:
+        if (not isinstance(value, list)
+                or any(not isinstance(item, str) for item in value)
+                or len(value) != len(set(value))
+                or not set(value).issubset(MUTATION_ACTIONS)):
+            raise ProfileError(error)
+        return [action for action in MUTATION_ACTIONS if action in value]
+
     def update_preferences(self, updates: object) -> dict[str, Any]:
         if not isinstance(updates, dict):
             raise ProfileError("invalid_preferences")
@@ -190,6 +202,7 @@ class ProfileStore:
             "closeAfterOpen",
             "showMenuBar",
             "terminalAccess",
+            "terminalMutationAccess",
             "automaticUpdates",
             "automaticUpdatesPrompted",
             "onboardingSetupCompleted",
@@ -198,6 +211,10 @@ class ProfileStore:
                 if not isinstance(updates[name], bool):
                     raise ProfileError("invalid_preferences")
                 preferences[name] = updates[name]
+        if "terminalMutationActions" in updates:
+            preferences["terminalMutationActions"] = self._validated_mutation_actions(
+                updates["terminalMutationActions"], "invalid_preferences"
+            )
         if preferences["automaticUpdates"]:
             preferences["automaticUpdatesPrompted"] = True
         if "enabledCategories" in updates:
@@ -341,6 +358,7 @@ class ProfileStore:
             "closeAfterOpen",
             "showMenuBar",
             "terminalAccess",
+            "terminalMutationAccess",
             "automaticUpdates",
             "automaticUpdatesPrompted",
             "onboardingSetupCompleted",
@@ -354,6 +372,9 @@ class ProfileStore:
             if not isinstance(candidate, bool):
                 raise ProfileError("profile_store_unavailable")
             clean_preferences[name] = candidate
+        clean_preferences["terminalMutationActions"] = cls._validated_mutation_actions(
+            preferences.get("terminalMutationActions", []), "profile_store_unavailable"
+        )
         if clean_preferences["automaticUpdates"]:
             clean_preferences["automaticUpdatesPrompted"] = True
         categories = preferences.get("enabledCategories", list(CATEGORIES))

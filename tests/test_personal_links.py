@@ -777,6 +777,10 @@ class PersonalLinkBrokerCliTests(unittest.TestCase):
             developer_mode=True,
         )
         self.broker._context = Context.PROD
+        self.broker._profile_store.update_preferences({
+            "terminalMutationAccess": True,
+            "terminalMutationActions": ["addLinks", "addSections", "deleteLinks", "deleteSections"],
+        })
         self.calls = []
 
     def request(self, payload):

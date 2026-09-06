@@ -93,7 +93,12 @@ PATH-selected executable at this credential boundary.
 The supported terminal client validates the owner and permissions of the same
 socket and its directory, bounds responses to 5 MiB, and adds an explicit
 official-client marker. The broker refuses marked Rock requests when the
-default-on `terminalAccess` preference is disabled. Owner-local settings and
+default-on `terminalAccess` read preference is disabled. Remote mutations also
+require the default-off `terminalMutationAccess` gate and explicit membership in
+`terminalMutationActions` (empty by default). Draft commits re-evaluate grants;
+section deletion derives its action from the stored draft, and `--with-links`
+also requires delete permission for links. Implicit first-section creation and
+Recent Links build triggers enforce their corresponding grants. Owner-local settings and
 shortcut management remain available for configuration and recovery; settings
 reads return no profile identities or Rock data. This preference is a
 supported-client control, not a sandbox against hostile software already

@@ -30,6 +30,7 @@ PANEL_PATHS = (
     SEARCH_PATH,
     KNOWLEDGE_PATH,
     SETTINGS_PATH,
+    QML_PATH.with_name("RockArchCliAccessSettings.qml"),
     SCOPES_PATH,
     *sorted(QML_PATH.parent.glob("RockArch*Responses.js")),
 )
@@ -399,12 +400,14 @@ class QmlNavigationTests(unittest.TestCase):
         finish_setup = FINISH_SETUP_PATH.read_text(encoding="utf-8")
 
         self.assertIn("property bool preferenceTerminalAccess: true", source)
-        self.assertIn('label: "Terminal and agent access"', source)
+        self.assertIn('label: "Read access"', source)
+        self.assertIn('label: "Allow mutations"', source)
+        self.assertIn("property bool preferenceTerminalMutationAccess: false", source)
         self.assertIn(
             'updatePreference("terminalAccess", preferenceTerminalAccess)', source
         )
         self.assertIn(
-            '"Use the rock-arch command with this account."', source
+            '"Search, inspect, and preview with rock-arch."', source
         )
         self.assertNotIn("terminal", finish_setup.lower())
 

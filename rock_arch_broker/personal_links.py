@@ -12,6 +12,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .cli_permissions import require_mutation
 from .http_security import (
     HttpSecurityError,
     decode_bounded_json,
@@ -507,13 +508,17 @@ class PersonalLinkManager:
         }
 
     def delete(
-        self, draft_id: object, *, confirmed: bool, with_links: bool = False
+        self, draft_id: object, *, confirmed: bool, with_links: bool = False,
+        allowed_actions: frozenset[str] | None = None,
     ) -> dict[str, Any]:
         if confirmed is not True:
             raise PersonalLinkError("personal_link_confirmation_required")
         draft = self._deletions.get(draft_id) if isinstance(draft_id, str) else None
         if draft is None or draft.deadline <= time.monotonic():
             raise PersonalLinkError("personal_link_draft_expired")
+        require_mutation(allowed_actions, "deleteLinks" if draft.kind == "link" else "deleteSections")
+        if draft.kind == "section" and draft.with_links:
+            require_mutation(allowed_actions, "deleteLinks")
         if with_links is not draft.with_links:
             raise PersonalLinkError("personal_delete_scope_invalid")
         with self._session.authenticated_cookie() as cookie:
@@ -636,8 +641,10 @@ class PersonalLinkManager:
         section_id: object,
         *,
         confirmed: bool,
+        allowed_actions: frozenset[str] | None = None,
     ) -> dict[str, Any]:
         draft = self._draft(draft_id, "link", confirmed)
+        require_mutation(allowed_actions, "addLinks")
         clean_name, clean_url = _name(name), self._url(url)
         selected = draft.default_section if section_id is None else section_id
         if not isinstance(selected, str) or selected not in draft.sections:
@@ -654,6 +661,8 @@ class PersonalLinkManager:
                 )
             elif section is None:
                 raise PersonalLinkError("personal_link_section_changed")
+            if section is None:
+                require_mutation(allowed_actions, "addSections")
             # Consume before any write. Interrupted or replayed requests cannot
             # resubmit the same mutation, including creation of a first section.
             del self._drafts[str(draft_id)]

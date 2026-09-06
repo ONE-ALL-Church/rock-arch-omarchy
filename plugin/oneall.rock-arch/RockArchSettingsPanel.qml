@@ -588,29 +588,6 @@ Column {
     }
 
     Toggle {
-      id: terminalAccessCheckBox
-      width: parent.width
-      label: "Terminal and agent access"
-      description: !settingsPanel.controller.preferenceTerminalAccess
-        ? "Rock commands are disabled. Local settings remain editable."
-        : settingsPanel.controller.terminalError === "cli_launcher_conflict"
-          ? "Another rock-arch command is already installed."
-          : settingsPanel.controller.terminalError === "cli_launcher_managed_manually"
-            ? "Terminal setup is managed outside this checkout."
-            : settingsPanel.controller.terminalError
-          ? "The rock-arch command could not be installed."
-          : settingsPanel.controller.terminalInstalled
-            ? (settingsPanel.controller.terminalInPath
-              ? "Use the rock-arch command with this account."
-              : "Add ~/.local/bin to your terminal's PATH to use rock-arch.")
-            : "The rock-arch command is not available."
-      checked: settingsPanel.controller.preferenceTerminalAccess
-      onActiveFocusChanged: settingsPanel.controller.revealFocusedControl(
-        terminalAccessCheckBox)
-      onClicked: settingsPanel.controller.toggleTerminalAccessPreference()
-    }
-
-    Toggle {
       id: personContextCheckBox
       width: parent.width
       label: "Show person context"
@@ -643,6 +620,13 @@ Column {
       width: parent.width
       controller: settingsPanel.controller
     }
+  }
+
+  PanelSeparator {}
+
+  RockArchCliAccessSettings {
+    width: parent.width
+    controller: settingsPanel.controller
   }
 
   PanelSeparator {}
