@@ -4,6 +4,11 @@ Audited on 2026-09-05 before release. This is a source review with synthetic
 regression tests and local release checks, not a penetration test of a Rock
 server or an independent certification.
 
+A subsequent [Omarchy marketplace review on 2026-09-06](OMARCHY-SECURITY-REVIEW.md)
+raised two unresolved listing requirements. Its intake records the updater
+finding and the qualified Magnus text-format evidence separately from this
+historical release audit.
+
 ## Scope
 
 Reviewed the broker socket and request routing, credential input and Secret
