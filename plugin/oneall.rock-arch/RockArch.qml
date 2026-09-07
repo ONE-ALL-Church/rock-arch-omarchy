@@ -56,7 +56,7 @@ Panel {
   property bool onboardingAutomaticUpdates: false
   property bool updateManaged: false
   property string updateState: "idle"
-  property string currentVersion: "0.26.0"
+  property string currentVersion: "0.26.1"
   property string availableVersion: ""
   property string updateLastCheckedAt: ""
   property string updateLastUpdatedAt: ""
@@ -272,6 +272,9 @@ Panel {
       return "Local plugin changes must be committed or removed before updating."
     if (code === "update_history_diverged")
       return "This installation has a different Git history and must be updated manually."
+    if (code === "update_check_required") return "Check for updates again before installing."
+    if (code === "update_revision_mismatch" || code === "update_checkout_changed") return "The checked update changed. Check again before installing."
+    if (code === "update_restart_failed") return "The checked update installed, but the shell could not restart."
     if (code === "update_managed_manually") return "Updates for this installation are managed manually."
     if (code === "update_source_not_allowed") return "This installation's update source isn't trusted. Update it manually."
     if (code === "update_launch_failed" || code === "update_failed")
@@ -790,7 +793,7 @@ Panel {
     if (!updateManaged || updateState === "manual")
       return "Updates are managed manually for this installation"
     if (updateState === "checking") return "Checking for updates…"
-    if (updateState === "updating") return "Installing the update through Omarchy…"
+    if (updateState === "updating") return "Installing the checked update…"
     if (updateState === "available")
       return availableVersion && availableVersion !== currentVersion ?
         availableVersion + " available" : "A new revision is available"

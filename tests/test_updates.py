@@ -43,9 +43,9 @@ class FakeGit:
             return self._result(command)
         if arguments == ["rev-parse", "FETCH_HEAD"]:
             return self._result(command, self.available + "\n")
-        if arguments == ["merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"]:
+        if arguments == ["merge-base", "--is-ancestor", self.current, self.available]:
             return self._result(command)
-        if arguments == ["show", "FETCH_HEAD:manifest.json"]:
+        if arguments == ["show", self.available + ":manifest.json"]:
             return self._result(
                 command,
                 json.dumps({"id": PLUGIN_ID, "version": "0.16.0"}),
@@ -96,7 +96,7 @@ class UpdateManagerTests(unittest.TestCase):
         with self.assertRaisesRegex(UpdateError, "update_source_not_allowed"):
             manager._check_once()
 
-        manager._state.update(state="available", updateAvailable=True)
+        manager._state.update(state="available", updateAvailable=True, availableRevision="b" * 40)
         with self.assertRaisesRegex(UpdateError, "update_source_not_allowed"):
             manager.start_update()
         self.assertEqual(manager._state["error"], "update_source_not_allowed")
@@ -116,7 +116,7 @@ class UpdateManagerTests(unittest.TestCase):
 
         self.assertEqual(state["state"], "current")
         self.assertFalse(state["updateAvailable"])
-        self.assertFalse(any(command[-2:] == ["show", "FETCH_HEAD:manifest.json"] for command, _ in git.commands))
+        self.assertFalse(any(command[-2:] == ["show", git.available + ":manifest.json"] for command, _ in git.commands))
 
     def test_local_tracked_changes_block_check_and_install(self):
         manager = self.manager(FakeGit(dirty=True))
@@ -124,7 +124,7 @@ class UpdateManagerTests(unittest.TestCase):
         self.assertEqual(checked["state"], "modified")
         self.assertEqual(checked["error"], "local_changes_prevent_update")
 
-        manager._state.update(state="available", updateAvailable=True)
+        manager._state.update(state="available", updateAvailable=True, availableRevision="b" * 40)
         with self.assertRaisesRegex(UpdateError, "local_changes_prevent_update"):
             manager.start_update()
 
@@ -135,7 +135,7 @@ class UpdateManagerTests(unittest.TestCase):
             launched.append((command, working_directory))
 
         manager = self.manager(FakeGit(), launcher)
-        manager._state.update(state="available", updateAvailable=True)
+        manager._state.update(state="available", updateAvailable=True, availableRevision="b" * 40)
         status = manager.start_update()
 
         self.assertEqual(status["state"], "updating")
@@ -143,8 +143,18 @@ class UpdateManagerTests(unittest.TestCase):
         command, working_directory = launched[0]
         self.assertEqual(command[:3], [str(PYTHON), "-m", "rock_arch_broker.update_worker"])
         self.assertEqual(working_directory, self.root)
+        self.assertEqual(command[command.index("--expected-revision") + 1], "b" * 40)
         self.assertEqual(self.state_file.stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.state_file.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_invalid_checked_revision_never_launches_worker(self):
+        launched = []
+        manager = self.manager(FakeGit(), lambda *args: launched.append(args))
+        for target in ("", "HEAD", "FETCH_HEAD", "b" * 7, "B" * 40):
+            manager._state.update(state="available", updateAvailable=True, availableRevision=target)
+            with self.subTest(target=target), self.assertRaisesRegex(UpdateError, "update_check_required"):
+                manager.start_update()
+        self.assertEqual(launched, [])
 
     def test_state_loader_rejects_permissive_file(self):
         write_update_state(

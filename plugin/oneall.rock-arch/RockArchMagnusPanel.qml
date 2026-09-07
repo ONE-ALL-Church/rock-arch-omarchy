@@ -266,14 +266,12 @@ Column {
       height: visible ? Style.space(300) : 0
       clip: true
 
-      QQC.TextArea {
+      RockArchPlainTextArea {
         id: magnusTextArea
+        textFormat: TextEdit.PlainText
         text: magnusPanel.controller.magnusPreview
           ? magnusPanel.controller.magnusPreview.content
           : ""
-        readOnly: true
-        selectByMouse: true
-        wrapMode: TextEdit.NoWrap
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall
         color: Color.foreground

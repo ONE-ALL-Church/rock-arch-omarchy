@@ -31,7 +31,8 @@ These are standard Omarchy desktop packages. Rock Arch does not install, upgrade
 or remove system packages. If a helper is missing, install its named package
 manually through `omarchy pkg add`. This command is guidance for the user and is
 not executed by the plugin. Rock Arch's optional self-updater updates only the
-`oneall.rock-arch` plugin through `omarchy plugin update`.
+`oneall.rock-arch` plugin at the exact checked commit, using Git and Omarchy's
+static plugin validator and shell restart command.
 
 Python uses only its standard library; Qt Test is a development dependency, and
 no pip packages are required.
@@ -349,9 +350,12 @@ removes that metadata and its Recent Links. Both actions require confirmation
 and do not modify the Rock server.
 
 Git-managed installations check the public remote once a day. Automatic update
-installation is opt-in. Rock Arch refuses to install over local tracked changes
-or diverged history, validates plugin identity and version, and delegates the
-actual fast-forward update, validation, rollback, and shell restart to Omarchy.
+installation is opt-in. Rock Arch passes the full checked commit to its worker,
+validates it in a temporary worktree using Omarchy's plugin validator, and
+fast-forwards only to that exact commit. It refuses local changes, diverged
+history, and ignored-file collisions, then verifies the installed commit before
+asking Omarchy to restart the shell. Failed candidate validation leaves the
+installed checkout intact; concurrent edits are preserved and reported as errors.
 
 Manual update:
 

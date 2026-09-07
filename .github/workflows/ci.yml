@@ -23,7 +23,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libxkbcommon0 xkb-data qt6-declarative-dev-tools \
             qml6-module-qtqml qml6-module-qtqml-models qml6-module-qtqml-workerscript \
-            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qttest
+            qml6-module-qtquick qml6-module-qtquick-window qml6-module-qttest \
+            qml6-module-qtquick-controls qml6-module-qtquick-templates
       - name: Unit and release-contract tests
         run: python -m unittest discover -s tests -v
       - name: Lint

@@ -29,9 +29,20 @@ Update checks are limited to the canonical Git-managed Rock Arch installation.
 They first require `origin` to be the canonical ONE&ALL Church repository, fetch
 its public `HEAD`, refuse local tracked changes or diverged history, validate
 the remote plugin ID and version, and expose only bounded status codes to QML.
-Installation always delegates to Omarchy's fixed plugin updater so its
-fast-forward, validation, rollback, and rescan safeguards remain authoritative.
+Installation pins the full checked commit ID unchanged through the worker. It
+validates that commit in a private temporary worktree with Omarchy's static
+validator, then performs an exact-ID fast-forward with Git hooks disabled. It
+verifies the installed ID and clean state before requesting an Omarchy shell
+restart; the worker never fetches or follows a mutable ref. Concurrent updates,
+local edits, diverged history, and ignored-file collisions are refused. Failed
+candidate validation leaves the installed checkout intact. Later concurrent
+changes cause an error without forcing a rollback over the user's edits.
 Automatic installation is disabled by default.
+
+Magnus file previews explicitly use `TextEdit.PlainText`. Remote content is
+selectable literal text and cannot request rich-text image resources. The
+[0.26.1 follow-up](docs/SECURITY-REVIEW-0.26.1.md) records both marketplace fixes
+and their regression evidence.
 
 The supported CLI uses the same owner-only broker and emits a versioned,
 bounded JSON contract. Private search input can be read from stdin so person

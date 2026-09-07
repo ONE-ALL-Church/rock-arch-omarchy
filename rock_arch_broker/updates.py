@@ -18,6 +18,7 @@ from .version import VERSION
 PLUGIN_ID = "oneall.rock-arch"
 CHECK_INTERVAL = timedelta(days=1)
 MAX_UPDATE_STATE_BYTES = 16 * 1024
+REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 VERSION_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
 GIT = Path("/usr/bin/git")
 OMARCHY = Path("/usr/bin/omarchy")
@@ -114,7 +115,7 @@ def write_update_state(path: Path, state: dict[str, Any]) -> None:
 
 
 class UpdateManager:
-    """Checks a fixed Omarchy plugin checkout and delegates installs to Omarchy."""
+    """Checks a fixed plugin checkout and pins installs to the checked commit."""
 
     def __init__(
         self,
@@ -176,6 +177,9 @@ class UpdateManager:
                 return self._public_status(self._state)
             if not self._state.get("updateAvailable"):
                 raise UpdateError("no_update_available")
+            expected_revision = self._state.get("availableRevision", "")
+            if not isinstance(expected_revision, str) or not REVISION_PATTERN.fullmatch(expected_revision):
+                raise UpdateError("update_check_required")
 
         clean = self._git("status", "--porcelain", "--untracked-files=no", timeout=5)
         if clean.returncode != 0 or clean.stdout.strip():
@@ -200,6 +204,8 @@ class UpdateManager:
             str(self.plugin_root),
             "--parent-pid",
             str(os.getpid()),
+            "--expected-revision",
+            expected_revision,
         ]
         try:
             self._launch_process(command, self.plugin_root)
@@ -271,6 +277,9 @@ class UpdateManager:
 
         current_revision = current.stdout.strip()
         available_revision = available.stdout.strip()
+        if not (REVISION_PATTERN.fullmatch(current_revision)
+                and REVISION_PATTERN.fullmatch(available_revision)):
+            raise UpdateError("update_check_failed")
         if current_revision == available_revision:
             return self._checked_state(
                 state="current",
@@ -281,7 +290,7 @@ class UpdateManager:
             )
 
         ancestor = self._git(
-            "merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD", timeout=5
+            "merge-base", "--is-ancestor", current_revision, available_revision, timeout=5
         )
         if ancestor.returncode != 0:
             return self._checked_state(
@@ -292,7 +301,7 @@ class UpdateManager:
                 error="update_history_diverged",
             )
 
-        manifest = self._git("show", "FETCH_HEAD:manifest.json", timeout=5)
+        manifest = self._git("show", available_revision + ":manifest.json", timeout=5)
         available_version = self._manifest_version(manifest)
         return self._checked_state(
             state="available",

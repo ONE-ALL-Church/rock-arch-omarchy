@@ -1,8 +1,17 @@
 # Verification record
 
-This record describes the prepared `0.26.0` release boundary and the unreleased
+This record describes the prepared `0.26.1` release boundary and the unreleased
 feature acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
+
+## Development integration of the 0.26.1 security patch
+
+On 2026-09-06, the 0.26.1 marketplace fixes were merged into the development
+branch while preserving its unreleased features. The combined tree passed
+352 Python tests and 90 Qt cases, Ruff, ty, bytecode compilation, Omarchy plugin
+validation, and whitespace checks. The public 0.26.1 patch remains scoped to
+242 Python tests and 43 Qt cases; its full remediation evidence is in
+[SECURITY-REVIEW-0.26.1.md](SECURITY-REVIEW-0.26.1.md).
 
 ## Unreleased CLI permissions and bookmarks
 
@@ -149,8 +158,10 @@ omarchy plugin validate .
 git diff --check
 ```
 
-At the `0.26.0` release boundary, the suite contained 232 Python tests and 35 Qt
-behavioral tests. Release-contract
+At the `0.26.1` release boundary, the suite contains 242 Python tests and 35 Qt
+behavioral tests (43 Qt cases including setup and cleanup). One Python test
+additionally runs the production Magnus preview in Qt and verifies its network
+and local-file resource boundary. Release-contract
 coverage keeps the manifest, package, network user-agent, and displayed version
 synchronized;
 verifies the composed QML entry point and focused panel files; and prevents the
@@ -161,6 +172,15 @@ public-source URL validation, and keyboard-complete detail navigation. Updater
 coverage verifies remote revision detection, manifest identity and
 version validation, local-change refusal, fixed worker launch arguments, private
 state permissions, broker routing, and the opt-in automatic-update preference.
+Real Git fixtures advance remote HEAD and FETCH_HEAD between check and install;
+manual and automatic updates still install and activate only the checked commit.
+Additional cases cover invalid targets, concurrent workers, validation failures,
+tracked/untracked edits, ignored-file collisions, diverged history, revision
+mismatch, and restart failure. No real shell restart occurs in these fixtures.
+Magnus resource tests display literal HTML through the production plain-text
+control, observe no HTTP requests or local fixture opens, and use rich-text
+positive controls to prove both observers work. See
+[the marketplace follow-up](SECURITY-REVIEW-0.26.1.md) for scope and limitations.
 CLI coverage verifies private stdin queries, the versioned schema, redacted
 diagnostics, target descriptions, side-effect-free dry runs, Omarchy UI
 handoffs, command routing, masked interactive login, confirmation gates,
@@ -336,8 +356,11 @@ plugin or assert that the interactive Omarchy shell lifecycle was tested.
   version. A non-fast-forward history or local tracked changes disables the
   install action and leaves the checkout untouched.
 - Automatic installation is a persisted boolean preference that defaults to
-  off. Manual and automatic installs both invoke Omarchy's fixed plugin updater,
-  which performs its own fast-forward merge, validation, rollback, and rescan.
+  off. Manual and automatic installs pass the full checked commit unchanged to
+  the worker. It privately validates that exact commit with Omarchy, refuses
+  local changes, fast-forwards only to that ID, and verifies installed identity
+  and clean state before requesting a shell restart. It never refetches a
+  mutable target. Candidate validation failure leaves the live checkout intact.
 - The detached worker accepts only the canonical installed plugin directory and
   writes only owner-readable status. It never includes profile credentials,
   cookies, tenant data, or command output in its state or notifications.

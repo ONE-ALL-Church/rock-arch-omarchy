@@ -1,5 +1,12 @@
 # Omarchy security review intake — 2026-09-06
 
+Remediation update: both findings are addressed in security patch commit
+[`7acb1426ac479664db5c6ba5fa9309b248e739bb`](https://github.com/ONE-ALL-Church/rock-arch-omarchy/commit/7acb1426ac479664db5c6ba5fa9309b248e739bb)
+and merged into development. See the
+[0.26.1 follow-up](SECURITY-REVIEW-0.26.1.md) for implementation and regression
+evidence. Marketplace re-review and approval remain pending. The intake evidence
+below describes the original reviewed code, before these fixes.
+
 Source: [HANCORE-linux's marketplace review](https://github.com/omacom/omarchy-plugin-marketplace/issues/5075#issuecomment-5562310599),
 posted September 6, 2026 at 21:30:53 UTC on submission #5075.
 The issue remains open with `needs-fixes` and `security-review-required` labels.
@@ -16,8 +23,8 @@ unchanged between those commits: `updates.py`, `update_worker.py`,
 
 | Item | Marketplace request | Local assessment | Status |
 |---|---|---|---|
-| Update revision changes between check and install | Carry the full checked commit SHA into the worker, install only that commit, and verify it before and after installation; otherwise remove self-update. | Confirmed missing revision binding; a mocked worker accepted a different installed commit. | Open blocker |
-| Magnus preview lacks an explicit text format | Set `textFormat: TextEdit.PlainText` and verify literal markup without resource requests. | Missing declaration confirmed. Claimed HTML-triggered loading was not reproduced on installed Qt 6.11.2; the default was PlainText. | Open reviewer requirement; explicit hardening recommended |
+| Update revision changes between check and install | Carry the full checked commit SHA into the worker, install only that commit, and verify it before and after installation; otherwise remove self-update. | Confirmed missing revision binding; a mocked worker accepted a different installed commit. | Fixed in 0.26.1; awaiting re-review |
+| Magnus preview lacks an explicit text format | Set `textFormat: TextEdit.PlainText` and verify literal markup without resource requests. | Missing declaration confirmed. Claimed HTML-triggered loading was not reproduced on installed Qt 6.11.2; the default was PlainText. | Explicit hardening and resource tests added in 0.26.1; awaiting re-review |
 
 The earlier `package-manager` baseline flag refers to the README's manual
 dependency-installation example. It is separate from these two new findings;
