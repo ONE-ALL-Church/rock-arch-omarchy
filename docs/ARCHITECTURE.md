@@ -42,9 +42,9 @@
 13. `http_security`: shared redirect refusal, authenticated cookie-header
     validation, and bounded JSON decoding used by every Rock HTTP client.
 14. `UpdateManager`: daily public-Git revision checks plus a fixed detached
-    worker that delegates installation, validation, rollback, and shell restart
-    to Omarchy. Automatic installation is an explicit preference and defaults
-   to off.
+    worker that pins installation to the full checked commit, validates it with
+    Omarchy, and requests a shell restart after exact-ID verification. Automatic
+    installation is an explicit preference and defaults to off.
 15. `ShortcutManager`: optional owner-local Lua shortcut edits. The UI model
     and shared setup controls live in `RockArchShortcut.qml` and
     `RockArchShortcutSettings.qml`. `shortcut_keymap.py` resolves physical
@@ -120,11 +120,17 @@ Git-managed `oneall.rock-arch` installation. It also requires `origin` to match
 the canonical ONE&ALL Church repository before it fetches `origin HEAD`,
 compares revisions, and validates the remote root manifest's plugin ID and
 semantic version. It will not install over tracked changes or diverged history.
-Both the manual and optional automatic path launch a detached fixed module that
-accepts only the canonical install directory and calls Omarchy's plugin updater.
-Omarchy remains responsible for the fast-forward merge, plugin validation, and
-rollback; Rock Arch then requests a full shell restart so new IPC methods are
-registered. Updater state is bounded, owner-only JSON and
+Both the manual and optional automatic path pass the same full 40-character
+checked commit to a detached fixed module. It accepts only the canonical install
+directory and serializes workers with a private advisory lock. The worker
+validates an exact-commit temporary worktree with Omarchy's static validator,
+rechecks the live checkout, and uses a hook-disabled fast-forward to that immutable
+ID. It never fetches or invokes Omarchy's mutable-target plugin updater. Local
+changes, untracked files, and ignored-file collisions are preserved. After
+verifying installed identity, version, and clean state, it requests a full shell
+restart so new IPC methods are registered. Candidate validation failure leaves
+the existing installation intact; later concurrent changes cause a failure
+without forcibly reverting someone else's changes. Updater state is bounded, owner-only JSON and
 contains no Git output, credentials, cookies, or Rock data.
 
 Person Quick Look exposes only `displayName`, `subtitle`, `campus`, and an

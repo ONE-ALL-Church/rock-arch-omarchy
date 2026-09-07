@@ -5,6 +5,28 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-09-06
+
+### Security
+
+- Pin manual and automatic self-updates to the full commit checked by the broker.
+  Validate that commit in a temporary worktree, fast-forward only to its immutable
+  ID, and verify the installed ID before restarting the shell. The worker never
+  refetches remote HEAD or invokes Omarchy's mutable-target plugin updater.
+- Refuse concurrent updates, local changes, diverged history, and ignored-file
+  collisions. Failed candidate validation leaves the installed checkout intact.
+- Explicitly render Magnus file previews as plain text so remote markup cannot
+  request images from the network or local filesystem.
+
+### Verification
+
+- Exercise the real Git check/install flow with both remote HEAD and FETCH_HEAD
+  advancing after the check, for manual and automatic updates.
+- Exercise the production Magnus preview control with HTML image payloads and
+  observe HTTP requests and local fixture reads; positive controls verify both
+  observers can detect rich-text resource loading.
+- Document the marketplace review fixes in `docs/SECURITY-REVIEW-0.26.1.md`.
+
 ## [0.26.0] - 2026-09-05
 
 ### Security

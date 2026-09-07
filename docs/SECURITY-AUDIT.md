@@ -1,5 +1,8 @@
 # Release security audit — 0.26.0
 
+Historical audit: the later marketplace review identified two additional issues,
+addressed in the [0.26.1 follow-up](SECURITY-REVIEW-0.26.1.md).
+
 Audited on 2026-09-05 before release. This is a source review with synthetic
 regression tests and local release checks, not a penetration test of a Rock
 server or an independent certification.

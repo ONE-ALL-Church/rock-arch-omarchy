@@ -217,7 +217,9 @@ rock-arch updates install --confirm
 ```
 
 The same Git-managed-install, clean-worktree, fast-forward, manifest identity,
-and Omarchy validation rules used by Settings apply to CLI updates.
+and Omarchy validation rules used by Settings apply to CLI updates. Installation
+uses only the full commit returned by the check, even if remote HEAD advances.
+Run another check to select a newer commit.
 
 ## Omarchy panel handoff
 
