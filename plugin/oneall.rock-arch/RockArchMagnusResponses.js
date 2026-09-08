@@ -15,16 +15,21 @@ function status(root, ui, response, frame) {
 
 function content(root, ui, response, frame) {
     if (response.magnusBrowser) {
+      var returning = root.pendingMagnusReturn || null
+      root.pendingMagnusReturn = null
+      var previousItem = root.magnusItems[root.magnusCursor]
+      var sameFolder = root.magnusFolderId === String(response.magnusBrowser.folderId || "")
       root.magnusBusy = false
       root.magnusPreview = null
       root.magnusFolderId = String(response.magnusBrowser.folderId || "")
       root.magnusFolderTitle = String(response.magnusBrowser.title || "Magnus")
       root.magnusItems = Array.isArray(response.magnusBrowser.items) ? response.magnusBrowser.items : []
-      root.magnusCursor = root.magnusItems.length ? 0 : -1
-      ui.panelFlick.contentY = 0
+      var retained = sameFolder && previousItem ? root.magnusItems.findIndex(function(item) { return item.safeId === previousItem.safeId }) : -1
+      root.magnusCursor = root.magnusItems.length ? Math.max(0, Math.min(root.magnusItems.length - 1, returning ? returning.cursor : retained)) : -1
+      if (root.viewMode === "magnus") ui.panelFlick.contentY = returning ? returning.scroll : 0
       Qt.callLater(function() {
         if (root.viewMode !== "magnus") return
-        ui.keyCatcher.forceActiveFocus()
+        if (!root.tabBarFocused) ui.keyCatcher.forceActiveFocus()
         if (root.magnusCursor >= 0)
           root.revealItem(ui.magnusPanel.repeater.itemAt(root.magnusCursor))
       })

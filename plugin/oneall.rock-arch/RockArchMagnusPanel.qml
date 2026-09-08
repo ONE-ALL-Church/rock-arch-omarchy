@@ -9,8 +9,11 @@ import qs.Ui
 Column {
   id: magnusPanel
 
+  property alias listFocus: listFocus
   required property var controller
   property alias repeater: magnusRepeater
+  property alias buildCancelButton: magnusBuildCancelButton
+  property alias buildControls: buildMagnusConfirm
   property alias buildConfirmButton: magnusBuildConfirmButton
   property alias previewPrimaryButton: magnusDownloadButton
   readonly property bool inputActive: magnusTextArea.activeFocus
@@ -324,6 +327,13 @@ Column {
     }
   }
 
+  RockArchListFocus {
+    id: listFocus
+    controller: magnusPanel.controller
+    visible: magnusPanel.controller.magnusPreview === null && magnusPanel.controller.magnusCount > 0 && magnusPanel.controller.pendingMagnusBuildId === ""
+    Accessible.name: "Magnus items"
+  }
+
   Repeater {
     id: magnusRepeater
     model: magnusPanel.controller.magnusPreview === null
@@ -344,6 +354,7 @@ Column {
       clip: true
 
       RockArchSelectionChrome {
+          keyboardFocused: magnusPanel.listFocus.activeFocus
         anchors.fill: parent
         selected: itemRow.rowSelected
       }

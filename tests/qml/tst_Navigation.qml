@@ -17,19 +17,14 @@ TestCase {
     compare(order, ["magnus", "knowledge", "search", "personal"])
   }
 
-  function test_tab_cycle_follows_order_and_keeps_settings_reachable() {
+  function test_tab_cycle_uses_only_visible_workspaces() {
     var tabs = Navigation.tabs(["personal", "magnus", "search", "knowledge"], true)
-    var current = "settings"
-    var visited = []
-    for (var i = 0; i < 5; i++) {
-      current = Navigation.adjacent(tabs, current, 1)
-      visited.push(current)
-    }
-    compare(visited, ["personal", "magnus", "search", "knowledge", "settings"])
-    for (var j = 4; j >= 0; j--) {
-      current = Navigation.adjacent(tabs, current, -1)
-      compare(current, ["settings", "personal", "magnus", "search", "knowledge"][j])
-    }
+    compare(Navigation.adjacent(tabs, "knowledge", 1), "personal")
+    compare(Navigation.adjacent(tabs, "personal", -1), "knowledge")
+    compare(Navigation.adjacent(tabs, "settings", 1), "personal")
+    compare(Navigation.adjacent([], "search", 1), "")
+    tabs = Navigation.tabs(["personal", "magnus", "search", "knowledge"], false)
+    compare(Navigation.adjacent(tabs, "personal", 1), "search")
   }
 
   function test_reorder_is_bounded_and_preserves_every_tab() {

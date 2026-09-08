@@ -31,7 +31,7 @@ function results(root, ui, response, frame) {
       if (root.job && root.contextName === "PROD" && root.results.some(function(item) { return item.category === "Jobs" }))
         root.job.refreshAccess()
       root.recentCursor = -1
-      if (preservedCursor < 0) ui.panelFlick.contentY = 0
+      if (preservedCursor < 0 && root.viewMode === "search") ui.panelFlick.contentY = 0
       Qt.callLater(function() {
         if (root.viewMode === "search" && root.resultCursor >= 0)
           root.revealItem(ui.searchPanel.resultRepeater.itemAt(root.resultCursor))
@@ -44,7 +44,7 @@ function knowledgeResults(root, ui, response, frame) {
       root.knowledgeResults = response.knowledgeResults
       root.knowledgeCursor = root.knowledgeResults.length ? 0 : -1
       root.knowledgeLinkCursor = -1
-      ui.panelFlick.contentY = 0
+      if (root.viewMode === "knowledge") ui.panelFlick.contentY = 0
       Qt.callLater(function() {
         if (root.viewMode === "knowledge" && root.knowledgeCursor >= 0)
           root.revealItem(ui.knowledgePanel.resultRepeater.itemAt(root.knowledgeCursor))

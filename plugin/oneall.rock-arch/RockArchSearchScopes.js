@@ -70,3 +70,9 @@ function withoutScope(value) {
   if (!keyForQuery(text)) return text.trim()
   return text.substring(text.indexOf(":") + 1).trim()
 }
+
+function placeholder(options) {
+  var examples = {p: "Alex", g: "Welcome", gt: "Small Group", dt: "Status", w: "Request", j: "Sync", pg: "Home", ct: "Articles", c: "News"}
+  var hints = options.slice(0, 2).map(function(option) { return option.prefix + ": " + examples[option.prefix] })
+  return hints.length ? "Search Rock… " + hints.join(", ") : "Search Rock by name or ID"
+}

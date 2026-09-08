@@ -8,6 +8,7 @@ import qs.Ui
 Column {
   id: knowledgePanel
 
+  property alias listFocus: listFocus
   required property var controller
   property alias queryField: knowledgeField
   property alias resultRepeater: knowledgeResultRepeater
@@ -20,6 +21,7 @@ Column {
   spacing: Style.spacing.panelGap
 
   Keys.onPressed: function(event) {
+    if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
     if (knowledgePanel.controller.knowledgeDetail !== null &&
         (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp)) {
       knowledgePanel.controller.scrollKnowledgeDetail(event.key === Qt.Key_PageDown ? 1 : -1)
@@ -45,6 +47,7 @@ Column {
     }
     Keys.priority: Keys.BeforeItem
     Keys.onPressed: function(event) {
+      if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
       if (event.key === Qt.Key_Escape) {
         knowledgePanel.controller.escapePanel()
         event.accepted = true
@@ -60,6 +63,13 @@ Column {
         event.accepted = true
       }
     }
+  }
+
+  RockArchListFocus {
+    id: listFocus
+    controller: knowledgePanel.controller
+    visible: knowledgePanel.controller.knowledgeDetail === null && knowledgePanel.controller.knowledgeResults.length > 0
+    Accessible.name: "Knowledge results"
   }
 
   Column {
@@ -159,6 +169,7 @@ Column {
         clip: true
 
         RockArchSelectionChrome {
+          keyboardFocused: knowledgePanel.listFocus.activeFocus
           anchors.fill: parent
           selected: resultRow.rowSelected
         }

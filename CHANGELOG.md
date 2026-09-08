@@ -16,6 +16,13 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Changed
 
+- Give Ctrl+Tab/Ctrl+Shift+Tab consistent workspace switching, keep Tab within
+  controls, and make the tab bar keyboard-focusable. Keep Search below the tabs,
+  replace the category-button row with static input hints and F1 help, and restore
+  workspace focus, drafts and scroll. Lists no longer switch tabs at their edges.
+- Keep Cancel initially focused in destructive confirmations and consume
+  workspace shortcuts while those confirmations are open.
+
 - Replace Search's Save label with an accessible outline bookmark icon and use
   Ctrl+B to open Add bookmark. Keep Ctrl+S for saving the completed form.
 - Separate CLI read access from an additional mutation gate and six individual

@@ -9,6 +9,32 @@ Column {
   id: settingsPanel
 
   required property var controller
+  function confirmationRow() {
+    for (var i = 0; i < profileRows.count; i++) {
+      var row = profileRows.itemAt(i)
+      if (row && (controller.pendingRemoveProfileId === row.modelData.id ||
+          (controller.pendingSignOut && row.modelData.isActive))) return row
+    }
+    return null
+  }
+  function confirmationStops() {
+    var row = confirmationRow()
+    return row ? [row.cancelConfirmationButton, controller.pendingSignOut ? row.signOutButton : row.removeButton].filter(function(item) { return item.visible && item.enabled }) : []
+  }
+  function focusConfirmation() {
+    var row = confirmationRow()
+    if (row) {
+      expandedProfileId = row.modelData.id
+      Qt.callLater(function() { row.cancelConfirmationButton.forceActiveFocus(Qt.TabFocusReason) })
+    }
+  }
+  function cancelConfirmation() {
+    var row = confirmationRow()
+    var target = row ? (controller.pendingSignOut ? row.signOutButton : row.removeButton) : primaryButton
+    controller.pendingRemoveProfileId = ""
+    controller.pendingSignOut = false
+    target.forceActiveFocus(Qt.TabFocusReason)
+  }
   property string expandedProfileId: ""
   property alias primaryButton: settingsAddProfileButton
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
@@ -58,6 +84,13 @@ Column {
   spacing: Style.spacing.panelGap
   onVisibleChanged: if (!visible) expandedProfileId = ""
 
+  Button {
+    text: "Keyboard & search help"
+    tooltipText: "Keyboard & search help · F1"
+    focusable: true
+    onClicked: settingsPanel.controller.openKeyboardHelp()
+  }
+
   Column {
     width: parent.width
     spacing: Style.spacing.rowGap
@@ -92,11 +125,15 @@ Column {
     }
 
     Repeater {
+      id: profileRows
       model: settingsPanel.controller.profiles
 
       delegate: CursorSurface {
         id: profileRow
 
+        property alias cancelConfirmationButton: cancelConfirmationButton
+        property alias signOutButton: signOutButton
+        property alias removeButton: removeProfileButton
         required property var modelData
         readonly property bool editing: settingsPanel.controller.editingProfileId ===
           profileRow.modelData.id
@@ -282,7 +319,18 @@ Column {
             }
 
             Button {
+              id: cancelConfirmationButton
+              visible: settingsPanel.controller.pendingRemoveProfileId === profileRow.modelData.id ||
+                (settingsPanel.controller.pendingSignOut && profileRow.modelData.isActive)
+              text: "Cancel"
+              focusable: true
+              KeyNavigation.right: settingsPanel.controller.pendingSignOut ? signOutButton : removeProfileButton
+              onClicked: settingsPanel.cancelConfirmation()
+            }
+
+            Button {
               id: signOutButton
+              KeyNavigation.left: cancelConfirmationButton.visible ? cancelConfirmationButton : null
               visible: profileRow.modelData.isActive &&
                 settingsPanel.controller.rockConfigured
               text: settingsPanel.controller.pendingSignOut ? "Confirm sign out" : "Sign out"
@@ -299,6 +347,7 @@ Column {
 
             Button {
               id: removeProfileButton
+              KeyNavigation.left: cancelConfirmationButton.visible ? cancelConfirmationButton : null
               text: settingsPanel.controller.pendingRemoveProfileId === profileRow.modelData.id
                 ? "Confirm remove"
                 : "Remove"

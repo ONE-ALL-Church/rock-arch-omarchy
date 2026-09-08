@@ -36,7 +36,9 @@ function moved(order, key, direction) {
 }
 
 function adjacent(tabs, current, direction) {
-  var keys = tabs.map(function(tab) { return tab.key }).concat(["settings"])
+  var keys = tabs.map(function(tab) { return tab.key })
+  if (!keys.length) return ""
   var index = keys.indexOf(current)
+  if (index < 0) return direction < 0 ? keys[keys.length - 1] : keys[0]
   return keys[(index + direction + keys.length) % keys.length]
 }

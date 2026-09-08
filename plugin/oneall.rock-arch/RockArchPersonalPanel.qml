@@ -7,6 +7,7 @@ import qs.Ui
 Column {
   id: personalPanel
 
+  property alias listFocus: listFocus
   required property var controller
   property alias repeater: personalLinkRepeater
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
@@ -52,6 +53,13 @@ Column {
     }
   }
 
+  RockArchListFocus {
+    id: listFocus
+    controller: personalPanel.controller
+    visible: personalPanel.controller.navigationCount > 0
+    Accessible.name: "Personal Links"
+  }
+
   Repeater {
     id: personalLinkRepeater
     model: personalPanel.controller.linkView.rows
@@ -94,6 +102,7 @@ Column {
       }
 
       RockArchSelectionChrome {
+          keyboardFocused: personalPanel.listFocus.activeFocus
         anchors.fill: parent
         anchors.leftMargin: row.inset
         selected: row.rowSelected
@@ -168,6 +177,7 @@ Column {
         Accessible.name: (row.modelData.group ? "Delete section " : "Delete link ") + row.modelData.title
         Accessible.onPressAction: deleteButton.clicked()
         focusable: true
+        activeFocusOnTab: row.rowSelected
         onClicked: personalPanel.controller.beginPersonalDelete(row.modelData)
       }
     }

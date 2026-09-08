@@ -7,6 +7,9 @@ PanelHero {
 
   required property var controller
 
+  property Item settingsButton: null
+  function focusSettings() { if (settingsButton) settingsButton.forceActiveFocus(Qt.TabFocusReason) }
+
   title: "Rock Arch"
   meta: controller.onboardingRequired
     ? "Bridging Rock RMS and Omarchy"
@@ -15,13 +18,16 @@ PanelHero {
   fontFamily: Style.font.family
   trailingControl: Component {
     Button {
+      id: settingsButton
+      Component.onCompleted: hero.settingsButton = settingsButton
       visible: !hero.controller.onboardingFlowActive
       text: hero.controller.updateAvailable ? "Settings · Update" : "Settings"
       tooltipText: "Settings · Ctrl+,"
       selected: hero.controller.viewMode === "settings"
       fontSize: Style.font.caption
       horizontalPadding: Style.spacing.md
-      focusable: false
+      focusable: true
+      enabled: !hero.controller.navigationModal
       onClicked: hero.controller.openSettings(false)
     }
   }

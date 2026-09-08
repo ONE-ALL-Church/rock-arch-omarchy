@@ -11,6 +11,8 @@ Column {
   property alias nameField: nameField
   readonly property Item cancelButton: model.deleting ? deleteCancelButton : formCancelButton
   readonly property string deleteLabel: model.kind === "delete-section" ? (model.linkCount > 0 ? "Delete section and links" : "Delete section") : "Delete link"
+  readonly property bool popupOpen: sectionField.popupOpen
+  function closePopup() { sectionField.close() }
   readonly property bool inputActive: nameField.activeFocus || urlField.activeFocus || sectionField.popupOpen
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.panelGap

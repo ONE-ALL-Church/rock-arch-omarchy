@@ -28,6 +28,11 @@ Item {
       closeRequested(); event.accepted = true; return
     }
 
+    // Modified shortcuts belong to Shortcut or the focused editor. Never turn
+    // Ctrl+Tab into Tab, Ctrl+Backspace into a one-character deletion, or Ctrl+C
+    // into a Magnus command.
+    if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
+
     // Magnus previews use native Tab focus, but their displayed single-key
     // commands still need to work from a focused action button.
     if (!blocked && commandMode && event.text && event.text.length === 1 &&

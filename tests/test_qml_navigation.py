@@ -83,7 +83,7 @@ class QmlNavigationTests(unittest.TestCase):
             source.count("anchors.leftMargin: Style.spacing.rowPaddingX"), 4
         )
         self.assertGreaterEqual(source.count("anchors.rightMargin:"), 4)
-        self.assertIn('Border.controlSpec("hover-cursor"', selection)
+        self.assertIn('Border.controlSpec(root.keyboardFocused ? "focus" : "hover-cursor"', selection)
         self.assertIn("Style.hoverFillFor(Color.foreground, Color.accent)", selection)
         self.assertNotIn("border.width:", selection)
 
@@ -107,7 +107,7 @@ class QmlNavigationTests(unittest.TestCase):
         )
         self.assertIn("if (changedView) refreshPersonalLinks()", source)
         self.assertIn(
-            'viewMode === "search" && searchField.activeFocus && activeSearchCount',
+            'if (viewMode === "search" && searchField.enabled) searchField.forceActiveFocus()',
             source,
         )
         self.assertIn(
@@ -203,7 +203,7 @@ class QmlNavigationTests(unittest.TestCase):
 
         self.assertIn('prefix === "kb" || prefix === "knowledge"', source)
         self.assertNotIn('sequence: "Alt+K"', source)
-        self.assertIn('else if (key === "knowledge") openKnowledge()', source)
+        self.assertIn('else if (viewMode === "knowledge") {', source)
         self.assertIn(
             'navigation.controller.navigationTabs', source
         )
@@ -272,7 +272,7 @@ class QmlNavigationTests(unittest.TestCase):
             "cancelProfileRenameButton",
         ):
             start = source.index(f"id: {control_id}")
-            excerpt = source[start : start + 500]
+            excerpt = source[start : start + 850]
             self.assertTrue(
                 "focusable: true" in excerpt or "activeFocusOnTab: true" in excerpt
             )
@@ -333,7 +333,7 @@ class QmlNavigationTests(unittest.TestCase):
             key_catcher.index("if (blocked || formMode) return"),
         )
         self.assertIn(
-            'formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings"',
+            'formMode: keyboardHelpVisible || navigationBar.activeFocus || root.onboardingFlowActive || root.viewMode === "settings"',
             source,
         )
         self.assertIn(
@@ -352,7 +352,7 @@ class QmlNavigationTests(unittest.TestCase):
             "saveLoginButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("focusable: true", source[start : start + 500])
+            self.assertIn("focusable: true", source[start : start + 850])
         self.assertGreaterEqual(
             source.count("onActiveFocusChanged:"),
             16,
@@ -440,7 +440,7 @@ class QmlNavigationTests(unittest.TestCase):
         key_catcher = KEY_CATCHER_PATH.read_text(encoding="utf-8")
 
         self.assertIn(
-            'root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null',
+            'root.pendingClearRecent || root.pendingMagnusBuildId !== "" || (root.viewMode === "magnus" && root.magnusPreview !== null)',
             source,
         )
         self.assertIn(
@@ -456,7 +456,7 @@ class QmlNavigationTests(unittest.TestCase):
             "magnusOpenButton",
         ):
             start = source.index(f"id: {control_id}")
-            self.assertIn("focusable: true", source[start : start + 500])
+            self.assertIn("focusable: true", source[start : start + 850])
         self.assertIn("commandMode: root.magnusPreviewCommandsEnabled", source)
         self.assertIn('"dchor".indexOf(event.text.toLowerCase())', key_catcher)
         for key in ("d", "c", "h", "o", "r"):
@@ -490,14 +490,14 @@ class QmlNavigationTests(unittest.TestCase):
         self.assertIn('"Last started " + searchPanel.controller.relativeTime', source)
         self.assertIn("function deploymentSummary(title)", source)
         self.assertIn(
-            "magnusPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
+            "magnusPanel.buildCancelButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
         self.assertIn("KeyNavigation.tab: magnusBuildCancelButton", source)
         self.assertIn("KeyNavigation.backtab: magnusBuildConfirmButton", source)
         self.assertIn("KeyNavigation.tab: recentBuildCancelButton", source)
         self.assertIn("KeyNavigation.backtab: recentBuildConfirmButton", source)
         self.assertIn(
-            "searchPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)", source
+            "searchPanel.buildCancelButton.forceActiveFocus(Qt.TabFocusReason)", source
         )
         self.assertGreaterEqual(source.count("focusable: true"), 4)
         self.assertGreaterEqual(source.count("Keys.onEscapePressed:"), 4)

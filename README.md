@@ -133,10 +133,10 @@ Rock Arch reports acceptance separately from completion and offers **Check
 status** for the latest recorded run. Unsupported blocks, denied access, and
 ambiguous placements hide the trigger. No GUID configuration is needed.
 
-When Search is empty, static category hints appear beneath the field. Select
-`p: People` or `g: Groups` to insert a prefix, or **More** for other enabled,
-accessible categories. The hints disappear while typing. Tab reaches the hints;
-Enter chooses one, and Escape collapses More or returns to the search field.
+When Search is empty, its placeholder shows static examples such as `p: Alex`
+and `g: Welcome`, using categories this account can search. Press **F1**, or
+choose **Keyboard & search help** in Settings, for all available prefixes and
+shortcuts. Selecting a category in help inserts its prefix. Hints do not rotate.
 A numeric ID or GUID is checked across all enabled categories, so `42` can
 return several entity types whose IDs overlap. Use a prefix when the type is
 known:
@@ -330,7 +330,17 @@ Tab order is editable under **Tab order → Edit** using the up/down controls.
 Changes save immediately. `Ctrl+1` through `Ctrl+4` follow the visible tabs from
 left to right; by default these are Search, Links, Knowledge, and Magnus.
 Unavailable Magnus stays in the saved order but takes no shortcut number.
-Tab/Shift+Tab follow the same order. Settings remains on `Ctrl+,`.
+`Ctrl+Tab` / `Ctrl+Shift+Tab` cycle the visible workspaces in that order,
+including from fields, toolbars and detail views. Settings stays on `Ctrl+,`;
+Escape returns to the previous workspace.
+
+`Tab` / `Shift+Tab` move between controls inside the current workspace. The tab
+bar is one focus stop: Shift+Tab from the first workspace control reaches it,
+Left/Right selects tabs, Home/End selects the first/last tab, and Tab enters
+content. Each workspace retains its focus, selection and scroll when revisited.
+Unfinished link/section forms survive switching tabs until saved, cancelled,
+or the panel closes. Confirmations keep focus local and suspend workspace
+switching; Cancel is focused initially.
 
 All preferences also support JSON through `rock-arch settings get`,
 `rock-arch settings schema`, and `rock-arch settings set KEY JSON_VALUE`.
@@ -436,7 +446,7 @@ These are future directions under consideration, not committed release dates:
 
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
-| Workspaces | `Ctrl+1`–`Ctrl+4` follow visible tab order | — | `Esc` closes | `Ctrl+,` Settings |
+| Workspaces | `Ctrl+Tab` / `Ctrl+Shift+Tab`; arrows when tab bar is focused | Tab enters content | `Esc` closes | `Ctrl+1`–`Ctrl+4` follow visible order; `Ctrl+,` Settings; F1 help |
 | Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+B` bookmarks a Search result; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab; Page Up/Down scrolls | Enter or Space | Esc walks Back history | Ctrl+F filters Model Map; Open source and Related items |
@@ -451,8 +461,8 @@ These are future directions under consideration, not committed release dates:
 
 The first Recent Link is selected when Search opens; the first matching result
 is selected when a query completes. Selection uses the same visible treatment
-in every list. Down stops on the final Search or Recent row; use Tab or `Ctrl+2`
-when you want to move to Personal Links. Backspace from a selected item returns
+in every list, with a distinct keyboard focus border. Arrows stay inside the
+current workspace. Use `Ctrl+Tab` or `Ctrl+2` (default order) to move to Links. Backspace from a selected item returns
 to the search field and deletes at the cursor, allowing immediate refinement.
 
 ## Terminal and agent CLI

@@ -8,17 +8,30 @@ import qs.Ui
 Column {
   id: searchPanel
 
+  property alias listFocus: listFocus
   required property var controller
   required property var searchField
   property alias resultRepeater: resultRepeater
   property alias quickReturnRepeater: quickReturnRepeater
+  property alias clearCancelButton: cancelClearButton
   property alias clearButton: clearRecentButton
   property alias buildConfirmButton: recentBuildConfirmButton
+  property alias jobSurface: jobPanel
+  property alias buildCancelButton: recentBuildCancelButton
+  property alias buildControls: buildRecentConfirm
+  property alias clearControls: clearControls
   property alias jobCancelButton: jobPanel.cancelButton
   readonly property color dim: Qt.darker(Color.foreground, 1.4)
 
   height: visible ? implicitHeight : 0
   spacing: Style.spacing.rowGap
+
+  RockArchListFocus {
+    id: listFocus
+    controller: searchPanel.controller
+    visible: searchPanel.controller.activeSearchCount > 0 && !searchPanel.controller.job.editing && !searchPanel.controller.pendingClearRecent && searchPanel.controller.pendingMagnusBuildId === ""
+    Accessible.name: "Search results"
+  }
 
   RockArchJobPanel {
     id: jobPanel
@@ -54,6 +67,7 @@ Column {
         opacity: searchPanel.controller.resultsAreCurrent ? 1 : 0.45
 
         RockArchSelectionChrome {
+          keyboardFocused: searchPanel.listFocus.activeFocus
           anchors.fill: parent
           selected: resultRow.rowSelected
         }
@@ -148,7 +162,7 @@ Column {
           tooltipText: "Open in Rock · Enter"
           fontSize: Style.font.caption
           bordered: true
-          focusable: false
+          focusable: true
           z: 2
           onClicked: {
             searchPanel.controller.resultCursor = resultRow.index
@@ -253,9 +267,22 @@ Column {
     RowLayout {
       width: parent.width
 
+      id: clearControls
       PanelSectionHeader {
         text: "RECENT LINKS"
         Layout.fillWidth: true
+      }
+
+      Button {
+        id: cancelClearButton
+        visible: searchPanel.controller.pendingClearRecent
+        text: "Cancel"
+        focusable: true
+        KeyNavigation.right: clearRecentButton
+        onClicked: {
+          searchPanel.controller.pendingClearRecent = false
+          searchPanel.controller.focusList()
+        }
       }
 
       Button {
@@ -266,12 +293,11 @@ Column {
         foreground: searchPanel.controller.pendingClearRecent ? Color.urgent : Color.foreground
         bordered: searchPanel.controller.pendingClearRecent
         focusable: true
+        KeyNavigation.left: cancelClearButton.visible ? cancelClearButton : null
         fontSize: Style.font.caption
         horizontalPadding: Style.spacing.lg
         verticalPadding: Style.spacing.xs
         enabled: searchPanel.controller.quickReturns.length > 0 && !searchPanel.controller.setupBusy
-        KeyNavigation.tab: clearRecentButton
-        KeyNavigation.backtab: clearRecentButton
         onActiveFocusChanged: searchPanel.controller.revealFocusedControl(clearRecentButton)
         onClicked: searchPanel.controller.clearRecentLinks()
       }
@@ -399,6 +425,7 @@ Column {
         clip: true
 
         RockArchSelectionChrome {
+          keyboardFocused: searchPanel.listFocus.activeFocus
           anchors.fill: parent
           selected: recentRow.rowSelected
         }

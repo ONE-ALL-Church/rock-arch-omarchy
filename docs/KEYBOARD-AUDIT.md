@@ -1,89 +1,102 @@
-# Keyboard and panel audit
+# Keyboard navigation contract
 
-Audited 2026-09-02 against the installed Omarchy shell. The review covered
-every Rock Arch surface: login and Finish setup onboarding, header navigation,
-Search and Recent Links, Personal Links, Magnus browsing and file actions,
-build confirmation, Settings, and the dedicated public Knowledge workspace.
+Updated 2026-09-08. This replaces the earlier model that used Tab to cycle
+workspaces. Switching workspaces, moving focus between controls, and selecting
+items now have separate keyboard paths.
 
-## Outcome
+## Shared navigation
 
-The primary workflows are keyboard-complete and use a consistent focus model.
-List views keep the shared selected-row treatment; form and action views use
-the shell's native focused-button treatment. Moving between views resets stale
-scroll position, so the selected first item is not clipped. Magnus is shown in
-normal use only when the active Rock profile reports access. The gated preview
-workspace also supplies a complete, side-effect-free Magnus experience for UI
-development and documentation.
+The panel keeps a stable order: header, workspace tabs, workspace controls,
+content. Search opens with the input focused. The tab bar is one focus stop:
+Shift+Tab from the first workspace control reaches it; Left/Right selects tabs,
+Home/End selects the first/last, and Tab enters that workspace.
 
-## Audit steps and health
+| Key | Behavior |
+|---|---|
+| Ctrl+Tab / Ctrl+Shift+Tab | Next/previous visible workspace, wrapping in the user's saved order |
+| Ctrl+1…4 | Direct visible workspace position; unavailable Magnus takes no number |
+| Tab / Shift+Tab | Next/previous visible enabled control; composite lists and choices have one stop |
+| Arrows | Select tabs, list rows, section children, view choices or adjacent confirmation buttons |
+| Ctrl+F | Focus Search/Knowledge input, or the existing Model Map filter in detail |
+| Ctrl+, | Settings; Escape restores the previous workspace |
+| F1 | Keyboard and search help; also reachable from Settings |
+| Escape | Close the innermost menu, confirmation or detail; at workspace root close the panel |
 
-1. **Onboarding — healthy.** Profile name, domain, username, password, and Connect form a
-   closed Tab/Shift+Tab loop. Enter advances fields or submits from the
-   password field. After login, Finish setup checks all eight supported entity
-   categories, offers only those the account can search, and includes automatic
-   updates in one keyboard-complete screen. Navigation remains hidden until
-   setup succeeds; a failed access check leaves a focused retry action.
-2. **Header — healthy.** Tab/Shift+Tab continue to cycle the launcher views.
-   `Ctrl+1` through `Ctrl+4` follow the editable visible tab order; Settings
-   stays on `Ctrl+,`. These shortcuts use application
-   scope because the bar widget and its keyboard panel are separate windows.
-3. **Search and Recent Links — healthy.** The first recent or result is selected
-   immediately, Up/Down moves the selection, Enter opens it, and Backspace
-   returns to the search field while deleting at the cursor. `X` or `Delete`
-   opens a focused, escapable clear confirmation. Empty-state guidance now
-   reflects the actual view.
-4. **Rock Knowledge — healthy.** The dedicated Knowledge tab and `Ctrl+3` (default order) open
-   the public workspace; typing `kb:` in Search transfers there without adding
-   controls to the Search UI. Up/Down selects results, Enter opens the selected
-   detail, Tab moves through Back, Open source, and related items, and Esc walks
-   the nested detail history. The empty state teaches `mm:`, `is:`, `idea:`,
-   `lava:`, `recipe:`, and `guide:` search areas.
-5. **Personal Links — healthy.** The first item is selected on entry, Up/Down
-   moves, Enter opens, and the view resets and reveals its selection instead of
-   inheriting a stale scroll offset from another panel.
-6. **Magnus browser — healthy.** The first item is selected, Up/Down and Enter
-   browse, Backspace or Esc returns, `R` refreshes, and `B` opens the selected
-   mobile-app build confirmation. Preview context follows the actual hierarchy
-   from content-family folders to the Mobile Applications listing and then into
-   application, page, block, and file descendants. It shows Deploy only on the
-   application row and suppresses every side effect.
-7. **Magnus file preview — healthy with a bounded preview check.** The
-   Download action receives focus when a preview opens. Tab walks every visible
-   action; `D`, `C`, `H`, `O`, and `R` remain direct shortcuts. Code structure,
-   lint parsing, navigation tests, and the retained deterministic file capture
-   cover the preview without reading or retaining private file content.
-8. **Build confirmation — healthy.** Deploy now receives focus on entry, Tab
-   moves to Cancel, Enter activates the focused action, and Esc cancels. No
-   production build was started during this audit.
-9. **Settings — healthy.** Tab/Shift+Tab walk profile controls, inline profile
-   renaming, login fields, preferences, categories, update actions, and toggles;
-   focused controls are scrolled into view. Unavailable entity categories are
-   omitted and a failed access check exposes a keyboard-focusable retry action.
+Settings is not part of the workspace cycle. From Settings, Ctrl+Tab cycles
+relative to the workspace that opened it. Workspace changes retain selection,
+query, inline detail, scroll and valid content focus. A tab selected with arrows
+keeps focus on the tab bar until the user enters its content.
 
-## Privacy-safe visual evidence
+## Flow paths
 
-The retained captures are cropped to Rock Arch and contain no credentials,
-production tenant, raw Rock identifiers, Personal Link targets, or private
-Magnus file contents. Search uses the intentionally public Demo Church;
-Knowledge uses the fixed public service; Personal Links, Recent Links, and
-Magnus use deterministic preview fixtures.
+1. **Search and Recent:** input → list → available selected-row actions. Down
+   enters results; Up from the first result returns to the input. List boundaries
+   never switch workspaces. Ctrl+B bookmarks a result. Backspace from a selected
+   row resumes editing. Modified editing keys retain their native behavior.
+2. **Links:** Sections/A–Z choice → Add → sections/links → selected-item action.
+   Left/Right operates the focused choice or expands/collapses sections. Tab does
+   not create a loop isolated from the header. Ctrl+N opens Add; Escape closes its
+   menu and returns to Add. Expansion preferences remain persisted.
+3. **Add link/section:** Tab follows the visible fields and actions; Ctrl+S saves
+   the current form. In-memory drafts survive switching workspaces. Closing the
+   panel, changing profile/context, signing out or cancelling clears them. A new
+   bookmark does not silently overwrite an existing unfinished form. Passwords
+   are cleared when leaving Settings, rather than retained as drafts.
+4. **Knowledge:** query → results → inline detail. Result boundaries stay within
+   Knowledge. Detail provides Back, source, model-map controls and related items.
+   Escape walks the detail history and restores the originating position.
+5. **Magnus:** folder toolbar → list → selected actions; previews expose their
+   actions and selectable text. Folder return restores the previous cursor and
+   scroll. Ctrl+Tab works from preview text. Single-letter commands ignore
+   Ctrl/Alt/Meta so they do not intercept clipboard or editing shortcuts.
+6. **Confirmations:** Cancel receives initial focus for link/section deletion,
+   job triggering, deployment, history clearing, sign-out and profile removal.
+   Adjacent buttons support Left/Right and Tab. Enter activates only the focused
+   action. Workspace shortcuts are consumed without switching or moving local
+   focus. Escape cancels/dismisses the surface; dismissing remote-job status does
+   not claim to cancel a job already requested.
+7. **Settings and onboarding:** visible controls follow their visual order and
+   focused controls scroll into view. Reordering tabs preserves focus on the
+   moved entry. Onboarding and confirmations temporarily suspend workspace
+   navigation. Settings returns to its initiating workspace rather than forcing
+   Search every time.
 
-![Live Demo Church search](../outputs/screenshots/search-demo-decker.png)
+## Search hints
 
-![Live public Knowledge detail](../outputs/screenshots/knowledge-model-map-detail.png)
+The People / Groups / More row has been removed. Search uses stable placeholder
+examples drawn only from available enabled categories. F1 or Settings exposes
+all available prefixes and existing Alt shortcuts, and categories can be chosen
+there. There is no timed hint rotation. The accessible input name remains
+“Search Rock”; an active scope has a focusable clear control and Alt+0.
 
-![Deterministic Magnus file preview](../outputs/screenshots/magnus-preview-file.png)
+## Verification
 
-## Keyboard map
+- `scripts/check-qml`: Qt state, focus-composite and modifier-dispatch tests.
+- `scripts/check-keyboard`: loads the current plugin and Omarchy's actual UI
+  controls in an isolated offscreen Quickshell process. An inert broker and a
+  plain Qt window replace authenticated transport and the layer-shell window.
+  QtTest sends real key events across fields, tab buttons, toolbars, lists,
+  detail, preview text, drafts, Settings and confirmations. Fixtures contain no
+  user data, and the broker performs no operations.
+- `python -B -m unittest discover -s tests`: broker and distribution regression
+  coverage plus the existing QML source contracts.
 
-| Surface | Move | Activate | Return or cancel | Direct actions |
-|---|---|---|---|---|
-| Views | Tab / Shift+Tab | — | Esc | Ctrl+1 Search, Ctrl+2 Personal, Ctrl+3 Knowledge, Ctrl+4 Magnus, Ctrl+, Settings |
-| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace edits search | X or Delete clears Recent Links |
-| Knowledge results | Up / Down | Enter opens detail | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
-| Knowledge detail | Tab / Shift+Tab | Enter or Space follows actions and related items | Esc walks Back history | Open source |
-| Personal Links | Up / Down | Enter or Space | Backspace returns to Search | — |
-| Magnus folders | Up / Down | Enter or Space | Backspace or Esc | R refresh, B deploy selected app |
-| Magnus preview | Tab / Shift+Tab | Enter or Space | Esc | D download, C copy, H hash, O open, R refresh |
-| Confirmations | Tab / Shift+Tab | Enter or Space | Esc | — |
-| Onboarding / Settings | Tab / Shift+Tab | Enter or Space | Esc | — |
+The offscreen harness verifies Qt interaction and cross-window shortcut scope;
+it does not simulate Hyprland's layer-shell focus acquisition or constitute an
+accessibility certification. Live installed-panel screenshots verify layout and
+loading separately. A physical keyboard walkthrough remains useful for the
+compositor-specific experience.
+
+## Design references
+
+The installed Omarchy `Ui/Button.qml`, `Ui/PanelKeyCatcher.qml` and clock-panel
+form provide native controls and compact panel conventions. The generic key
+catcher is not a complete navigation policy for a multi-workspace plugin.
+
+[WAI keyboard-interface guidance](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/)
+and the [tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/) inform the
+separation of Tab traversal from arrow navigation. These conventions are adapted
+to native Qt, rather than presented as ARIA conformance.
+[Qt focus](https://doc.qt.io/qt-6/qtquick-input-focus.html) and
+[Qt Shortcut](https://doc.qt.io/qt-6/qml-qtquick-shortcut.html) explain the focused
+item's key dispatch and application-scoped shortcuts used here.

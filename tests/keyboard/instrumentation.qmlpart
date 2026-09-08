@@ -1,0 +1,14 @@
+  function testShowWindow() { panel.show(); panel.requestActivate() }
+  function testSnapshot() {
+    return {view: viewMode, focus: String(panel.activeFocusItem),
+      field: searchField.activeFocus, magnusText: magnusPanel.inputActive, tabs: navigationBar.activeFocus,
+      list: listTarget() && listTarget().activeFocus,
+      help: keyboardHelpVisible, name: personalLinkEditor.nameField.activeFocus,
+      clearCancel: searchPanel.clearCancelButton.activeFocus,
+      buildCancel: magnusPanel.buildCancelButton.activeFocus,
+      jobCancel: searchPanel.jobCancelButton.activeFocus,
+      stops: focusStops().map(function(item) { return String(item) })}
+  }
+  function testFocusField() { searchField.forceActiveFocus() }
+  function testFocusDetail() { knowledgePanel.backButton.forceActiveFocus() }
+  function testFocusMagnusText() { var items = Focus.stops(magnusPanel); items[items.length - 1].forceActiveFocus() }

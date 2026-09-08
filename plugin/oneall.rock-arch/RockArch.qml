@@ -7,6 +7,7 @@ import qs.Commons
 import qs.Ui
 import "RockArchSearchScopes.js" as SearchScopes
 import "RockArchNavigation.js" as Navigation
+import "RockArchFocus.js" as Focus
 import "RockArchResponses.js" as Responses
 import "RockArchAccountResponses.js" as AccountResponses
 Panel {
@@ -21,6 +22,17 @@ Panel {
   property string contextName: "PROD"
   property bool developerMode: false
   property string viewMode: "search"
+  property var pendingMagnusReturn: null
+  property var knowledgeReturnFocus: null
+  readonly property bool tabBarFocused: navigationBar.activeFocus
+  property var workspaceFocus: ({})
+  property string settingsReturnView: "search"
+  property bool keyboardHelpVisible: false
+  readonly property bool navigationModal: onboardingFlowActive || keyboardHelpVisible ||
+    jobModel.editing || personalLinkModel.deleting || personalLinkModel.saving ||
+    pendingClearRecent || pendingMagnusBuildId !== "" ||
+    pendingRemoveProfileId !== "" || pendingSignOut
+  readonly property bool workspaceNavigationEnabled: opened && !navigationModal
   property var tabOrder: Navigation.defaultOrder()
   readonly property var navigationTabs: Navigation.tabs(tabOrder, showMagnus)
   readonly property var searchScopeOptions: SearchScopes.options(enabledCategories,
@@ -166,7 +178,7 @@ Panel {
   readonly property string scopeKey: scopeKeyForQuery(query)
   readonly property string scopeLabel: scopeLabelForKey(scopeKey)
   readonly property bool scopeShortcutsEnabled: opened && viewMode === "search" &&
-    !jobModel.editing && !onboardingFlowActive && !onboardingForm.inputActive &&
+    !navigationModal && !onboardingForm.inputActive &&
     !finishSetupPanel.inputActive && !settingsPanel.inputActive
   readonly property string connectionText: contextName === "DEV" ? "Preview data" :
     rockConfigured ? (activeProfileName() === instanceDomain ? "Connected · " + instanceDomain : activeProfileName() + " · " + instanceDomain) :
@@ -405,11 +417,11 @@ Panel {
   }
 
   function escapePanel() {
+    if (keyboardHelpVisible) { closeKeyboardHelp(); return }
     if (jobModel.editing) { jobModel.cancel(); return }
-    if (personalLinkModel.editing) { personalLinkModel.cancel(); return }
-    if (searchHints.visible && searchHints.inputActive) {
-      if (searchHints.expanded) searchHints.expanded = false
-      else searchField.forceActiveFocus(Qt.TabFocusReason)
+    if (viewMode === "personal" && personalLinkModel.editing) {
+      if (personalLinkEditor.popupOpen) personalLinkEditor.closePopup()
+      else personalLinkModel.cancel()
       return
     }
     if (finishSetupOnboardingRequired) {
@@ -440,7 +452,9 @@ Panel {
       return
     }
     if (viewMode === "settings") {
-      focusSearch()
+      if (pendingRemoveProfileId !== "" || pendingSignOut) { settingsPanel.cancelConfirmation(); return }
+      if (addProfileMode || editLoginMode) { addProfileMode = false; editLoginMode = false; dropQueuedCredentialRequests(); return }
+      openTab(settingsReturnView)
       return
     }
     if (viewMode === "magnus" && (magnusPreview !== null || magnusHistory.length > 0)) {
@@ -554,6 +568,8 @@ Panel {
   }
   function beginPersonalLink(safeId, preferredSection) {
     if (!rockConfigured || contextName !== "PROD" || personalLinkModel.saving) return
+    if (personalLinkModel.editing) { openTab("personal"); feedbackText = "Finish or cancel the current form first"; return }
+    rememberWorkspace()
     personalLinkReturnView = viewMode
     viewMode = "personal"
     feedbackText = ""
@@ -615,11 +631,12 @@ Panel {
   }
 
   function openSettings(showAdd) {
+    if (navigationModal && !onboardingFlowActive) return
+    if (viewMode !== "settings") { rememberWorkspace(); settingsReturnView = viewMode }
+    personalToolbar.closeMenu()
+    personalLinkEditor.closePopup()
     viewMode = "settings"
     addProfileMode = showAdd === true || (profilesLoaded && profiles.length === 0)
-    resultCursor = -1
-    recentCursor = -1
-    linkCursor = -1
     quickLook = null
     pendingRemoveProfileId = ""
     pendingSignOut = false
@@ -640,9 +657,6 @@ Panel {
   }
   function openKnowledge(prefill) {
     viewMode = "knowledge"
-    resultCursor = -1
-    recentCursor = -1
-    linkCursor = -1
     quickLook = null
     pendingClearRecent = false
     feedbackText = ""
@@ -673,7 +687,7 @@ Panel {
     knowledgeCursor = Math.max(0, Math.min(knowledgeResults.length - 1, index))
     knowledgeLinkCursor = -1
     Qt.callLater(function() {
-      keyCatcher.forceActiveFocus()
+      root.focusList()
       root.revealItem(knowledgePanel.resultRepeater.itemAt(root.knowledgeCursor))
     })
   }
@@ -681,6 +695,7 @@ Panel {
     if (index < 0 || index >= knowledgeResults.length || knowledgeBusy) return
     knowledgeCursor = index
     knowledgeHistory = []
+    knowledgeReturnFocus = {scroll: panelFlick.contentY, cursor: index}
     knowledgeBusy = true
     feedbackText = "Opening knowledge…"
     request({op: "knowledge_result", safeId: knowledgeResults[index].safeId})
@@ -689,7 +704,7 @@ Panel {
     if (!knowledgeDetail || !Array.isArray(knowledgeDetail.links) ||
         index < 0 || index >= knowledgeDetail.links.length || knowledgeBusy) return
     knowledgeLinkCursor = index
-    knowledgeHistory = knowledgeHistory.concat([knowledgeDetail])
+    knowledgeHistory = knowledgeHistory.concat([{detail: knowledgeDetail, scroll: panelFlick.contentY, item: panel.activeFocusItem}])
     pendingKnowledgeNavigation = true
     knowledgeBusy = true
     feedbackText = "Opening related knowledge…"
@@ -698,12 +713,17 @@ Panel {
   function closeKnowledgeDetail() {
     if (knowledgeBusy) return
     if (knowledgeHistory.length) {
-      knowledgeDetail = knowledgeHistory[knowledgeHistory.length - 1]
+      var previous = knowledgeHistory[knowledgeHistory.length - 1]
+      knowledgeDetail = previous.detail
       knowledgeHistory = knowledgeHistory.slice(0, knowledgeHistory.length - 1)
       knowledgeLinkCursor = -1
       feedbackText = ""
       panelFlick.contentY = 0
-      Qt.callLater(function() { knowledgePanel.backButton.forceActiveFocus(Qt.TabFocusReason) })
+      Qt.callLater(function() {
+        if (previous.item && previous.item.visible) previous.item.forceActiveFocus(Qt.TabFocusReason)
+        else knowledgePanel.backButton.forceActiveFocus(Qt.TabFocusReason)
+        panelFlick.contentY = previous.scroll
+      })
       return
     }
     knowledgeDetail = null
@@ -711,7 +731,11 @@ Panel {
     feedbackText = ""
     panelFlick.contentY = 0
     if (knowledgeCursor >= 0)
-      Qt.callLater(function() { root.selectKnowledgeResult(root.knowledgeCursor) })
+      Qt.callLater(function() {
+        root.focusList()
+        if (root.knowledgeReturnFocus) panelFlick.contentY = root.knowledgeReturnFocus.scroll
+        root.revealItem(knowledgePanel.resultRepeater.itemAt(root.knowledgeCursor))
+      })
     else
       Qt.callLater(function() { knowledgePanel.queryField.forceActiveFocus() })
   }
@@ -858,12 +882,9 @@ Panel {
     }
     viewMode = "search"
     resultCursor = Math.max(0, Math.min(results.length - 1, index))
-    recentCursor = -1
-    linkCursor = -1
     quickLook = null
-    knowledgeDetail = null
     Qt.callLater(function() {
-      keyCatcher.forceActiveFocus()
+      root.focusList()
       root.revealItem(searchPanel.resultRepeater.itemAt(root.resultCursor))
     })
   }
@@ -878,35 +899,28 @@ Panel {
       return
     }
     viewMode = "search"
-    resultCursor = -1
     recentCursor = Math.max(0, Math.min(quickReturns.length - 1, index))
-    linkCursor = -1
     quickLook = null
     Qt.callLater(function() {
-      keyCatcher.forceActiveFocus()
+      root.focusList()
       root.revealItem(searchPanel.quickReturnRepeater.itemAt(root.recentCursor))
     })
   }
   function selectPersonalLink(index) {
     var changedView = viewMode !== "personal"
     viewMode = "personal"
-    resultCursor = -1
-    recentCursor = -1
     linkCursor = navigationCount ? Math.max(0, Math.min(navigationCount - 1, index)) : -1
     quickLook = null
     if (changedView) panelFlick.contentY = 0
     if (changedView) refreshPersonalLinks()
     Qt.callLater(function() {
-      keyCatcher.forceActiveFocus()
+      root.focusList()
       root.revealItem(personalPanel.repeater.itemAt(root.linkCursor))
     })
   }
   function openMagnus() {
     if (!showMagnus) return
     viewMode = "magnus"
-    resultCursor = -1
-    recentCursor = -1
-    linkCursor = -1
     quickLook = null
     feedbackText = ""
     panelFlick.contentY = 0
@@ -918,14 +932,14 @@ Panel {
       request({op: "magnus_browse"})
     } else if (magnusItems.length) {
       magnusCursor = Math.max(0, magnusCursor)
-      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+      Qt.callLater(function() { root.focusList() })
     }
   }
   function selectMagnus(index) {
     if (!magnusItems.length) return
     magnusCursor = Math.max(0, Math.min(magnusItems.length - 1, index))
     Qt.callLater(function() {
-      keyCatcher.forceActiveFocus()
+      root.focusList()
       root.revealItem(magnusPanel.repeater.itemAt(root.magnusCursor))
     })
   }
@@ -934,7 +948,7 @@ Panel {
     var item = magnusItems[index]
     magnusBusy = true
     if (item.kind === "folder") {
-      magnusHistory = magnusHistory.concat([{id: magnusFolderId, title: magnusFolderTitle}])
+      magnusHistory = magnusHistory.concat([{id: magnusFolderId, title: magnusFolderTitle, cursor: magnusCursor, scroll: panelFlick.contentY}])
       request({op: "magnus_browse", safeId: item.safeId})
     } else {
       request({op: "magnus_preview", safeId: item.safeId})
@@ -963,12 +977,12 @@ Panel {
     pendingMagnusBuildId = String(safeId)
     pendingMagnusBuildTitle = String(title || "mobile app").replace(/^Deploy /, "")
     pendingMagnusBuildRecent = recent === true
-    feedbackText = "Press Enter to deploy, or Esc to cancel"
+    feedbackText = ""
     Qt.callLater(function() {
       if (root.pendingMagnusBuildRecent)
-        searchPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)
+        searchPanel.buildCancelButton.forceActiveFocus(Qt.TabFocusReason)
       else
-        magnusPanel.buildConfirmButton.forceActiveFocus(Qt.TabFocusReason)
+        magnusPanel.buildCancelButton.forceActiveFocus(Qt.TabFocusReason)
     })
   }
   function cancelMagnusBuild() {
@@ -977,7 +991,7 @@ Panel {
     pendingMagnusBuildTitle = ""
     pendingMagnusBuildRecent = false
     feedbackText = "Build cancelled"
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function() { root.focusList() })
   }
   function confirmMagnusBuild() {
     if (!pendingMagnusBuildId || magnusActionBusy) return
@@ -1013,12 +1027,13 @@ Panel {
     if (magnusBusy) return
     if (magnusPreview !== null) {
       magnusPreview = null
-      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+      Qt.callLater(function() { root.focusList() })
       return
     }
     if (!magnusHistory.length) return
     var previous = magnusHistory[magnusHistory.length - 1]
     magnusHistory = magnusHistory.slice(0, magnusHistory.length - 1)
+    pendingMagnusReturn = previous
     magnusBusy = true
     request({op: "magnus_browse", safeId: previous.id})
   }
@@ -1026,51 +1041,122 @@ Panel {
     if (queryIsEmpty) selectRecent(index)
     else selectResult(index)
   }
+  function listTarget() {
+    if (viewMode === "search") return searchPanel.listFocus
+    if (viewMode === "personal") return personalPanel.listFocus
+    if (viewMode === "knowledge") return knowledgePanel.listFocus
+    if (viewMode === "magnus") return magnusPanel.listFocus
+    return null
+  }
+  function ensureListSelection() {
+    if (viewMode === "search") {
+      if (queryIsEmpty && recentCursor < 0) recentCursor = 0
+      else if (!queryIsEmpty && resultCursor < 0) resultCursor = 0
+    } else if (viewMode === "personal" && linkCursor < 0) linkCursor = 0
+    else if (viewMode === "knowledge" && knowledgeCursor < 0) knowledgeCursor = 0
+    else if (viewMode === "magnus" && magnusCursor < 0) magnusCursor = 0
+  }
+  function focusList() {
+    var target = listTarget()
+    if (target && target.visible && target.enabled && !navigationModal) target.forceActiveFocus()
+  }
+  function focusTabBar() { navigationBar.focusCurrent() }
+  function focusStops() {
+    if (keyboardHelpVisible) return Focus.stops(keyboardHelp)
+    if (jobModel.editing) return Focus.stops(searchPanel.jobSurface)
+    if (personalLinkModel.deleting || personalLinkModel.saving) return Focus.stops(personalLinkEditor)
+    if (pendingClearRecent) return Focus.stops(searchPanel.clearControls)
+    if (pendingMagnusBuildId !== "")
+      return Focus.stops(pendingMagnusBuildRecent ? searchPanel.buildControls : magnusPanel.buildControls)
+    if (pendingRemoveProfileId !== "" || pendingSignOut) return settingsPanel.confirmationStops()
+    if (onboardingFlowActive) return Focus.stops(onboardingRequired ? onboardingForm : finishSetupPanel)
+    return Focus.stops(content)
+  }
   function moveTab(direction) {
-    if (viewMode === "personal" && !personalLinkModel.editing) {
-      if (direction < 0) personalToolbar.focusLast()
-      else personalToolbar.focusView()
+    var target = Focus.next(focusStops(), panel.activeFocusItem, direction)
+    if (!target) return
+    if (target === navigationBar) focusTabBar()
+    else target.forceActiveFocus(direction < 0 ? Qt.BacktabFocusReason : Qt.TabFocusReason)
+    if (Focus.contains(body, target)) revealItem(target)
+  }
+  function rememberWorkspace() {
+    var next = Object.assign({}, workspaceFocus)
+    var item = panel.activeFocusItem
+    if (Focus.contains(navigationBar, item) || Focus.contains(hero, item))
+      item = next[viewMode] ? next[viewMode].item : null
+    next[viewMode] = {item: item, scroll: panelFlick.contentY}
+    workspaceFocus = next
+  }
+  function focusWorkspace(restore) {
+    var saved = restore ? workspaceFocus[viewMode] : null
+    if (saved && saved.item && saved.item.visible && saved.item.enabled &&
+        Focus.contains(content, saved.item) && !Focus.contains(navigationBar, saved.item)) {
+      saved.item.forceActiveFocus(Qt.TabFocusReason)
+      panelFlick.contentY = Math.max(0, Math.min(saved.scroll, panelFlick.contentHeight - panelFlick.height))
       return
     }
-    if (direction >= 0) {
-      if (viewMode === "search" && searchField.activeFocus && searchHints.visible)
-        searchHints.focusFirst()
-      else if (viewMode === "search" && searchField.activeFocus && activeSearchCount)
-        selectSearchItem(0)
-      else if (viewMode === "knowledge" && knowledgeDetail === null &&
-               knowledgePanel.queryField.activeFocus && knowledgeResults.length)
-        selectKnowledgeResult(0)
-      else
-        openAdjacentTab(1)
-      return
-    }
-    if (viewMode === "knowledge" && knowledgeDetail === null && knowledgeCursor >= 0 &&
-        !knowledgePanel.queryField.activeFocus) {
-      knowledgePanel.queryField.forceActiveFocus()
-    } else if (viewMode === "search" && !searchField.activeFocus &&
-               (resultCursor >= 0 || recentCursor >= 0)) {
-      focusSearch()
-    } else {
-      openAdjacentTab(-1)
+    if (viewMode === "search" && searchField.enabled) searchField.forceActiveFocus()
+    else if (viewMode === "knowledge") {
+      if (knowledgeDetail !== null) knowledgePanel.backButton.forceActiveFocus(Qt.TabFocusReason)
+      else knowledgePanel.queryField.forceActiveFocus()
+    } else if (viewMode === "personal" && personalLinkModel.editing)
+      personalLinkEditor.nameField.forceActiveFocus(Qt.TabFocusReason)
+    else if (viewMode === "magnus" && magnusPreview !== null)
+      magnusPanel.previewPrimaryButton.forceActiveFocus(Qt.TabFocusReason)
+    else if (listTarget() && listTarget().visible) focusList()
+    else if (viewMode === "personal" && personalToolbar.canAdd) personalToolbar.addButton.forceActiveFocus(Qt.TabFocusReason)
+    else {
+      var stops = Focus.stops(viewMode === "settings" ? settingsPanel : body)
+      if (stops.length) stops[0].forceActiveFocus(Qt.TabFocusReason)
+      else focusTabBar()
     }
   }
-  function openTab(key) {
-    if (key === "search") focusSearch()
-    else if (key === "personal") selectPersonalLink(0)
-    else if (key === "knowledge") openKnowledge()
-    else if (key === "magnus" && showMagnus) openMagnus()
-    else if (key === "settings") openSettings(false)
+  function openTab(key, keepTabFocus) {
+    if (!workspaceNavigationEnabled) return
+    if (key === "settings") { openSettings(false); return }
+    if (!navigationTabs.some(function(tab) { return tab.key === key })) return
+    if (viewMode !== key) rememberWorkspace()
+    if (viewMode === "settings" && key !== "settings") dropQueuedCredentialRequests()
+    personalToolbar.closeMenu()
+    personalLinkEditor.closePopup()
+    var firstVisit = !workspaceFocus[key]
+    viewMode = key
+    feedbackText = ""
+    if (firstVisit) {
+      panelFlick.contentY = 0
+      if (key === "personal" && !personalLinkModel.editing) refreshPersonalLinks()
+      else if (key === "magnus" && showMagnus) openMagnus()
+    }
+    Qt.callLater(function() {
+      if (root.viewMode !== key || !root.opened) return
+      if (keepTabFocus) root.focusTabBar()
+      else root.focusWorkspace(true)
+    })
   }
   function openTabAt(index) {
     if (index >= 0 && index < navigationTabs.length) openTab(navigationTabs[index].key)
   }
   function openAdjacentTab(direction) {
-    var key = Navigation.adjacent(navigationTabs, viewMode, direction)
-    openTab(key)
-    if (direction < 0 && key === "search" && activeSearchCount)
-      selectSearchItem(activeSearchCount - 1)
-    else if (direction < 0 && key === "personal" && navigationCount)
-      selectPersonalLink(navigationCount - 1)
+    openTab(Navigation.adjacent(navigationTabs, viewMode === "settings" ? settingsReturnView : viewMode, direction))
+  }
+  Connections {
+    target: panel
+    function onActiveFocusItemChanged() {
+      var item = panel.activeFocusItem
+      if (!root.opened || !item || !item.visible || root.keyboardHelpVisible ||
+          !Focus.contains(content, item) || Focus.contains(navigationBar, item) || Focus.contains(hero, item)) return
+      root.rememberWorkspace()
+    }
+  }
+  function openKeyboardHelp() {
+    if (!workspaceNavigationEnabled) return
+    rememberWorkspace()
+    keyboardHelpVisible = true
+    Qt.callLater(function() { keyboardHelp.closeButton.forceActiveFocus(Qt.TabFocusReason) })
+  }
+  function closeKeyboardHelp() {
+    keyboardHelpVisible = false
+    Qt.callLater(function() { root.focusWorkspace(true) })
   }
   function moveTabOrder(key, direction) {
     tabOrder = Navigation.moved(tabOrder, key, direction)
@@ -1083,7 +1169,6 @@ Panel {
   function moveCursor(dx, dy) {
     if (dx !== 0) {
       if (viewMode === "personal") { linkViewModel.horizontal(dx); return }
-      moveTab(dx)
       return
     }
     if (dy === 0) return
@@ -1091,7 +1176,7 @@ Panel {
       if (knowledgeDetail !== null) return
       if (knowledgePanel.queryField.activeFocus) {
         if (dy > 0 && knowledgeResults.length) selectKnowledgeResult(0)
-        else if (dy < 0) openAdjacentTab(-1)
+        else if (dy < 0) return
         return
       }
       var nextKnowledge = knowledgeCursor < 0
@@ -1100,7 +1185,7 @@ Panel {
       if (nextKnowledge < 0)
         knowledgePanel.queryField.forceActiveFocus()
       else if (nextKnowledge >= knowledgeResults.length)
-        openAdjacentTab(1)
+        selectKnowledgeResult(knowledgeResults.length - 1)
       else
         selectKnowledgeResult(nextKnowledge)
       return
@@ -1109,21 +1194,21 @@ Panel {
       if (magnusPreview !== null) return
       if (!magnusCount) return
       var nextMagnus = magnusCursor < 0 ? (dy > 0 ? 0 : magnusCount - 1) : magnusCursor + dy
-      if (nextMagnus < 0) openAdjacentTab(-1)
-      else if (nextMagnus >= magnusCount) openAdjacentTab(1)
+      if (nextMagnus < 0) selectMagnus(0)
+      else if (nextMagnus >= magnusCount) selectMagnus(magnusCount - 1)
       else selectMagnus(nextMagnus)
       return
     }
     if (viewMode === "search") {
       if (searchField.activeFocus) {
         if (dy > 0 && activeSearchCount) selectSearchItem(0)
-        else if (dy < 0) openAdjacentTab(-1)
+        else if (dy < 0) return
         return
       }
       var searchCursor = showRecentLinks ? recentCursor : resultCursor
       if (searchCursor < 0) {
         if (dy > 0 && activeSearchCount) selectSearchItem(0)
-        else if (dy < 0) openAdjacentTab(-1)
+        else if (dy < 0) return
         return
       }
       var nextSearchItem = searchCursor + dy
@@ -1231,8 +1316,10 @@ Panel {
   }
   function removeProfile(profileId) {
     if (pendingRemoveProfileId !== profileId) {
+      pendingSignOut = false
       pendingRemoveProfileId = profileId
-      feedbackText = "Press Remove again to confirm"
+      Qt.callLater(function() { settingsPanel.focusConfirmation() })
+      feedbackText = ""
       return
     }
     beginSetup("Removing profile…")
@@ -1241,8 +1328,10 @@ Panel {
   }
   function signOut() {
     if (!pendingSignOut) {
+      pendingRemoveProfileId = ""
       pendingSignOut = true
-      feedbackText = "Press Sign out again to clear the saved login"
+      Qt.callLater(function() { settingsPanel.focusConfirmation() })
+      feedbackText = ""
       return
     }
     beginSetup("Signing out…")
@@ -1270,8 +1359,8 @@ Panel {
     if (!quickReturns.length || setupBusy) return
     if (!pendingClearRecent) {
       pendingClearRecent = true
-      feedbackText = "Press Enter to clear Recent Links, or Esc to cancel"
-      Qt.callLater(function() { searchPanel.clearButton.forceActiveFocus(Qt.TabFocusReason) })
+      feedbackText = ""
+      Qt.callLater(function() { searchPanel.clearCancelButton.forceActiveFocus(Qt.TabFocusReason) })
       return
     }
     pendingClearRecent = false
@@ -1281,7 +1370,7 @@ Panel {
     focusSearch()
   }
   function deleteCurrentItem() {
-    if (viewMode === "personal") { beginPersonalDelete(linkViewModel.selected()); return }
+    if (viewMode === "personal" && !personalLinkModel.editing) { beginPersonalDelete(linkViewModel.selected()); return }
     if (viewMode === "search" && showRecentLinks && quickReturns.length)
       clearRecentLinks()
   }
@@ -1321,6 +1410,8 @@ Panel {
     if (viewMode === "personal") refreshPersonalLinks()
   }
   function resetPanel() {
+    workspaceFocus = ({})
+    keyboardHelpVisible = false
     query = ""
     if (finishSetupOnboardingRequired) {
       initializeOnboardingSetup()
@@ -1378,32 +1469,33 @@ Panel {
     })
     onDismissed: {
       broker.dropJobRequests()
-      root.focusSearch()
+      Qt.callLater(function() { root.focusList() })
       if (root.contextName === "PROD" && root.rockConfigured) jobModel.refreshAccess()
     }
   }
 
-  onActiveProfileIdChanged: { jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onActiveProfileIdChanged: { workspaceFocus = ({}); jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; linkCursor = -1; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
   onRockConfiguredChanged: if (!rockConfigured) { jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinks = []; personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
   onViewModeChanged: {
     if (viewMode !== "search") { jobModel.close(); broker.dropJobRequests() }
-    if (viewMode !== "personal") { personalLinkModel.closed(); broker.dropPersonalLinkRequests() }
+    // Link drafts stay in memory while switching workspaces. Closing the panel,
+    // signing out, changing profile or cancelling still clears them.
   }
-  onContextNameChanged: { jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
+  onContextNameChanged: { workspaceFocus = ({}); jobModel.reset(); broker.dropJobRequests(); personalLinkModel.closed(); personalLinkSections = []; pendingPersonalLinkSelection = null; broker.dropPersonalLinkRequests() }
 
   RockArchPersonalLinkState {
     id: personalLinkModel
     onRequested: function(payload) { root.request(payload) }
     onFocusRequested: Qt.callLater(function() {
-      if (personalLinkModel.editing) {
+      if (root.viewMode === "personal" && personalLinkModel.editing) {
         if (personalLinkModel.deleting) personalLinkEditor.cancelButton.forceActiveFocus(Qt.TabFocusReason)
         else personalLinkEditor.nameField.forceActiveFocus(Qt.TabFocusReason)
       }
     })
     onCancelled: function(wasDeleting) {
       broker.dropPersonalLinkRequests()
-      if (wasDeleting) { Qt.callLater(function() { keyCatcher.forceActiveFocus() }); return }
-      if (root.personalLinkReturnView === "search") root.focusSearch()
+      if (wasDeleting) { Qt.callLater(function() { root.focusList() }); return }
+      if (root.personalLinkReturnView === "search") root.openTab("search")
       else { root.selectPersonalLink(0); Qt.callLater(function() { personalToolbar.addButton.forceActiveFocus(Qt.TabFocusReason) }) }
     }
     onSaved: function(alreadySaved, name, section) {
@@ -1418,7 +1510,7 @@ Panel {
       root.refreshPersonalLinks()
       root.feedbackText = kind === "section" ? (linkCount > 0 ? "Section and links deleted" : "Section deleted") : "Link deleted"
       personalLinkNoticeTimer.restart()
-      Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+      Qt.callLater(function() { root.focusList() })
     }
     onSavedSection: function(alreadySaved, name, groupId) {
       if (root.preferencePersonalLinksView !== "sections") root.setLinkView("sections")
@@ -1437,7 +1529,7 @@ Panel {
     onAddLinkRequested: function(sectionId) { root.beginPersonalLink("", sectionId) }
     onFocusRequested: Qt.callLater(function() {
       if (root.viewMode !== "personal" || personalLinkModel.editing) return
-      keyCatcher.forceActiveFocus()
+      root.focusList()
       root.revealItem(personalPanel.repeater.itemAt(root.linkCursor))
     })
   }
@@ -1530,14 +1622,21 @@ Panel {
   Shortcut { sequence: "Alt+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Items"); onActivated: root.applyScope("c") }
   Shortcut { sequence: "Alt+Shift+C"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Content Channel Types"); onActivated: root.applyScope("ct") }
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
-  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalToolbar.openAddMenu() }
-  Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && root.viewMode === "search" && !jobModel.editing; onActivated: root.bookmarkSearchResult() }
-  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && personalLinkModel.editing && !personalLinkModel.deleting; onActivated: personalLinkModel.save() }
-  Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openSettings(false) }
-  Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(0) }
-  Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(1) }
-  Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive; onActivated: root.openTabAt(2) }
-  Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.navigationTabs.length > 3; onActivated: root.openTabAt(3) }
+  Shortcut { sequence: "Ctrl+Tab"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openAdjacentTab(1) }
+  Shortcut { sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab"]; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openAdjacentTab(-1) }
+  Shortcut { sequence: "Tab"; context: Qt.ApplicationShortcut; enabled: root.opened && Focus.contains(content, panel.activeFocusItem) && !personalLinkEditor.popupOpen; onActivated: root.moveTab(1) }
+  Shortcut { sequences: ["Shift+Tab", "Backtab"]; context: Qt.ApplicationShortcut; enabled: root.opened && Focus.contains(content, panel.activeFocusItem) && !personalLinkEditor.popupOpen; onActivated: root.moveTab(-1) }
+  Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled; onActivated: root.openKeyboardHelp() }
+  Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled && (root.viewMode === "search" || (root.viewMode === "knowledge" && root.knowledgeDetail === null)); onActivated: root.focusWorkspace(false) }
+  Shortcut { sequence: "Alt+Left"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled && ((root.viewMode === "knowledge" && root.knowledgeDetail !== null) || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))); onActivated: root.escapePanel() }
+  Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled && root.viewMode === "personal" && !personalLinkModel.editing && root.contextName === "PROD" && root.rockConfigured; onActivated: personalToolbar.openAddMenu() }
+  Shortcut { sequence: "Ctrl+B"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled && root.contextName === "PROD" && root.viewMode === "search" && !jobModel.editing; onActivated: root.bookmarkSearchResult() }
+  Shortcut { sequence: "Ctrl+S"; context: Qt.ApplicationShortcut; enabled: root.opened && !root.onboardingFlowActive && root.contextName === "PROD" && root.viewMode === "personal" && !root.keyboardHelpVisible && personalLinkModel.editing && !personalLinkModel.deleting; onActivated: personalLinkModel.save() }
+  Shortcut { sequence: "Ctrl+,"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: { if (root.workspaceNavigationEnabled) root.openSettings(false) } }
+  Shortcut { sequence: "Ctrl+1"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openTabAt(0) }
+  Shortcut { sequence: "Ctrl+2"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openTabAt(1) }
+  Shortcut { sequence: "Ctrl+3"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openTabAt(2) }
+  Shortcut { sequence: "Ctrl+4"; context: Qt.ApplicationShortcut; enabled: root.opened && root.navigationTabs.length > 3; onActivated: root.openTabAt(3) }
 
   RockArchBarButton {
     id: button
@@ -1561,16 +1660,17 @@ Panel {
     RockArchKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      formMode: searchHints.inputActive || root.onboardingFlowActive || root.viewMode === "settings" || personalLinkModel.editing || jobModel.editing ||
-        root.pendingClearRecent || root.pendingMagnusBuildId !== "" || root.magnusPreview !== null ||
+      formMode: keyboardHelpVisible || navigationBar.activeFocus || root.onboardingFlowActive || root.viewMode === "settings" || (root.viewMode === "personal" && personalLinkModel.editing) || jobModel.editing ||
+        root.pendingClearRecent || root.pendingMagnusBuildId !== "" || (root.viewMode === "magnus" && root.magnusPreview !== null) ||
         (root.viewMode === "knowledge" && root.knowledgeDetail !== null)
       commandMode: root.magnusPreviewCommandsEnabled
-      blocked: searchHints.inputActive || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive || personalToolbar.inputActive ||
+      blocked: (!root.listTarget() || !root.listTarget().activeFocus) && !root.magnusPreviewCommandsEnabled || navigationBar.activeFocus || searchField.activeFocus || onboardingForm.inputActive || personalLinkEditor.inputActive || personalToolbar.inputActive ||
         finishSetupPanel.inputActive || settingsPanel.inputActive || magnusPanel.inputActive ||
         knowledgePanel.queryField.activeFocus
       backspaceEnabled: root.resultCursor >= 0 || root.recentCursor >= 0 || root.linkCursor >= 0 ||
         (root.viewMode === "knowledge" && root.knowledgeCursor >= 0) ||
         (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))
+      onActiveFocusChanged: if (activeFocus && root.opened) Qt.callLater(function() { root.focusList() })
       onCloseRequested: root.escapePanel()
       onMoveRequested: function(dx, dy) { root.moveCursor(dx, dy) }
       onTabRequested: function(direction) { root.moveTab(direction) }
@@ -1593,11 +1693,19 @@ Panel {
         spacing: Style.spacing.panelGap
 
         RockArchHero {
+          id: hero
           Layout.fillWidth: true
           controller: root
         }
 
         PanelSeparator { Layout.fillWidth: true }
+
+        RockArchNavigationTabs {
+          id: navigationBar
+          visible: !root.onboardingFlowActive
+          Layout.fillWidth: true
+          controller: root
+        }
 
         RowLayout {
           visible: root.viewMode === "search" && !root.onboardingFlowActive
@@ -1620,7 +1728,7 @@ Panel {
                   : root.contextName === "PROD" && root.searchCapabilitiesReady &&
                     root.availableSearchCategories.length === 0
                     ? "This account has no searchable entity categories"
-                    : "Search Rock by name or ID"
+                    : SearchScopes.placeholder(root.searchScopeOptions)
             selectByMouse: true
             inputMethodHints: Qt.ImhNoPredictiveText
             onTextEdited: {
@@ -1641,6 +1749,7 @@ Panel {
             }
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: function(event) {
+              if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return
               if (event.key === Qt.Key_Escape) {
                 root.escapePanel()
                 event.accepted = true
@@ -1668,29 +1777,9 @@ Panel {
             bordered: true
             fontSize: Style.font.caption
             horizontalPadding: Style.spacing.lg
-            focusable: false
+            focusable: true
             onClicked: root.clearScope()
           }
-        }
-
-        RockArchSearchHints {
-          id: searchHints
-          visible: root.opened && root.viewMode === "search" && !root.onboardingFlowActive &&
-            root.queryIsEmpty && searchField.enabled && options.length > 0
-          Layout.fillWidth: true
-          options: root.searchScopeOptions
-          onSelected: function(key) { root.applyScope(key) }
-          onExitRequested: function(direction) {
-            if (direction < 0) searchField.forceActiveFocus(Qt.TabFocusReason)
-            else if (root.activeSearchCount) root.selectSearchItem(0)
-            else root.openAdjacentTab(1)
-          }
-        }
-
-        RockArchNavigationTabs {
-          visible: !root.onboardingFlowActive
-          Layout.fillWidth: true
-          controller: root
         }
 
         Column {
@@ -1743,8 +1832,16 @@ Panel {
           onListFocusRequested: root.selectPersonalLink(Math.max(0, root.linkCursor))
         }
 
+        RockArchKeyboardHelp {
+          id: keyboardHelp
+          visible: root.keyboardHelpVisible
+          Layout.fillWidth: true
+          controller: root
+        }
+
         Flickable {
           id: panelFlick
+          visible: !root.keyboardHelpVisible
           readonly property real preferredHeight: root.onboardingFlowActive
             ? body.implicitHeight
             : Style.space(root.viewMode === "settings"

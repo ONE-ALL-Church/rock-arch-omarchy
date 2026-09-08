@@ -26,6 +26,7 @@ RowLayout {
     if (canAdd) addAction.forceActiveFocus(Qt.BacktabFocusReason)
     else focusView()
   }
+  function closeMenu() { addMenu.restoreFocus = false; addMenu.close() }
   function openAddMenu() { if (visible && canAdd) addMenu.open() }
   function activateView(index) {
     viewChoice.forceActiveFocus()
@@ -57,7 +58,7 @@ RowLayout {
     Keys.onSpacePressed: toolbar.activateView(cursor)
     Keys.onDownPressed: toolbar.listFocusRequested()
     Keys.onTabPressed: { if (toolbar.canAdd) addAction.forceActiveFocus(Qt.TabFocusReason); else toolbar.listFocusRequested() }
-    Keys.onBacktabPressed: toolbar.listFocusRequested()
+    Keys.onBacktabPressed: toolbar.controller.focusTabBar()
     Keys.onPressed: function(event) {
       if (event.text === "h") { cursor = Math.max(0, cursor - 1); event.accepted = true }
       else if (event.text === "l") { cursor = Math.min(toolbar.views.length - 1, cursor + 1); event.accepted = true }

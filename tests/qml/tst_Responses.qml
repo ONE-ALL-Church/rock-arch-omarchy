@@ -79,6 +79,25 @@ TestCase {
     wait(1) // Run the real Qt.callLater focus and refresh callbacks.
   }
 
+  function test_returning_to_magnus_folder_restores_selection_and_scroll() {
+    state.viewMode = "magnus"
+    state.pendingMagnusReturn = {cursor: 1, scroll: 120}
+    accept({ok: true, magnusBrowser: {folderId: "parent", title: "Parent", items: [{safeId: "a"}, {safeId: "b"}]}})
+    compare(state.magnusCursor, 1)
+    compare(ui.panelFlick.contentY, 120)
+    compare(state.pendingMagnusReturn, null)
+  }
+
+  function test_background_knowledge_results_do_not_scroll_another_workspace() {
+    state.viewMode = "personal"
+    state.knowledgeSearchInFlight = true
+    state.knowledgeQuery = "group"
+    state.knowledgeSearchInFlightQuery = "group"
+    accept({ok: true, knowledgeResults: [{safeId: "result"}]})
+    compare(state.knowledgeResults.length, 1)
+    compare(ui.panelFlick.contentY, 80)
+  }
+
   function test_cli_grants_refresh_and_missing_preferences_fail_closed() {
     accept({ok: true, profiles: {activeProfileId: "", profiles: [], preferences: {
       terminalAccess: true, terminalMutationAccess: true, terminalMutationActions: ["addLinks"]
