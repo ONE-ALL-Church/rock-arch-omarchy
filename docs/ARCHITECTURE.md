@@ -25,7 +25,7 @@
    driven browsing, bounded previews/downloads, clipboard values, hashes,
    same-origin view links, and confirmed mobile app builds on the selected Rock
    origin. It reuses `RockSessionProvider`; no external CLI is launched.
-8. `RockRestReadOnlyAdapter`: eight fixed Rock REST v1 entity GETs plus the fixed
+8. `RockRestReadOnlyAdapter`: nine fixed Rock REST v1 entity GETs plus the fixed
    current-user Personal Links action, authenticated by the native Rock session.
 9. `RockKbReadOnlyAdapter`: explicit public Knowledge search and exact-result
    reads through a fixed, credentialless HTTPS origin, with bounded response
@@ -203,13 +203,14 @@ available when the plugin is absent or the account lacks Magnus permission.
 
 The client cannot choose an endpoint. These are Rock's established REST v1
 controller/OData routes, not `/api/v2`. Search is limited to `People`, `Groups`,
-`GroupTypes`, `WorkflowTypes`, `ServiceJobs`, `Pages`, `ContentChannelTypes`,
+`GroupTypes`, `DefinedTypes`, `WorkflowTypes`, `ServiceJobs`, `Pages`, `ContentChannelTypes`,
 and `ContentChannelItems`, with fixed `$select`, `$orderby`, `$top=3`, and
-generated prefix filters (contains-style matching for Workflow Types). The eight fixed reads share one native Rock
+generated prefix filters (contains-style matching for Workflow Types and
+Defined Types). The nine fixed reads share one native Rock
 session cookie and start in
 parallel; results are still transformed in a deterministic category order.
 After login, a separate bounded capability pass sends `$select=Id&$top=1` to
-those same eight endpoints in parallel. A successful list response marks a
+those same nine endpoints in parallel. A successful list response marks a
 category searchable even when it contains no rows; authorization and missing-
 endpoint responses mark only that category unavailable. Transient failures make
 the access check fail closed instead of guessing. The result is cached in broker
@@ -439,6 +440,7 @@ Rock route:
 | Person | `/Person/{id}` |
 | Group | `/Group/{id}` |
 | Group Type | `/admin/general/group-types/{id}` |
+| Defined Type | `/admin/general/defined-types/{id}` |
 | Workflow Type | `/admin/general/workflows?WorkflowTypeId={id}` |
 | Scheduled Job | `/admin/system/jobs/{id}` |
 | Page | `/page/{id}` |

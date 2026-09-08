@@ -33,6 +33,7 @@ ENTITY_PREFIXES = {
     "people": "p",
     "groups": "g",
     "group-types": "gt",
+    "defined-types": "dt",
     "workflows": "w",
     "jobs": "j",
     "pages": "page",

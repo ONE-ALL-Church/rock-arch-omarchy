@@ -4,6 +4,17 @@ This record describes the prepared `0.26.1` release boundary and the unreleased
 feature acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
 
+## Unreleased Defined Types search
+
+On 2026-09-08, Defined Types became the ninth development search category.
+356 Python tests and 90 Qt cases pass, alongside Ruff, ty, bytecode compilation,
+Omarchy manifest validation, and whitespace checks. Tests cover name matching,
+ID/GUID filters, exact definition routes, restricted reads, disabled and denied
+categories, aliases, CLI routing, QML hints and shortcut wiring, and the profile
+version 1/2 upgrade to version 3. Disabling the new category remains saved after
+reopening the profile store. These tests do not simulate a physical Alt+D keypress.
+The published 0.26.1 release still has eight entity categories.
+
 ## Development integration of the 0.26.1 security patch
 
 On 2026-09-06, the 0.26.1 marketplace fixes were merged into the development
@@ -290,13 +301,13 @@ plugin or assert that the interactive Omarchy shell lifecycle was tested.
   URLs, or exception text, apart from the validated same-origin URL in the
   explicit Personal Link editor. Content is limited to a user-selected bounded Magnus
   text preview and a user-selected bounded public Knowledge result.
-- Search uses eight fixed Rock REST v1 resources with fixed projections, bounded
+- Search uses nine fixed Rock REST v1 resources with fixed projections, bounded
   results, contains-style Workflow Type matching, fast prefix matching for the
   other entity categories, exact ID/GUID matching, and exact-origin navigation
   targets. The search client exposes no writes, SQL, or generic HTTP transport.
   Separate Personal Link and job clients provide the narrowly scoped, confirmed
   writes described in [SECURITY.md](../SECURITY.md).
-- A bounded post-login probe checks those same eight endpoints with only
+- A bounded post-login probe checks those same nine endpoints with only
   `$select=Id&$top=1`. Denied or unsupported categories are hidden, and the
   broker independently excludes them from scoped and unscoped requests.
 - Transient access-check failures disable entity search until retry instead of

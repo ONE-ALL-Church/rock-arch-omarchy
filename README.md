@@ -96,11 +96,12 @@ Settings.
 
 ## Search Rock
 
-Search covers eight fixed Rock entity categories:
+Search covers nine fixed Rock entity categories:
 
 - People
 - Groups
 - Group Types
+- Defined Types
 - Workflow Types
 - Scheduled Jobs
 - Pages
@@ -110,6 +111,11 @@ Search covers eight fixed Rock entity categories:
 The account's Rock permissions remain authoritative. After login, Rock Arch
 probes each supported category and hides any category that is unavailable or
 unauthorized. Search never falls back to sample data during normal use.
+
+Defined Type searches match any part of the name and open the definition at
+`/admin/general/defined-types/{id}`. They do not search individual Defined Values.
+The category is added once to existing installations; later disabling it in
+Settings or `enabledCategories` remains saved.
 
 An unscoped query searches every enabled category plus matching Personal Links.
 Workflow search finds **Workflow Types** (definitions), not individual workflow
@@ -140,6 +146,7 @@ known:
 | People | `p:`, `person:`, `people:` | `people` | `Alt+P` |
 | Groups | `g:`, `group:`, `groups:` | `groups` | `Alt+G` |
 | Group Types | `gt:`, `grouptype:`, `grouptypes:` | `group-types` | `Alt+Shift+G` |
+| Defined Types | `dt:`, `definedtype:`, `definedtypes:` | `defined-types` | `Alt+D` |
 | Workflow Types | `w:`, `wt:`, `workflow:`, `workflowtype:` | `workflows` | `Alt+W` |
 | Jobs | `j:`, `job:`, `jobs:` | `jobs` | `Alt+J` |
 | Pages | `pg:`, `page:`, `pages:` | `pages` | `Alt+Shift+P` |
@@ -518,7 +525,7 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
   after 15 idle minutes.
 - Usernames and passwords live in desktop Secret Service under a random profile
   ID; they are never returned to QML or placed in process arguments.
-- Entity search uses eight fixed REST v1 routes with fixed projections and
+- Entity search uses nine fixed REST v1 routes with fixed projections and
   bounded responses. Job discovery uses bounded metadata reads and the exact
   Obsidian block initialization action. The only job write is a confirmed
   `RunNow` POST to the discovered page/block; no arbitrary endpoint is accepted.

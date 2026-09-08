@@ -179,6 +179,7 @@ class RockRestAdapterTests(unittest.TestCase):
                 "/api/GroupTypes": [
                     {"Id": 5, "Name": "Small Group"}
                 ],
+                "/api/DefinedTypes": [{"Id": 13, "Name": "Connection Status"}],
                 "/api/WorkflowTypes": [
                     {"Id": 6, "Name": "Follow-up", "IsActive": True}
                 ],
@@ -242,6 +243,7 @@ class RockRestAdapterTests(unittest.TestCase):
                 "Group Type",
                 "/admin/general/group-types/5",
             ),
+            "Defined Types": ("Defined Type", "/admin/general/defined-types/13"),
             "Workflows": (
                 "Workflow Type",
                 "/admin/general/workflows?WorkflowTypeId=6",
@@ -515,6 +517,31 @@ class RockRestAdapterTests(unittest.TestCase):
         self.assertTrue(
             all(params["$filter"] == "Id eq 17" for _, params, _ in http.calls)
         )
+
+    def test_defined_type_scope_identity_and_access_boundaries(self):
+        http = FakeHttp({"/api/DefinedTypes": [{"Id": 49, "Name": "Connection Status"}]})
+        adapter = RockRestReadOnlyAdapter(FakeCookieProvider(), http)
+        for query, expected_filter in (
+            ("Status", "substringof('Status',Name)"),
+            ("49", "Id eq 49"),
+            ("a81b7c6d-1234-4abc-9876-0123456789ab", "Guid eq guid'a81b7c6d-1234-4abc-9876-0123456789ab'"),
+        ):
+            with self.subTest(query=query):
+                batch = adapter.search(query, "Defined Types")
+                path, params, _ = http.calls[-1]
+                self.assertEqual(path, "/api/DefinedTypes")
+                self.assertEqual(params["$filter"], expected_filter)
+                self.assertEqual(params["$select"], "Id,Name")
+                self.assertEqual(params["$top"], "3")
+                self.assertEqual(adapter.resolve(batch.results[0]["safeId"]).url,
+                                 DEFAULT_ROCK_ORIGIN + "/admin/general/defined-types/49")
+        http.calls.clear()
+        self.assertEqual(adapter.search("49", "Defined Types", categories=["People"]).results, [])
+        self.assertEqual(http.calls, [])
+        denied = RockRestReadOnlyAdapter(FakeCookieProvider(), CapabilityHttp(unavailable=["/api/DefinedTypes"]))
+        self.assertIn("Defined Types", denied.searchable_categories().unavailable)
+        with self.assertRaisesRegex(RockRestError, "rock_search_failed"):
+            denied.search("49", "Defined Types")
 
     def test_scoped_search_rejects_unknown_internal_categories(self):
         with self.assertRaisesRegex(RockRestError, "invalid_search_scope"):

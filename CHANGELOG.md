@@ -32,6 +32,12 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Search Defined Types by name, numeric ID, or GUID using `dt:`, Alt+D, or
+  `rock-arch search --entity defined-types`. Open the specific definition on the
+  selected Rock instance. Probe access before offering the category; add it once
+  to existing preferences while preserving other disabled categories and later
+  opt-outs. Defined Values are not included in this category.
+
 - Discover Scheduled Job List placements and verify page access plus block Edit
   permission before showing Run on job results. Confirm an exact, short-lived
   job draft with Cancel initially focused, recheck access and identity before

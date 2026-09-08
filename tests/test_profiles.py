@@ -179,7 +179,7 @@ class ProfileStoreTests(unittest.TestCase):
         self.assertTrue(snapshot["preferences"]["onboardingSetupCompleted"])
         self.assertEqual(
             snapshot["preferences"]["enabledCategories"],
-            ["People", "Groups", "Group Types", "Content Channel Types"],
+            ["People", "Groups", "Group Types", "Defined Types", "Content Channel Types"],
         )
         store.update_preferences(
             {"enabledCategories": ["People", "Content Channel Types"]}
@@ -190,6 +190,20 @@ class ProfileStoreTests(unittest.TestCase):
             store.preferences()["enabledCategories"],
             ["People", "Content Channel Types"],
         )
+
+    def test_version_two_gains_defined_types_once_and_preserves_disabled_categories(self):
+        self.path.write_text(json.dumps({
+            "version": 2, "activeProfileId": "", "profiles": [],
+            "preferences": {"enabledCategories": ["People"], "terminalMutationAccess": False},
+        }))
+        self.path.chmod(0o600)
+        store = ProfileStore(self.path, self.instance)
+        self.assertEqual(store.preferences()["enabledCategories"], ["People", "Defined Types"])
+        self.assertFalse(store.preferences()["terminalMutationAccess"])
+        store.update_preferences({"enabledCategories": ["People"]})
+        reopened = ProfileStore(self.path, self.instance)
+        self.assertEqual(reopened.preferences()["enabledCategories"], ["People"])
+        self.assertEqual(json.loads(self.path.read_text())["version"], PROFILE_STORE_VERSION)
 
     def test_profile_name_can_be_changed_without_changing_its_identity(self):
         store = ProfileStore(self.path, self.instance)

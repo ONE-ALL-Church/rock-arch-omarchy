@@ -161,6 +161,11 @@ class RockArchCliTests(unittest.TestCase):
             ],
         )
 
+    def test_defined_types_entity_maps_to_scoped_search(self):
+        client = FakeClient()
+        _request(_parser().parse_args(["search", "49", "--entity", "defined-types"]), client)
+        self.assertEqual(client.calls, [{"op": "search", "query": "dt: 49"}])
+
     def test_stdin_credentials_are_private_and_do_not_prompt(self):
         credentials = {"name": "Demo", "domain": "demo.example.org", "username": "fixture", "password": "synthetic-password"}
         output = io.StringIO()

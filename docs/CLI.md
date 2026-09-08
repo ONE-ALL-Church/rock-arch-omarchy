@@ -190,13 +190,14 @@ operations return nonzero and a stable error code.
 
 ## Rock search and links
 
-Search supports the same eight entity categories as the panel:
+Search supports the same nine entity categories as the panel:
 
 | Entity | `--entity` value | Query prefix | `enabledCategories` value |
 |---|---|---|---|
 | People | `people` | `p:` | `People` |
 | Groups | `groups` | `g:` | `Groups` |
 | Group Types | `group-types` | `gt:` | `Group Types` |
+| Defined Types | `defined-types` | `dt:` | `Defined Types` |
 | Workflow Types | `workflows` | `w:` | `Workflows` |
 | Scheduled Jobs | `jobs` | `j:` | `Jobs` |
 | Pages | `pages` | `page:` | `Pages` |
@@ -347,7 +348,7 @@ This is preferred for person names and other private terms because the query
 does not appear in the command's arguments. Positional queries remain supported
 for compatibility and non-sensitive terms.
 
-`--entity` accepts `people`, `groups`, `group-types`, `workflows`, `jobs`,
+`--entity` accepts `people`, `groups`, `group-types`, `defined-types`, `workflows`, `jobs`,
 `pages`, `content-types`, or `content-items`. Search still honors the active
 profile's detected Rock permissions and enabled categories. Opening an item,
 rerunning a Recent Link, and clearing history require `--confirm` because they

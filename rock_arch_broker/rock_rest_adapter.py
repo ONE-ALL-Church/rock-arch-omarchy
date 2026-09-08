@@ -48,6 +48,7 @@ ALLOWED_ENDPOINTS = frozenset(
     {
         "/api/People",
         "/api/Groups",
+        "/api/DefinedTypes",
         "/api/GroupTypes",
         "/api/WorkflowTypes",
         "/api/ServiceJobs",
@@ -225,6 +226,19 @@ SEARCH_SPECS = (
         "Group type",
         25,
         "/admin/general/group-types/{id}",
+    ),
+    _SearchSpec(
+        "Defined Types",
+        "Defined Type",
+        "/api/DefinedTypes",
+        ("Name",),
+        "Id,Name",
+        "Name",
+        ("Name",),
+        "Defined type",
+        27,
+        "/admin/general/defined-types/{id}",
+        match_anywhere=True,
     ),
     _SearchSpec(
         "Workflows",

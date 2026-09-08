@@ -69,6 +69,7 @@ Panel {
     {key: "People", label: "People"},
     {key: "Groups", label: "Groups"},
     {key: "Group Types", label: "Group Types"},
+    {key: "Defined Types", label: "Defined Types"},
     {key: "Workflows", label: "Workflow Types"},
     {key: "Jobs", label: "Jobs"},
     {key: "Pages", label: "Pages"},
@@ -1522,6 +1523,7 @@ Panel {
   Shortcut { sequence: "Alt+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("People"); onActivated: root.applyScope("p") }
   Shortcut { sequence: "Alt+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Groups"); onActivated: root.applyScope("g") }
   Shortcut { sequence: "Alt+Shift+G"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Group Types"); onActivated: root.applyScope("gt") }
+  Shortcut { sequence: "Alt+D"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Defined Types"); onActivated: root.applyScope("dt") }
   Shortcut { sequence: "Alt+W"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Workflows"); onActivated: root.applyScope("w") }
   Shortcut { sequence: "Alt+J"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Jobs"); onActivated: root.applyScope("j") }
   Shortcut { sequence: "Alt+Shift+P"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled && root.effectiveCategoryEnabled("Pages"); onActivated: root.applyScope("pg") }

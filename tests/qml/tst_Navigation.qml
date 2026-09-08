@@ -49,7 +49,7 @@ TestCase {
   }
 
   function test_every_displayed_prefix_maps_to_its_category() {
-    var categories = ["People", "Groups", "Group Types", "Workflows", "Jobs", "Pages", "Content Channel Types", "Content Channel Items"]
+    var categories = ["People", "Groups", "Group Types", "Defined Types", "Workflows", "Jobs", "Pages", "Content Channel Types", "Content Channel Items"]
     for (var option of Scopes.options(categories, categories)) {
       var key = Scopes.keyForQuery(option.prefix + ": query")
       compare(key, option.prefix)
@@ -57,6 +57,8 @@ TestCase {
       verify(Scopes.labelForKey(key).length > 0)
       compare(Scopes.withoutScope(option.prefix + ": query"), "query")
     }
+    for (var definedQuery of ["dt: 1", "definedtype: 1", "definedtypes: 1"])
+      compare(Scopes.categoryForKey(Scopes.keyForQuery(definedQuery)), "Defined Types")
     for (var query of ["pg: 1", "page: 1", "pages: 1"])
       compare(Scopes.categoryForKey(Scopes.keyForQuery(query)), "Pages")
   }

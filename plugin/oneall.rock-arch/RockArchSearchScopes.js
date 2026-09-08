@@ -5,6 +5,7 @@ function options(enabled, available) {
     {prefix: "p", label: "People", category: "People", shortcut: "Alt+P"},
     {prefix: "g", label: "Groups", category: "Groups", shortcut: "Alt+G"},
     {prefix: "gt", label: "Group Types", category: "Group Types", shortcut: "Alt+Shift+G"},
+    {prefix: "dt", label: "Defined Types", category: "Defined Types", shortcut: "Alt+D"},
     {prefix: "w", label: "Workflow Types", category: "Workflows", shortcut: "Alt+W"},
     {prefix: "j", label: "Jobs", category: "Jobs", shortcut: "Alt+J"},
     {prefix: "pg", label: "Pages", category: "Pages", shortcut: "Alt+Shift+P"},
@@ -23,6 +24,7 @@ function keyForQuery(value) {
   if (prefix === "p" || prefix === "person" || prefix === "people") return "p"
   if (prefix === "g" || prefix === "group" || prefix === "groups") return "g"
   if (prefix === "gt" || prefix === "grouptype" || prefix === "grouptypes") return "gt"
+  if (prefix === "dt" || prefix === "definedtype" || prefix === "definedtypes") return "dt"
   if (prefix === "w" || prefix === "wt" || prefix === "workflow" ||
       prefix === "workflows" || prefix === "workflowtype" ||
       prefix === "workflowtypes") return "w"
@@ -40,6 +42,7 @@ function labelForKey(key) {
   if (key === "p") return "People"
   if (key === "g") return "Groups"
   if (key === "gt") return "Group Types"
+  if (key === "dt") return "Defined Types"
   if (key === "w") return "Workflow Types"
   if (key === "j") return "Jobs"
   if (key === "pg") return "Pages"
@@ -53,6 +56,7 @@ function categoryForKey(key) {
   if (key === "p") return "People"
   if (key === "g") return "Groups"
   if (key === "gt") return "Group Types"
+  if (key === "dt") return "Defined Types"
   if (key === "w") return "Workflows"
   if (key === "j") return "Jobs"
   if (key === "pg") return "Pages"

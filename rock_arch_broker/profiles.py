@@ -19,7 +19,7 @@ from .origin import OriginError, validate_rock_origin
 MAX_PROFILE_STORE_BYTES = 64 * 1024
 MAX_PROFILES = 20
 PROFILE_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
-PROFILE_STORE_VERSION = 2
+PROFILE_STORE_VERSION = 3
 VERSION_2_CATEGORIES = ("Group Types", "Content Channel Types")
 DEFAULT_TAB_ORDER = ("search", "personal", "knowledge", "magnus")
 PERSONAL_LINK_VIEWS = ("sections", "alpha")
@@ -316,7 +316,7 @@ class ProfileStore:
     def _validated_state(cls, value: object) -> dict[str, Any]:
         if (
             not isinstance(value, dict)
-            or value.get("version") not in (1, PROFILE_STORE_VERSION)
+            or value.get("version") not in (1, 2, PROFILE_STORE_VERSION)
         ):
             raise ProfileError("profile_store_unavailable")
         source_version = value["version"]
@@ -391,6 +391,8 @@ class ProfileStore:
                 for category in VERSION_2_CATEGORIES
                 if category not in categories
             ]
+        if source_version < 3 and "Defined Types" not in categories:
+            categories = categories + ["Defined Types"]
         clean_preferences["enabledCategories"] = [
             category for category in CATEGORIES if category in categories
         ]

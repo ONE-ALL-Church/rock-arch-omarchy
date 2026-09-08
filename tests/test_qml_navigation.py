@@ -183,6 +183,9 @@ class QmlNavigationTests(unittest.TestCase):
     def test_search_category_model_includes_type_entities_and_shortcuts(self):
         source = all_qml_source()
 
+        self.assertIn('{key: "Defined Types", label: "Defined Types"}', source)
+        self.assertIn('sequence: "Alt+D"', source)
+        self.assertIn('onActivated: root.applyScope("dt")', source)
         self.assertIn('{key: "Group Types", label: "Group Types"}', source)
         self.assertIn(
             '{key: "Content Channel Types", label: "Content Channel Types"}',

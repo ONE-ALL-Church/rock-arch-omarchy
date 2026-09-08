@@ -79,6 +79,15 @@ _RECORDS = (
         "searchTerms": "108",
     },
     {
+        "category": "Defined Types",
+        "safeId": "mock-defined-type-connection-status",
+        "title": "Person Connection Status",
+        "subtitle": "Defined type",
+        "status": "",
+        "canOpen": True,
+        "searchTerms": "42",
+    },
+    {
         "category": "Workflows",
         "safeId": "mock-workflow-welcome",
         "title": "New Guest Follow-up",
