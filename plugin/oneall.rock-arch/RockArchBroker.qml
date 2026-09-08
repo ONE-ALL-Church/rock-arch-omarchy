@@ -20,7 +20,7 @@ QtObject {
   }
 
   property Process process: Process {
-    command: ["/usr/bin/python3", "-m", "rock_arch_broker"]
+    command: ["/usr/bin/python3", "-B", "-m", "rock_arch_broker"]
     workingDirectory: broker.packageRoot
     running: true
     onStarted: broker.connection.retry()

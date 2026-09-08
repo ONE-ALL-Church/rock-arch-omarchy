@@ -26,6 +26,7 @@ def render_launcher(plugin_root: Path) -> bytes:
         "#!/usr/bin/python3\n"
         f"{CLI_LAUNCHER_MARKER}\n"
         "import sys\n"
+        "sys.dont_write_bytecode = True\n"
         f"sys.path.insert(0, {root})\n"
         "from rock_arch_broker.cli import main\n"
         "main()\n"

@@ -196,6 +196,7 @@ class UpdateManager:
 
         command = [
             str(PYTHON),
+            "-B",
             "-m",
             "rock_arch_broker.update_worker",
             "--state-file",

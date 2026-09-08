@@ -141,7 +141,7 @@ class UpdateManagerTests(unittest.TestCase):
         self.assertEqual(status["state"], "updating")
         self.assertEqual(len(launched), 1)
         command, working_directory = launched[0]
-        self.assertEqual(command[:3], [str(PYTHON), "-m", "rock_arch_broker.update_worker"])
+        self.assertEqual(command[:4], [str(PYTHON), "-B", "-m", "rock_arch_broker.update_worker"])
         self.assertEqual(working_directory, self.root)
         self.assertEqual(command[command.index("--expected-revision") + 1], "b" * 40)
         self.assertEqual(self.state_file.stat().st_mode & 0o777, 0o600)

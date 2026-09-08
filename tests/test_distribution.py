@@ -67,12 +67,14 @@ class DistributionTests(unittest.TestCase):
                 "ROCK_ARCH_DEVELOPER_MODE": "0",
                 "PYTHONPATH": str(install),
             })
+            environment.pop("PYTHONDONTWRITEBYTECODE", None)
+            environment.pop("PYTHONPYCACHEPREFIX", None)
             socket_path = fixture_home / "run/rock-arch/broker.sock"
             tab_order = ["knowledge", "search", "magnus", "personal"]
             for startup in range(2):
                 # Second startup must reclaim the first broker's private socket.
                 process = subprocess.Popen(
-                    [sys.executable, "-c", BROKER_DRIVER, str(fixture_home)],
+                    [sys.executable, "-B", "-c", BROKER_DRIVER, str(fixture_home)],
                     cwd=install, env=environment,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 )
@@ -127,6 +129,8 @@ class DistributionTests(unittest.TestCase):
                         process.kill()
                         process.communicate(timeout=5)
 
+            self.assertEqual(list(install.rglob("__pycache__")), [],
+                             "Runtime cache writes trigger Omarchy plugin reloads")
             # Follow the documented cleanup only for this fixture's known files.
             self.assertEqual(launcher.read_bytes(), render_launcher(install))
             launcher.unlink()

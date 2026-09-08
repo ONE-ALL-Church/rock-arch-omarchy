@@ -180,6 +180,7 @@ class BrokerClient:
     def _start_broker(self) -> None:
         command = [
             sys.executable,
+            "-B",
             "-m",
             "rock_arch_broker",
             "--socket",

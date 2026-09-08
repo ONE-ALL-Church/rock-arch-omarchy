@@ -1695,7 +1695,8 @@ Panel {
 
         Column {
           visible: !root.onboardingFlowActive && root.viewMode !== "settings" &&
-            root.viewMode !== "knowledge" && root.contextName === "PROD" && !root.rockConfigured
+            root.viewMode !== "knowledge" && root.contextName === "PROD" &&
+            root.statusLoaded && root.profilesLoaded && !root.rockConfigured
           Layout.fillWidth: true
           topPadding: Style.spacing.xxxl
           bottomPadding: Style.spacing.huge
