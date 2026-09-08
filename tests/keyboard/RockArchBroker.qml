@@ -4,7 +4,8 @@ QtObject {
  required property string socketPath
  signal received(string line)
  signal interrupted()
- function request(payload) {}
+ property var requests: []
+ function request(payload) { requests = requests.concat([payload]) }
  function dropCredentials() {}
  function dropPersonalLinkRequests() {}
  function dropJobRequests() {}

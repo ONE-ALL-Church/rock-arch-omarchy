@@ -790,6 +790,25 @@ class PersonalLinkBrokerCliTests(unittest.TestCase):
             raise CliError(result["error"])
         return result
 
+    def test_bookmark_from_recent_link_prefills_and_rejects_actions_or_expired_ids(self):
+        from rock_arch_broker.navigation import NavigationTarget
+
+        self.broker._quick_returns.add(NavigationTarget("Recent page", "Page", 50, ORIGIN + "/page/42"))
+        recent = self.broker._quick_returns.public_items()[0]
+        result = _request(_parser().parse_args(["links", "add", "--from", recent["safeId"], "--dry-run"]), self)
+        self.assertTrue(result["ok"])
+        self.assertEqual(self.rock.writes, [])
+        prepared = self.request({"op": "personal_link_prepare", "safeId": recent["safeId"]})["personalLink"]
+        self.assertEqual(prepared["name"], "Recent page")
+        self.assertEqual(prepared["url"], ORIGIN + "/page/42")
+        self.broker._quick_returns.clear()
+        with self.assertRaisesRegex(CliError, "personal_link_source_invalid"):
+            self.request({"op": "personal_link_prepare", "safeId": recent["safeId"]})
+        self.broker._quick_returns.add(NavigationTarget("Deploy app", "Magnus Build", 60, ORIGIN + "/Build/mobileapps/1"))
+        build = self.broker._quick_returns.public_items()[0]
+        with self.assertRaisesRegex(CliError, "personal_link_source_invalid"):
+            self.request({"op": "personal_link_prepare", "safeId": build["safeId"]})
+
     def test_cli_delete_previews_then_confirms_exact_link_and_empty_section(self):
         self.rock.links = [
             {

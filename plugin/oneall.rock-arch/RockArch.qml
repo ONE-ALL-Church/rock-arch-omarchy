@@ -603,6 +603,12 @@ Panel {
     panelFlick.contentY = 0
   }
   function bookmarkSearchResult() {
+    if (showRecentLinks) {
+      if (jobModel.editing || viewMode !== "search" || !quickReturns.length) return
+      var recent = quickReturns[recentCursor >= 0 ? recentCursor : 0]
+      if (recent.kind !== "Magnus Build") beginPersonalLink(recent.safeId)
+      return
+    }
     if (jobModel.editing || viewMode !== "search" || !resultsAreCurrent || !results.length) return
     var result = results[resultCursor >= 0 ? resultCursor : 0]
     if (result.canOpen === true) beginPersonalLink(result.safeId)
@@ -890,6 +896,14 @@ Panel {
     })
   }
   function beginJob(index) {
+    if (showRecentLinks) {
+      if (!opened || viewMode !== "search" || !quickReturns.length) return
+      var recent = quickReturns[recentCursor >= 0 ? recentCursor : 0]
+      if (recent.kind !== "Scheduled Job") return
+      jobModel.begin({safeId: recent.safeId, title: recent.title, category: "Jobs"})
+      if (jobModel.editing) Qt.callLater(function() { searchPanel.jobCancelButton.forceActiveFocus(Qt.TabFocusReason) })
+      return
+    }
     if (!opened || viewMode !== "search" || !resultsAreCurrent || index < 0 || index >= results.length) return
     jobModel.begin(results[index])
     if (jobModel.editing) Qt.callLater(function() { searchPanel.jobCancelButton.forceActiveFocus(Qt.TabFocusReason) })

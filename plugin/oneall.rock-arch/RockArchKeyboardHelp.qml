@@ -21,7 +21,7 @@ ColumnLayout {
   }
   Text {
     Layout.fillWidth: true
-    text: "Ctrl+Tab / Ctrl+Shift+Tab  Switch workspaces\nCtrl+1–4  Open a workspace by position\nTab / Shift+Tab  Move between controls\nArrow keys  Move within tabs or lists\nCtrl+F  Focus search or Model Map filter\nCtrl+,  Settings    Esc  Back or close\nCtrl+B  Bookmark    Ctrl+N  Add link or section"
+    text: "Ctrl+Tab / Ctrl+Shift+Tab  Switch workspaces\nCtrl+1–4  Open a workspace by position\nTab / Shift+Tab  Move between controls\nArrow keys  Move within tabs or lists\nCtrl+F  Focus search or Model Map filter\nCtrl+,  Settings    Esc  Back or close\nCtrl+B  Bookmark    Ctrl+N  Add link or section\nR  Run selected job (from the list, when permitted)"
     textFormat: Text.PlainText
     color: Color.foreground
     font.family: Style.font.family

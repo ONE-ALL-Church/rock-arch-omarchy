@@ -4,6 +4,18 @@ This record describes the prepared `0.26.1` release boundary and the unreleased
 feature acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
 
+## Unreleased Recent Link actions
+
+On 2026-09-08, selected Recent Links gained Open and Bookmark actions, with
+Run for accessible jobs and Deploy for build entries. 363 Python tests and
+99 Qt cases pass. The offscreen keyboard integration exercises list selection,
+Tab through Run/Bookmark/Open, Enter opening without a trigger, R preparing a
+confirmed run, Ctrl+B preparing a bookmark, and hidden Run without access.
+Broker tests cover persisted recent jobs without a search registry, fresh access
+denial, expired references, exact route/kind validation, foreign-origin rejection,
+and CLI bookmark previews without writes. All job and bookmark tests use isolated
+fixtures. No production mutation is performed by these checks.
+
 ## Unreleased job Recent Links
 
 On 2026-09-08, accepted Run Job requests began recording the verified job entity

@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import stat
 import tempfile
@@ -114,6 +115,14 @@ class QuickReturnStore:
         except OSError:
             return False
         return True
+
+    def job_id(self, safe_id: str) -> int | None:
+        target = self.resolve(safe_id)
+        if target is None or target.kind != "Scheduled Job":
+            return None
+        match = re.fullmatch(re.escape(self.origin) + r"/admin/system/jobs/([1-9][0-9]{0,9})", target.url)
+        number = int(match[1]) if match else 0
+        return number if 0 < number <= 2_147_483_647 else None
 
     def migrate_from(self, path: Path) -> None:
         """Copy validated legacy history while retaining the source as rollback."""

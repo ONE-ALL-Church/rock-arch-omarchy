@@ -150,6 +150,35 @@ ShellRoot {
       press(Qt.Key_Escape)
       expect(rock.pendingRemoveProfileId === "", "Escape cancels profile removal")
       rock.openTab("search"); wait(30)
+      rock.query = ""
+      rock.quickReturns = [{title: "Fixture job", kind: "Scheduled Job", safeId: "quick-job"}]
+      rock.job.available = true
+      rock.selectRecent(0); wait(30)
+      expect(rock.testSnapshot().list, "Recent selection focuses list")
+      press(Qt.Key_Tab)
+      expect(rock.activeFocusItem.text === "Run", "Recent Tab reaches Run")
+      press(Qt.Key_Tab)
+      expect(rock.activeFocusItem.Accessible.name === "Add bookmark", "Recent Tab reaches Bookmark")
+      press(Qt.Key_Tab)
+      expect(rock.activeFocusItem.text === "Open", "Recent Tab reaches Open")
+      rock.preferenceCloseAfterOpen = false
+      press(Qt.Key_Return)
+      expect(rock.testRequests().slice(-1)[0].op === "activate_recent", "Recent Enter opens without triggering")
+      rock.selectRecent(0); wait(30)
+      press(Qt.Key_R)
+      expect(rock.job.editing && rock.job.safeId === "quick-job", "R prepares selected recent job")
+      expect(rock.testRequests().slice(-1)[0].op === "job_prepare", "Recent Run uses confirmation preparation")
+      press(Qt.Key_Escape)
+      rock.selectRecent(0); wait(30)
+      press(Qt.Key_B, Qt.ControlModifier)
+      expect(rock.personalLink.editing && rock.viewMode === "personal", "Ctrl+B bookmarks recent item")
+      expect(rock.testRequests().slice(-1)[0].safeId === "quick-job", "Bookmark uses opaque recent reference")
+      press(Qt.Key_Escape)
+      rock.openTab("search"); wait(30)
+      rock.job.available = false
+      rock.selectRecent(0); wait(30)
+      press(Qt.Key_Tab)
+      expect(rock.activeFocusItem.Accessible.name === "Add bookmark", "Denied job access omits Run action")
       rock.job.editing = true
       rock.job.phase = "confirm"
       rock.job.draftId = "fixture-draft"

@@ -450,7 +450,7 @@ Rock route:
 Personal Link targets may be relative but must resolve to HTTPS on the selected Rock origin; external and malformed
 links are omitted.
 
-Successful user-requested opens and accepted mobile app build requests are
+Successful user-requested opens, accepted job runs, and mobile app build requests are
 shown as Recent Links. The underlying Quick Return store keeps the title, type,
 order, target, and timestamp locally, but
 returns only another process-local opaque ID, title, and type to QML. Its
@@ -463,7 +463,12 @@ its clear and activation operations are no-ops. PROD never receives those
 fixtures. A Magnus Build entry cannot be opened as a URL; activation routes it
 back through the build-path validator after another UI confirmation. The broker
 serves this local list independently from Personal Links,
-so showing the empty Search state never performs a Rock network request. This
+so the local history read does not require a Rock request. When history includes
+scheduled jobs, the UI separately probes job access before offering Run. Recent
+job references resolve only exact `/admin/system/jobs/{id}` routes with the
+Scheduled Job kind on the active origin; preparation then rereads the job and
+verifies access through the existing confirmation flow. Bookmark preparation
+accepts ordinary Recent Link targets but rejects Magnus build action entries. This
 intentionally emulates Rock's useful return list without importing browser-local
 Rock history.
 

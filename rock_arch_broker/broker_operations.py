@@ -1015,8 +1015,7 @@ class BrokerOperations:
                     response["quickReturns"] = []
             else:
                 safe_id = sanitize_text(raw.get("safeId"), 100)
-                resolver = getattr(broker._live, "job_id", None)
-                number = resolver(safe_id) if callable(resolver) else None
+                number = broker._job_id(safe_id)
                 if number is None:
                     raise JobError("job_not_found")
                 result = (broker._jobs.prepare(number) if operation == "job_prepare"
@@ -1134,7 +1133,7 @@ class BrokerOperations:
                     safe_id = raw["safeId"]
                     if not isinstance(safe_id, str) or "url" in raw:
                         raise PersonalLinkError("personal_link_source_invalid")
-                    target = broker._live.resolve(safe_id)
+                    target = broker._live.resolve(safe_id) or broker._quick_returns.resolve(safe_id)
                     if target is None or target.kind == "Magnus Build":
                         raise PersonalLinkError("personal_link_source_invalid")
                     name, url = raw.get("name", prefill_name(target.title)), target.url

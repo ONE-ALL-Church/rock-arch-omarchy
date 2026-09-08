@@ -51,6 +51,11 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Added
 
+- Show Open and Bookmark on selected Recent Links, plus Run for authorized
+  scheduled jobs and Deploy for build entries. Match Search keyboard actions
+  with Ctrl+B and R, and support recent references in CLI bookmark/job commands.
+  Click selects a recent row; Enter or double-click performs its default action.
+
 - Search Defined Types by name, numeric ID, or GUID using `dt:`, Alt+D, or
   `rock-arch search --entity defined-types`. Open the specific definition on the
   selected Rock instance. Probe access before offering the category; add it once

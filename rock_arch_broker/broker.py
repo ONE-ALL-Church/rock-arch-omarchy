@@ -669,6 +669,11 @@ class Broker:
         key = profile_id or self._active_profile_id or "unconfigured"
         return self._quick_root / f"build-receipts-{key}.json"
 
+    def _job_id(self, safe_id: str) -> int | None:
+        resolver = getattr(self._live, "job_id", None)
+        number = resolver(safe_id) if callable(resolver) else None
+        return number if number is not None else self._quick_returns.job_id(safe_id)
+
     def _describe_safe_id(self, safe_id: str) -> dict[str, Any]:
         candidate = sanitize_text(safe_id, 100)
         if candidate.startswith("magnus-"):
@@ -686,9 +691,10 @@ class Broker:
             raise ValueError("not_found")
         action = "build" if target.kind == "Magnus Build" else "open"
         actions = [action]
-        job_resolver = getattr(self._live, "job_id", None)
+        if action == "open":
+            actions.append("bookmark")
         if (self._context is Context.PROD and target.kind == "Scheduled Job"
-                and callable(job_resolver) and job_resolver(candidate) is not None
+                and self._job_id(candidate) is not None
                 and self._session.status().get("configured")
                 and "Jobs" in self._profile_store.preferences()["enabledCategories"]
                 and self._jobs.access()["available"]):

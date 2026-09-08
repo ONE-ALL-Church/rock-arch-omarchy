@@ -109,7 +109,9 @@ placement is required. Multiple equally valid placements, unsupported versions,
 or inaccessible metadata leave the capability unavailable. Access is cached for
 60 seconds and discarded on profile, credentials, or context changes.
 
-`run` accepts only an opaque ID from a current Jobs search. Dry runs prepare
+`run` accepts an opaque ID from a current Jobs search or a Scheduled Job in
+Recent Links. Recent references must resolve to an exact job entity route on
+the active instance; history does not grant permission to run it. Dry runs prepare
 the target without triggering it. Confirmation consumes a single-use draft
 (valid for two minutes), repeats discovery/access checks, rereads the job, and
 rejects changed identity, name, or placement before sending a single POST.
@@ -363,6 +365,9 @@ available actions, and opaque-ID lifetime without opening or reading it. Every
 confirmed action also accepts `--dry-run` in place of `--confirm`. A dry run
 validates the registered target and returns expected side effects with
 `"executed": false`.
+
+Recent Links can also prefill bookmarks with `rock-arch links add --from SAFE_ID --dry-run` or `--confirm`. Use an opaque ID from `rock-arch links recent`;
+Magnus build action entries cannot be bookmarked as entity pages.
 
 ## Public Rock Knowledge
 

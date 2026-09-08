@@ -12,3 +12,5 @@
   function testFocusField() { searchField.forceActiveFocus() }
   function testFocusDetail() { knowledgePanel.backButton.forceActiveFocus() }
   function testFocusMagnusText() { var items = Focus.stops(magnusPanel); items[items.length - 1].forceActiveFocus() }
+
+  function testRequests() { return broker.requests }

@@ -170,10 +170,15 @@ address, or full birth date for search context.
 
 ## Recent Links and Personal Links
 
-An empty Search shows **Recent Links**, newest-used first. Opened records and
-accepted Magnus builds become profile-scoped shortcuts, capped at 20. A build
+An empty Search shows **Recent Links**, newest-used first. Opened records,
+accepted job runs, and accepted Magnus builds become profile-scoped shortcuts,
+capped at 20. A build
 shortcut returns to the confirmation flow—it never silently deploys. `X` or
-`Delete` opens the clear confirmation.
+`Delete` opens the clear confirmation. Select a row to reveal **Open** and the
+**bookmark icon**; scheduled jobs also offer **Run** when access is available.
+`Tab` reaches these actions, `Ctrl+B` bookmarks, and `R` from the list prepares
+a job run with confirmation. Single-click selects; Enter or double-click opens
+the entity (or reviews a build deployment).
 
 **Personal Links** are the current user's Rock admin bookmarks. They remain a
 separate workspace, while unscoped Search can also match their title or section.
@@ -188,7 +193,7 @@ Use the **Sections / A–Z** toolbar (or press `V`) to choose a flat alphabetica
 Returning to Sections restores the expanded sections. Both preferences are
 editable through the CLI.
 
-Choose the **bookmark icon** beside a Search result, or press `Ctrl+B`, to prefill its name and
+Choose the **bookmark icon** beside a Search result or Recent Link, or press `Ctrl+B`, to prefill its name and
 URL. In **Links**, choose **Add → Link** to enter a bookmark manually; `Ctrl+N`
 opens the Add menu. Review the name, Rock URL, and personal section, then select **Save
 link** or press `Ctrl+S`. Escape cancels the form. The saved bookmark is selected
@@ -447,7 +452,7 @@ These are future directions under consideration, not committed release dates:
 | Surface | Move | Activate | Return or cancel | Direct actions |
 |---|---|---|---|---|
 | Workspaces | `Ctrl+Tab` / `Ctrl+Shift+Tab`; arrows when tab bar is focused | Tab enters content | `Esc` closes | `Ctrl+1`–`Ctrl+4` follow visible order; `Ctrl+,` Settings; F1 help |
-| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+B` bookmarks a Search result; `X` or Delete clears recents |
+| Search / Recent | Up / Down (stays in list) | Enter or Space | Backspace resumes editing | `Ctrl+B` bookmarks; `R` prepares a permitted job run; `X` or Delete clears recents |
 | Knowledge results | Up / Down | Enter | Backspace edits search | `Ctrl+3` (default order) opens Knowledge |
 | Knowledge detail | Tab / Shift+Tab; Page Up/Down scrolls | Enter or Space | Esc walks Back history | Ctrl+F filters Model Map; Open source and Related items |
 | Personal Links | Up / Down stays in the list; Left / Right collapses or expands sections | Enter or Space toggles a section or opens a link | Backspace returns to Search | `V` focuses Sections / A–Z; `Ctrl+N` opens Add; `Delete` reviews deletion |

@@ -169,7 +169,7 @@ QtObject {
     if (code === "personal_section_limit") return "This account has reached Rock Arch's limit of 100 personal sections."
     if (code === "personal_links_not_authorized") return "Rock doesn't permit this action for your account. Your Rock administrator can review Personal Links API access."
     if (code === "personal_links_preview_only") return "Saving Personal Links is unavailable in Preview."
-    if (code === "personal_link_source_invalid") return "That search result has expired. Search again and choose Save."
+    if (code === "personal_link_source_invalid") return "That item is no longer available. Refresh and choose Bookmark again."
     if (code === "personal_link_rejected") return kind === "section" ? "Rock rejected the section. Check its name." : "Rock rejected the link. Check its name, URL, and section."
     if (code === "rock_login_required" || code === "rock_login_failed") return "Sign in to Rock again, then reopen this action."
     return deleting ? "Rock Arch couldn't check or delete this item. Reload to try again." : "Rock Arch couldn't load or save this " + kind + ". Reload to try again."

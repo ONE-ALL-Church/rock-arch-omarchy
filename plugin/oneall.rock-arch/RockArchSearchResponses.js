@@ -55,6 +55,8 @@ function knowledgeResults(root, ui, response, frame) {
 function recentLinks(root, response) {
     if (Array.isArray(response.quickReturns)) {
       root.quickReturns = response.quickReturns
+      if (root.job && root.contextName === "PROD" && root.quickReturns.some(function(item) { return item.kind === "Scheduled Job" }))
+        root.job.refreshAccess()
       if (root.showRecentLinks) {
         root.recentCursor = root.quickReturns.length ? 0 : -1
         root.resultCursor = -1

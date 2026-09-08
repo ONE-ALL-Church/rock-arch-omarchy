@@ -31,7 +31,8 @@ keeps focus on the tab bar until the user enters its content.
 
 1. **Search and Recent:** input → list → available selected-row actions. Down
    enters results; Up from the first result returns to the input. List boundaries
-   never switch workspaces. Ctrl+B bookmarks a result. Backspace from a selected
+   never switch workspaces. Ctrl+B bookmarks a result or Recent Link; R prepares a permitted job run.
+   Recent rows select on click and open on Enter or double-click. Backspace from a selected
    row resumes editing. Modified editing keys retain their native behavior.
 2. **Links:** Sections/A–Z choice → Add → sections/links → selected-item action.
    Left/Right operates the focused choice or expands/collapses sections. Tab does

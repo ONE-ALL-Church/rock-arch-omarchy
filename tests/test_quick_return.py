@@ -38,6 +38,27 @@ class QuickReturnTests(unittest.TestCase):
         assert target is not None
         self.assertEqual(target.url, "https://rock.example.org/Person/17")
 
+    def test_job_resolution_requires_exact_local_entity_route_and_kind(self):
+        cases = [("Scheduled Job", "/admin/system/jobs/7", 7),
+                 ("Page", "/admin/system/jobs/7", None),
+                 ("Magnus Build", "/admin/system/jobs/7", None),
+                 ("Scheduled Job", "/admin/system/jobs/7?other=8", None),
+                 ("Scheduled Job", "/admin/system/jobs/7#8", None),
+                 ("Scheduled Job", "/admin/system/jobs/0", None),
+                 ("Scheduled Job", "/admin/system/jobs/2147483648", None),
+                 ("Scheduled Job", "/admin/system/jobs/07", None),
+                 ("Scheduled Job", "/admin/system/jobs/7/RunNow", None)]
+        for kind, route, expected in cases:
+            with self.subTest(kind=kind, route=route):
+                self.store.clear()
+                self.store.add(NavigationTarget("Job", kind, 40, DEFAULT_ROCK_ORIGIN + route))
+                item = self.store.public_items()[0]
+                self.assertEqual(self.store.job_id(item["safeId"]), expected)
+        self.assertIsNone(self.store.job_id("7"))
+        self.assertIsNone(self.store.job_id("quick-made-up"))
+        self.store.set_origin("https://other.example.org")
+        self.assertIsNone(self.store.job_id(item["safeId"]))
+
     def test_deduplicates_and_caps_at_twenty(self):
         first = NavigationTarget(
             "Ada", "Person", 10, "https://rock.example.org/Person/1"

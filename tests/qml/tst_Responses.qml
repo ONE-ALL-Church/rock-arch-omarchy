@@ -80,7 +80,7 @@ TestCase {
   }
 
   function test_job_receipt_refreshes_recent_links_without_disturbing_search() {
-    state.job = {editing: true, busy: true, requestId: "run-1", accept: function() {}}
+    state.job = {editing: true, busy: true, requestId: "run-1", accept: function() {}, refreshAccess: function() {}}
     state.query = "j: Test"
     state.resultCursor = 2
     state.showRecentLinks = false

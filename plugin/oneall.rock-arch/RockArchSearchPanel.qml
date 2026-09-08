@@ -8,7 +8,7 @@ import qs.Ui
 Column {
   id: searchPanel
 
-  property alias listFocus: listFocus
+  readonly property Item listFocus: controller.showRecentLinks ? recentListFocus : resultListFocus
   required property var controller
   required property var searchField
   property alias resultRepeater: resultRepeater
@@ -27,9 +27,9 @@ Column {
   spacing: Style.spacing.rowGap
 
   RockArchListFocus {
-    id: listFocus
+    id: resultListFocus
     controller: searchPanel.controller
-    visible: searchPanel.controller.activeSearchCount > 0 && !searchPanel.controller.job.editing && !searchPanel.controller.pendingClearRecent && searchPanel.controller.pendingMagnusBuildId === ""
+    visible: !searchPanel.controller.showRecentLinks && searchPanel.controller.activeSearchCount > 0 && !searchPanel.controller.job.editing && !searchPanel.controller.pendingClearRecent && searchPanel.controller.pendingMagnusBuildId === ""
     Accessible.name: "Search results"
   }
 
@@ -259,7 +259,7 @@ Column {
   }
 
   Column {
-    visible: searchPanel.controller.showRecentLinks
+    visible: searchPanel.controller.showRecentLinks && !searchPanel.controller.job.editing
     width: searchPanel.width
     height: visible ? implicitHeight : 0
     spacing: Style.spacing.rowGap
@@ -407,12 +407,21 @@ Column {
       }
     }
 
+    RockArchListFocus {
+      id: recentListFocus
+      controller: searchPanel.controller
+      visible: searchPanel.controller.quickReturns.length > 0 && !searchPanel.controller.pendingClearRecent && searchPanel.controller.pendingMagnusBuildId === ""
+      Accessible.name: "Recent links"
+    }
+
     Repeater {
       id: quickReturnRepeater
       model: searchPanel.controller.quickReturns
 
       delegate: Item {
         id: recentRow
+
+        enabled: !searchPanel.controller.pendingClearRecent && searchPanel.controller.pendingMagnusBuildId === ""
 
         required property var modelData
         required property int index
@@ -432,7 +441,7 @@ Column {
 
         Column {
           anchors.left: parent.left
-          anchors.right: parent.right
+          anchors.right: recentActions.visible ? recentActions.left : parent.right
           anchors.verticalCenter: parent.verticalCenter
           anchors.leftMargin: Style.spacing.rowPaddingX
           anchors.rightMargin: Style.spacing.rowPaddingX
@@ -468,7 +477,56 @@ Column {
           cursorShape: Qt.PointingHandCursor
           onClicked: {
             searchPanel.controller.selectRecent(recentRow.index)
+          }
+          onDoubleClicked: {
+            searchPanel.controller.selectRecent(recentRow.index)
             searchPanel.controller.activateRecent(recentRow.index)
+          }
+        }
+
+        Row {
+          id: recentActions
+          visible: recentRow.rowSelected && searchPanel.controller.contextName === "PROD"
+          anchors.right: parent.right
+          anchors.rightMargin: Style.spacing.sm
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: Style.spacing.xs
+          z: 2
+
+          Button {
+            visible: recentRow.modelData.kind === "Scheduled Job" && searchPanel.controller.job.available
+            text: "Run"
+            tooltipText: "Run now · R"
+            fontSize: Style.font.caption
+            focusable: true
+            onClicked: {
+              searchPanel.controller.selectRecent(recentRow.index)
+              searchPanel.controller.beginJob(recentRow.index)
+            }
+          }
+          Button {
+            visible: recentRow.modelData.kind !== "Magnus Build"
+            iconText: "\uf097"
+            iconSize: Style.font.body
+            Accessible.role: Accessible.Button
+            Accessible.name: "Add bookmark"
+            Accessible.description: "Add to Personal Links · Ctrl+B"
+            Accessible.onPressAction: clicked()
+            tooltipText: "Add to Personal Links · Ctrl+B"
+            fontSize: Style.font.caption
+            focusable: true
+            onClicked: searchPanel.controller.beginPersonalLink(recentRow.modelData.safeId)
+          }
+          Button {
+            text: recentRow.modelData.kind === "Magnus Build" ? "Deploy" : "Open"
+            tooltipText: recentRow.modelData.kind === "Magnus Build" ? "Review deployment · Enter" : "Open in Rock · Enter"
+            fontSize: Style.font.caption
+            bordered: true
+            focusable: true
+            onClicked: {
+              searchPanel.controller.recentCursor = recentRow.index
+              searchPanel.controller.activateRecent(recentRow.index)
+            }
           }
         }
       }

@@ -314,6 +314,29 @@ class JobBrokerTests(unittest.TestCase):
                 self.assertFalse(response["ok"])
                 self.assertEqual(broker._quick_returns.public_items(), [])
 
+    def test_recent_job_can_prepare_run_and_status_without_search_registry(self):
+        from rock_arch_broker.quick_return import QuickReturnStore
+
+        with self.fixture() as (broker, http, row, _):
+            response = self.run_job(broker, row)
+            broker._live._registry.clear()
+            # Restart the store to ensure only persisted history is used.
+            broker._quick_returns = QuickReturnStore(broker._quick_returns.path, ORIGIN)
+            recent = broker._quick_returns.public_items()[0]
+            actions = broker.handle({"op": "describe", "safeId": recent["safeId"]})["description"]["actions"]
+            self.assertEqual(actions, ["open", "bookmark", "runJob"])
+            response = self.run_job(broker, recent)
+            self.assertTrue(response["ok"])
+            self.assertEqual(len(response["quickReturns"]), 1)
+            status = broker.handle({"op": "job_status", "safeId": recent["safeId"]})
+            self.assertEqual(status["jobAction"]["title"], "Test job")
+            http.edit = False
+            denied = broker.handle({"op": "job_prepare", "safeId": recent["safeId"]})
+            self.assertEqual(denied["error"], "job_access_denied")
+            broker._quick_returns.clear()
+            expired = broker.handle({"op": "job_prepare", "safeId": recent["safeId"]})
+            self.assertEqual(expired["error"], "job_not_found")
+
     def test_disabled_history_does_not_record_accepted_run(self):
         with self.fixture() as (broker, _, row, _):
             broker._profile_store.update_preferences({"recentLinks": False})
