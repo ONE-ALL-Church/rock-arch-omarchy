@@ -14,6 +14,8 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Fixed
 
+- Traverse keyboard focus controls compatibly with older Qt child collections.
+
 - Add accepted job runs to Recent Links as the job entity page, respecting the
   history preference and updating existing entries. Canceled, rejected, and
   uncertain requests do not record a link; opening the link never reruns a job.

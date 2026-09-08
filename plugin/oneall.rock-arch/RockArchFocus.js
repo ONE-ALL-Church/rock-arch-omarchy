@@ -6,7 +6,9 @@ function stops(item) {
   if (!item || !item.visible || !item.enabled) return []
   if (item.activeFocusOnTab) return [item]
   var result = []
-  for (var child of item.children || []) result = result.concat(stops(child))
+  var children = item.children || []
+  for (var index = 0; index < children.length; ++index)
+    result = result.concat(stops(children[index]))
   return result
 }
 

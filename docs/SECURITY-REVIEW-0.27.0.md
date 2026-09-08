@@ -75,6 +75,10 @@ instead of relying on an assertion.
   fixture setup/cleanup. Keyboard integration runs actual Qt input events against
   the plugin and installed Omarchy controls in an offscreen window with an inert
   broker. Real Quickshell socket recovery is tested against a delayed local server.
+- GitHub CI additionally exercises Qt 6.4.2. Its focus-collection regression
+  caught unsupported for-of iteration over QML child lists; indexed traversal
+  now preserves the same focus order on older Qt. This was a compatibility
+  failure, not an authorization change.
 - Fresh distribution tests create an isolated installation and launcher, start
   and restart the real broker, check permissions and version, and clean it up;
   network and keyring access are blocked in that fixture. Earlier native
