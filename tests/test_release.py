@@ -81,7 +81,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("uvx --from ruff==", workflow)
         self.assertIn("uvx --from ty==", workflow)
         self.assertIn(
-            'command: ["/usr/bin/python3", "-m", "rock_arch_broker"]', qml
+            'command: ["/usr/bin/python3", "-B", "-m", "rock_arch_broker"]', qml
         )
 
 
