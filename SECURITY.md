@@ -22,7 +22,7 @@ compromised Quickshell process, a compromised Python runtime, or a malicious
 Rock server that returns semantically deceptive but structurally valid display
 text. Rock permissions remain the authorization boundary for tenant data,
 Personal Link creation and deletion, scheduled jobs, and the mobile-app build action. Rock Arch probes only
-its eight fixed read endpoints after login, hides denied categories, and independently enforces the
+its nine fixed entity read endpoints after login, hides denied categories, and independently enforces the
 detected allowlist in the broker before search requests are issued.
 
 Update checks are limited to the canonical Git-managed Rock Arch installation.
@@ -74,7 +74,10 @@ also requires the block's Edit permission, even when Rock's RunNow action would
 permit a viewer. The standard Jobs page is preferred, with a unique accessible
 custom placement as fallback. Discovery failures and ambiguous placements disable
 the action. Access caches and drafts are cleared on account/context changes.
-Only an existing Jobs search reference can create a two-minute, single-use draft.
+A current Jobs search reference or an exact Scheduled Job entity reference from
+the active profile's Recent Links can create a two-minute, single-use draft.
+History references must match the active origin and exact job route; they do
+not grant job access.
 Confirmation rechecks access, placement, and the job's GUID/name before one
 RunNow POST with its GUID. GET cannot trigger jobs, clients cannot supply page or
 block GUIDs, and uncertain writes are never retried. The UI drops unsent job
@@ -87,7 +90,8 @@ and primary alias from the authenticated session, offers only non-shared
 sections owned by that alias, and rechecks both account and section at Save.
 Clients cannot choose a raw owner or record ID. The URL must resolve to the
 active HTTPS Rock origin. Single-use drafts expire after ten minutes and are
-cleared on account/context changes and sign-out. Saves are read back before
+cleared on account/context changes and sign-out. Expiry is checked again after
+validation reads and before writes. Saves are read back before
 success is reported; ambiguous outcomes are not retried automatically. Explicit
 section creation accepts only a name and fixes the authenticated owner and
 `IsShared: false`. It checks for a matching private section before creating one,
@@ -128,3 +132,6 @@ records are not read.
 Do not attach a live tenant or retrieve production credentials when testing a
 security report. The unit suite uses synthetic stores, cookies, responses, and
 local Unix sockets.
+
+The [0.27.0 release audit](docs/SECURITY-REVIEW-0.27.0.md) covers the new mutation
+features, Recent Link actions, UI boundaries, and release verification.

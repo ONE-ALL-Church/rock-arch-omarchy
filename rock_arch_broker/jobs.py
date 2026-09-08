@@ -256,7 +256,8 @@ class JobManager:
                 raise JobError("job_changed")
             if draft.deadline <= time.monotonic():
                 raise JobError("job_draft_expired")
-            assert self._origin is not None
+            if self._origin is None:
+                raise JobError("job_access_unavailable")
             self._http.request(self._origin, draft.placement.action("RunNow"), {}, cookie, {"key": draft.guid})
         return JobRunOutcome(NavigationTarget(
             draft.title, "Scheduled Job", 40, f"{self._origin}/admin/system/jobs/{draft.number}"

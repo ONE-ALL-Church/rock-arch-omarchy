@@ -134,6 +134,40 @@ class PersonalLinkTests(unittest.TestCase):
     def draft(self):
         return self.manager.prepare("People", "/page/42")
 
+    def test_confirmation_expiring_during_validation_never_writes(self):
+        for action in ("link", "link_lookup", "section", "delete"):
+            with self.subTest(action=action):
+                rock = FakeRock()
+                manager = PersonalLinkManager(Cookie(), rock)
+                manager.set_origin(ORIGIN)
+                now = [100.0]
+                with patch("rock_arch_broker.personal_links.time.monotonic", side_effect=lambda now=now: now[0]):
+                    if action in ("link", "link_lookup"):
+                        draft = manager.prepare("Page", "/page/42")
+                        commit = lambda manager=manager, draft=draft: manager.save(draft["draftId"], "Page", "/page/42", None, confirmed=True)
+                    elif action == "section":
+                        draft = manager.prepare_section("New section")
+                        commit = lambda manager=manager, draft=draft: manager.save_section(draft["draftId"], "New section", confirmed=True)
+                    else:
+                        target = manager.list_sections()[0]["safeId"]
+                        draft = manager.prepare_delete("section", target)
+                        commit = lambda manager=manager, draft=draft: manager.delete(draft["draftId"], confirmed=True)
+                    now[0] = 699.0
+                    read = rock.get
+
+                    def slow_read(*args, read=read, now=now, action=action):
+                        result = read(*args)
+                        if action != "link_lookup" or args[1] == LINKS:
+                            now[0] = 701.0
+                        return result
+
+                    with (
+                        patch.object(rock, "get", side_effect=slow_read),
+                        self.assertRaisesRegex(PersonalLinkError, "draft_expired"),
+                    ):
+                        commit()
+                    self.assertEqual(rock.writes, [])
+
     def test_explicit_section_creation_is_private_confirmed_and_read_back(self):
         draft = self.manager.prepare_section("  Projects  ")
         self.assertEqual(self.rock.writes, [])

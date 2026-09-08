@@ -1,7 +1,8 @@
 # Verification record
 
-This record describes the prepared `0.26.1` release boundary and the unreleased
-feature acceptance below. Historical feature changes belong in
+The current release boundary is `0.27.0`; its consolidated evidence is recorded
+in [the release security review](SECURITY-REVIEW-0.27.0.md). The development
+acceptance entries and `0.26.1` checks below are historical records. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
 
 ## Unreleased Recent Link actions

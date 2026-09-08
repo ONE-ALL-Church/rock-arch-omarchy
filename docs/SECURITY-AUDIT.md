@@ -8,7 +8,7 @@ regression tests and local release checks, not a penetration test of a Rock
 server or an independent certification.
 
 A subsequent [Omarchy marketplace review on 2026-09-06](OMARCHY-SECURITY-REVIEW.md)
-raised two listing requirements, now addressed in 0.26.1 and awaiting re-review.
+raised two listing requirements, addressed in 0.26.1, which was published and maintainer-verified on 2026-09-08.
 Its intake records the updater
 finding and the qualified Magnus text-format evidence separately from this
 historical release audit.

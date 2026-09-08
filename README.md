@@ -11,8 +11,8 @@ client, OAuth application, Rock MCP server, Magnus CLI, Node.js, or npm.
 
 ![Rock Arch search in the native Omarchy panel](preview.png)
 
-_The current Omarchy interface, shown with synthetic preview data. Person context
-helps distinguish people with similar names._
+_The 0.27.0 Search interface with synthetic jobs and account details, rendered
+with Omarchy UI controls in an isolated preview window. No tenant data is shown._
 
 ## Install
 

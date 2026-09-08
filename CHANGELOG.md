@@ -3,7 +3,14 @@
 Rock Arch follows [Semantic Versioning](https://semver.org/). The GitHub
 repository's default branch is the source used by Omarchy plugin updates.
 
-## [Unreleased]
+## [0.27.0] - 2026-09-08
+
+### Security
+
+- Recheck bookmark and section confirmation expiry after validation reads and
+  immediately before writes. Slow validation cannot extend an expired draft.
+- Keep both 0.26.1 marketplace fixes: immutable update commits and literal-text
+  Magnus previews.
 
 ### Fixed
 

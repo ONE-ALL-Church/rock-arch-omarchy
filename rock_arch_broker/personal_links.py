@@ -372,6 +372,11 @@ class PersonalLinkManager:
             raise PersonalLinkError("personal_link_account_changed")
         return person, alias
 
+    @staticmethod
+    def _check_deadline(draft: _Draft | _DeleteDraft) -> None:
+        if draft.deadline <= time.monotonic():
+            raise PersonalLinkError("personal_link_draft_expired")
+
     def _delete_record(
         self, kind: str, number: int, cookie: str
     ) -> dict[str, Any] | None:
@@ -538,6 +543,7 @@ class PersonalLinkManager:
                             raise PersonalLinkError("personal_section_contents_changed")
                     else:
                         self._require_empty(record["Id"], cookie)
+            self._check_deadline(draft)
             del self._deletions[str(draft_id)]
             if not already_deleted:
                 self._client.delete(
@@ -589,6 +595,7 @@ class PersonalLinkManager:
             already_saved = section is not None
             if section is None and len(sections) >= MAX_SECTIONS:
                 raise PersonalLinkError("personal_section_limit")
+            self._check_deadline(draft)
             del self._drafts[str(draft_id)]
             if section is None:
                 section = self._create_section(person, alias, clean_name, cookie)
@@ -665,6 +672,7 @@ class PersonalLinkManager:
                 require_mutation(allowed_actions, "addSections")
             # Consume before any write. Interrupted or replayed requests cannot
             # resubmit the same mutation, including creation of a first section.
+            self._check_deadline(draft)
             del self._drafts[str(draft_id)]
             if section is None:
                 section = self._create_section(person, alias, "Links", cookie)
@@ -682,6 +690,7 @@ class PersonalLinkManager:
                     "name": _name(rows[0].get("Name")),
                     "section": section["name"],
                 }
+            self._check_deadline(draft)
             created = self._client.create(
                 self._origin,
                 LINKS,

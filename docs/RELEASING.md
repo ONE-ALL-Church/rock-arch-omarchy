@@ -16,6 +16,8 @@ required.
    ```bash
    python3 -m unittest discover -s tests -v
    scripts/check-qml
+   scripts/check-keyboard
+   scripts/check-socket
    uvx --from ruff==0.16.5 ruff check rock_arch_broker tests
    uvx --from ty==0.0.78 ty check rock_arch_broker
    python3 -m compileall -q rock_arch_broker
@@ -46,6 +48,12 @@ optional confirmed Magnus builds, and opt-in self-updates in maintainer notes.
 Check for an existing submission before creating another one. The marketplace
 scans the exact commit and requires maintainer approval; a GitHub release alone
 does not list the plugin. Keep the submitted commit stable while it is reviewed.
+
+For an existing listing, use the [Plugin verification form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=verify-plugin.yml),
+select **Verify and publish a newer upstream commit**, and provide the plugin ID,
+repository root URL, and full current HEAD SHA. Do not reopen the initial
+submission or create a duplicate initial listing. The prior marketplace snapshot
+remains in place while the update awaits review.
 
 ## Update an installation
 
