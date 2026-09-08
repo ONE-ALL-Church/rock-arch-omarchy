@@ -114,6 +114,10 @@ the target without triggering it. Confirmation consumes a single-use draft
 (valid for two minutes), repeats discovery/access checks, rereads the job, and
 rejects changed identity, name, or placement before sending a single POST.
 `requested` means the request was accepted, not that execution completed.
+Accepted runs add the job entity page to the active profile's Recent Links when
+enabled; opening that link does not rerun the job. Repeated runs update the same
+entry. Canceled, rejected, or uncertain requests do not add history. A local
+history-save failure leaves the run accepted and reports `recentLinkSaved: false`.
 `status` reports Rock's latest recorded run and does not attribute it to a
 particular request. Never automatically retry an uncertain request; inspect
 status and Rock's job history first.

@@ -48,6 +48,17 @@ TestCase {
     verify(!model.canRun)
     verify(model.notice.indexOf("does not confirm completion") >= 0)
   }
+  function test_history_failure_does_not_allow_rerunning_accepted_job() {
+    prepare()
+    model.run()
+    model.accept({requestId: model.requestId, state: "requested", recentLinkSaved: false})
+    compare(model.phase, "requested")
+    verify(!model.canRun)
+    verify(model.notice.indexOf("Recent link couldn't be saved") >= 0)
+    model.run()
+    compare(requests.length, 3)
+  }
+
   function test_cancel_and_profile_reset_invalidate_late_responses() {
     access(true)
     model.begin({safeId: "job-result", title: "Test job", category: "Jobs"})

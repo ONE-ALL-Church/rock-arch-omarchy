@@ -52,11 +52,7 @@ function knowledgeResults(root, ui, response, frame) {
     }
 }
 
-function links(root, ui, response, frame) {
-    if (Array.isArray(response.personalLinks)) {
-      root.linkView.replace(response.personalLinks, root.pendingPersonalLinkSelection, response.personalLinkSections || [])
-      root.pendingPersonalLinkSelection = null
-    }
+function recentLinks(root, response) {
     if (Array.isArray(response.quickReturns)) {
       root.quickReturns = response.quickReturns
       if (root.showRecentLinks) {
@@ -66,6 +62,14 @@ function links(root, ui, response, frame) {
         root.recentCursor = root.quickReturns.length - 1
       }
     }
+}
+
+function links(root, ui, response, frame) {
+    if (Array.isArray(response.personalLinks)) {
+      root.linkView.replace(response.personalLinks, root.pendingPersonalLinkSelection, response.personalLinkSections || [])
+      root.pendingPersonalLinkSelection = null
+    }
+    recentLinks(root, response)
     if (root.linkCursor >= root.navigationCount) root.linkCursor = root.navigationCount - 1
     if (root.viewMode === "personal" && root.linkCursor < 0 && root.navigationCount) root.linkCursor = 0
     if (root.viewMode === "personal" && root.linkCursor >= 0)

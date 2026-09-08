@@ -84,6 +84,7 @@ QtObject {
     } else if (value.state === "requested" && phase === "sending") {
       phase = "requested"
       notice = "Run requested. This does not confirm completion."
+      if (value.recentLinkSaved === false) notice += " Recent link couldn't be saved."
       statusDelay.restart()
       confirmationReady()
     } else if (value.state === "status" && (phase === "requested" || phase === "uncertain")) {

@@ -79,6 +79,23 @@ TestCase {
     wait(1) // Run the real Qt.callLater focus and refresh callbacks.
   }
 
+  function test_job_receipt_refreshes_recent_links_without_disturbing_search() {
+    state.job = {editing: true, busy: true, requestId: "run-1", accept: function() {}}
+    state.query = "j: Test"
+    state.resultCursor = 2
+    state.showRecentLinks = false
+    accept({ok: true, jobAction: {state: "requested", requestId: "run-1"},
+            quickReturns: [{safeId: "quick-job", title: "Test job", kind: "Scheduled Job"}]})
+    compare(state.quickReturns.length, 1)
+    compare(state.quickReturns[0].safeId, "quick-job")
+    compare(state.resultCursor, 2)
+    compare(state.query, "j: Test")
+    compare(ui.panelFlick.contentY, 80)
+    state.job.requestId = "new-profile-request"
+    accept({ok: true, jobAction: {state: "requested", requestId: "run-1"}, quickReturns: []})
+    compare(state.quickReturns.length, 1)
+  }
+
   function test_returning_to_magnus_folder_restores_selection_and_scroll() {
     state.viewMode = "magnus"
     state.pendingMagnusReturn = {cursor: 1, scroll: 120}

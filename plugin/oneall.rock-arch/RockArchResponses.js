@@ -28,7 +28,10 @@ function accept(root, ui, line) {
       return
     }
     if (response && response.jobAction) {
+      var currentJobRequest = root.job.editing && root.job.busy &&
+        response.jobAction.requestId === root.job.requestId
       root.job.accept(response.jobAction)
+      if (currentJobRequest && response.ok === true) Search.recentLinks(root, response)
       return
     }
     if (response && response.shortcut) {

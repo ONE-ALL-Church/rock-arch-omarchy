@@ -19,6 +19,7 @@ from .http_security import (
     redirect_free_opener,
     validate_rock_cookie_header,
 )
+from .navigation import NavigationTarget
 from .origin import validate_rock_origin
 from .rock_rest_adapter import CookieProvider
 from .rock_session import RockSessionError
@@ -124,6 +125,14 @@ class JobDraft:
     title: str
     placement: Placement
     deadline: float
+
+
+@dataclass(frozen=True)
+class JobRunOutcome:
+    target: NavigationTarget
+
+    def public_dict(self) -> dict[str, Any]:
+        return {"state": "requested", "title": self.target.title, "completionVerified": False}
 
 
 class JobManager:
@@ -232,7 +241,7 @@ class JobManager:
         self._drafts[token] = JobDraft(number, _guid(row["Guid"]), title, self._placement, time.monotonic() + DRAFT_SECONDS)
         return {"state": "confirm", "draftId": token, "title": title, "confirmationRequired": True}
 
-    def run(self, token: object, confirmed: bool) -> dict[str, Any]:
+    def run(self, token: object, confirmed: bool) -> JobRunOutcome:
         if not confirmed:
             raise JobError("job_confirmation_required")
         draft = self._drafts.pop(token, None) if isinstance(token, str) else None
@@ -249,7 +258,9 @@ class JobManager:
                 raise JobError("job_draft_expired")
             assert self._origin is not None
             self._http.request(self._origin, draft.placement.action("RunNow"), {}, cookie, {"key": draft.guid})
-        return {"state": "requested", "title": draft.title, "completionVerified": False}
+        return JobRunOutcome(NavigationTarget(
+            draft.title, "Scheduled Job", 40, f"{self._origin}/admin/system/jobs/{draft.number}"
+        ))
 
     def status(self, number: int) -> dict[str, Any]:
         with self._session.authenticated_cookie() as cookie:

@@ -519,7 +519,8 @@ def _request(args: argparse.Namespace, client: BrokerClient) -> dict[str, Any]:
         draft = client.request({"op": "job_prepare", "safeId": args.safe_id})["jobAction"]
         if args.dry_run:
             return {"ok": True, "dryRun": {"action": "runJob", "target": draft["title"],
-                    "confirmationRequired": True, "executed": False, "sideEffects": ["requests_scheduled_job_run"]}}
+                    "confirmationRequired": True, "executed": False,
+                    "sideEffects": ["requests_scheduled_job_run", "adds_recent_link"]}}
         return client.request({"op": "job_run", "draftId": draft["draftId"], "confirmed": True})
     if args.command == "knowledge":
         return _knowledge_request(args, client)

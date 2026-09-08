@@ -539,6 +539,8 @@ See [docs/CLI.md](docs/CLI.md) for the full command and JSON contract.
   bounded responses. Job discovery uses bounded metadata reads and the exact
   Obsidian block initialization action. The only job write is a confirmed
   `RunNow` POST to the discovered page/block; no arbitrary endpoint is accepted.
+  Accepted runs add the job page to Recent Links when enabled. Opening that
+  entry opens the entity page without triggering another run.
 - Cookies are attached only to exact-origin HTTPS requests. Cross-origin
   redirects and malformed targets are rejected.
 - QML receives display fields and process-local opaque IDs, not raw Rock IDs,

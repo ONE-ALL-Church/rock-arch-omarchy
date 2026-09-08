@@ -7,6 +7,10 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Fixed
 
+- Add accepted job runs to Recent Links as the job entity page, respecting the
+  history preference and updating existing entries. Canceled, rejected, and
+  uncertain requests do not record a link; opening the link never reruns a job.
+
 - Recover when the panel connects before its broker is ready by replacing failed
   Quickshell sockets. Read keyboard focus from Qt's attached Window so navigation
   works in the native layer-shell panel as well as ordinary Qt windows.

@@ -12,6 +12,8 @@ from rock_arch_broker.broker import Broker
 from rock_arch_broker.cli_permissions import MUTATION_ACTIONS
 from rock_arch_broker.contracts import Context
 from rock_arch_broker.instance import InstanceStore
+from rock_arch_broker.jobs import JobRunOutcome
+from rock_arch_broker.navigation import NavigationTarget
 from rock_arch_broker.personal_links import PersonalLinkManager
 from rock_arch_broker.profiles import ProfileError, ProfileStore
 from rock_arch_broker.terminal_access import CLI_CLIENT
@@ -29,7 +31,9 @@ class CliPermissionTests(unittest.TestCase):
         self.links = PersonalLinkManager(self.session, self.rock)
         self.magnus = FakeMagnus(True)
         self.jobs = Mock()
-        self.jobs.run.return_value = {"requested": True}
+        self.jobs.run.return_value = JobRunOutcome(
+            NavigationTarget("Synthetic job", "Scheduled Job", 40, ORIGIN + "/admin/system/jobs/7")
+        )
         live = FakeLive()
         live.invalidate_personal_links = Mock()
         self.broker = Broker(self.root / "context", instance_file=instance,

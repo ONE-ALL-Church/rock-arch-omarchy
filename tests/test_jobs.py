@@ -127,7 +127,7 @@ class JobManagerTests(unittest.TestCase):
         self.assertEqual(self.writes(), [])
         with self.assertRaisesRegex(JobError, "confirmation_required"):
             self.jobs.run(draft["draftId"], False)
-        result = self.jobs.run(draft["draftId"], True)
+        result = self.jobs.run(draft["draftId"], True).public_dict()
         self.assertEqual(result["state"], "requested")
         self.assertFalse(result["completionVerified"])
         self.assertEqual(self.writes(), [(ORIGIN, Placement(JOBS_PAGE, BLOCK).action("RunNow"), {}, {"key": JOB})])
@@ -249,6 +249,91 @@ class JobHttpTests(unittest.TestCase):
 
 
 class JobBrokerTests(unittest.TestCase):
+    @contextmanager
+    def fixture(self):
+        from test_broker import FakeMagnus, FakeSession
+
+        from rock_arch_broker.broker import Broker
+        from rock_arch_broker.instance import InstanceStore
+        from rock_arch_broker.rock_rest_adapter import RockRestReadOnlyAdapter
+
+        http = JobHttp()
+
+        class ReadHttp:
+            def get_json(self, path, params, cookie):
+                return [http.job] if path == "/api/ServiceJobs" else []
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            instance = root / "instance.json"
+            InstanceStore(instance).set(ORIGIN)
+            session = FakeSession(True)
+            live = RockRestReadOnlyAdapter(session, ReadHttp(), ORIGIN)
+            opened = []
+            broker = Broker(state_file=root / "context", session=session, live=live,
+                            jobs=JobManager(session, http), magnus=FakeMagnus(),
+                            instance_file=instance, developer_mode=False,
+                            url_opener=lambda url: opened.append(url) or True)
+            row = live.search("Test", "Jobs").results[0]
+            yield broker, http, row, opened
+
+    def run_job(self, broker, row, confirmed=True):
+        prepared = broker.handle({"op": "job_prepare", "safeId": row["safeId"]})
+        self.assertTrue(prepared["ok"])
+        return broker.handle({"op": "job_run", "draftId": prepared["jobAction"]["draftId"],
+                              "confirmed": confirmed, "requestId": "run-1"})
+
+    def test_accepted_run_adds_persistent_entity_link_and_repeated_runs_deduplicate(self):
+        from rock_arch_broker.quick_return import QuickReturnStore
+
+        with self.fixture() as (broker, http, row, opened):
+            # Opening and running the same entity must share one history entry.
+            self.assertTrue(broker.handle({"op": "open_navigation", "safeId": row["safeId"]})["ok"])
+            for _ in range(2):
+                response = self.run_job(broker, row)
+                self.assertTrue(response["ok"])
+                self.assertEqual(response["jobAction"]["state"], "requested")
+                self.assertFalse(response["jobAction"]["completionVerified"])
+                self.assertEqual(len(response["quickReturns"]), 1)
+            item = response["quickReturns"][0]
+            self.assertEqual((item["title"], item["kind"]), ("Test job", "Scheduled Job"))
+            restored = QuickReturnStore(broker._quick_returns.path, ORIGIN)
+            self.assertEqual(restored.public_items()[0]["title"], "Test job")
+            self.assertNotIn(JOB, json.dumps(response))
+            self.assertNotIn(ORIGIN, json.dumps(response))
+            writes = len([c for c in http.calls if c[3] is not None])
+            self.assertTrue(broker.handle({"op": "activate_recent", "safeId": item["safeId"]})["ok"])
+            self.assertEqual(opened[-1], ORIGIN + "/admin/system/jobs/7")
+            self.assertEqual(len([c for c in http.calls if c[3] is not None]), writes)
+
+    def test_failed_unconfirmed_and_uncertain_runs_do_not_add_history(self):
+        for error in ("", "job_run_rejected", "job_run_uncertain", "job_access_denied"):
+            with self.subTest(error=error), self.fixture() as (broker, http, row, _):
+                http.write_error = error
+                response = self.run_job(broker, row, confirmed=bool(error))
+                self.assertFalse(response["ok"])
+                self.assertEqual(broker._quick_returns.public_items(), [])
+
+    def test_disabled_history_does_not_record_accepted_run(self):
+        with self.fixture() as (broker, _, row, _):
+            broker._profile_store.update_preferences({"recentLinks": False})
+            response = self.run_job(broker, row)
+            self.assertTrue(response["ok"])
+            self.assertEqual(response["quickReturns"], [])
+            self.assertFalse(broker._quick_returns.path.exists())
+
+    def test_history_write_failure_preserves_accepted_run_and_consumed_draft(self):
+        with self.fixture() as (broker, http, row, _):
+            prepared = broker.handle({"op": "job_prepare", "safeId": row["safeId"]})
+            request = {"op": "job_run", "draftId": prepared["jobAction"]["draftId"], "confirmed": True}
+            with patch.object(broker._quick_returns, "add", side_effect=OSError("disk full")):
+                response = broker.handle(request)
+            self.assertTrue(response["ok"])
+            self.assertEqual(response["jobAction"]["state"], "requested")
+            self.assertFalse(response["jobAction"]["recentLinkSaved"])
+            self.assertEqual(broker.handle(request)["error"], "job_draft_expired")
+            self.assertEqual(len([c for c in http.calls if c[3] is not None]), 1)
+
     def test_only_registered_job_references_can_prepare_and_profile_changes_invalidate_drafts(self):
         from test_broker import FakeMagnus, FakeSession
 

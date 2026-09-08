@@ -14,6 +14,7 @@ from .contracts import (
 )
 from .jobs import JobError
 from .magnus_adapter import MagnusError
+from .navigation import NavigationError
 from .origin import OriginError, validate_rock_origin
 from .personal_links import PersonalLinkError, prefill_name
 from .profiles import (
@@ -991,6 +992,7 @@ class BrokerOperations:
         operation = raw["op"]
         envelope = "jobAccess" if operation == "job_access" else "jobAction"
         request_id = sanitize_text(raw.get("requestId"), 100)
+        response: dict[str, Any] = {}
         try:
             if (broker._context is not Context.PROD or not broker._origin
                     or not broker._session.status().get("configured")
@@ -1000,7 +1002,17 @@ class BrokerOperations:
                 result = broker._jobs.access(refresh=raw.get("refresh") is True)
             elif operation == "job_run":
                 require_mutation(self._cli_mutations(raw), "runJobs")
-                result = broker._jobs.run(raw.get("draftId"), raw.get("confirmed") is True)
+                outcome = broker._jobs.run(raw.get("draftId"), raw.get("confirmed") is True)
+                result = outcome.public_dict()
+                if broker._profile_store.preferences()["recentLinks"]:
+                    try:
+                        broker._quick_returns.add(outcome.target)
+                        response["quickReturns"] = broker._quick_returns.public_items()
+                    except (OSError, NavigationError):
+                        # A local history failure must not turn an accepted run into a retry.
+                        result["recentLinkSaved"] = False
+                else:
+                    response["quickReturns"] = []
             else:
                 safe_id = sanitize_text(raw.get("safeId"), 100)
                 resolver = getattr(broker._live, "job_id", None)
@@ -1009,7 +1021,7 @@ class BrokerOperations:
                     raise JobError("job_not_found")
                 result = (broker._jobs.prepare(number) if operation == "job_prepare"
                           else broker._jobs.status(number))
-            return broker._ok(**{envelope: {**result, "requestId": request_id}})
+            return broker._ok(**response, **{envelope: {**result, "requestId": request_id}})
         except (JobError, RockSessionError) as error:
             code = str(error) if isinstance(error, JobError) else "job_access_unavailable"
             return {**broker._error(code), envelope: {"state": "error", "available": False,

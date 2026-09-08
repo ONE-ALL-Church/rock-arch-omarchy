@@ -4,6 +4,18 @@ This record describes the prepared `0.26.1` release boundary and the unreleased
 feature acceptance below. Historical feature changes belong in
 [CHANGELOG.md](../CHANGELOG.md).
 
+## Unreleased job Recent Links
+
+On 2026-09-08, accepted Run Job requests began recording the verified job entity
+in the active profile's Recent Links. 360 Python tests and 99 Qt cases pass,
+alongside Ruff, ty, Omarchy validation, and keyboard/socket integration checks.
+New isolated broker tests exercise real history persistence, deduplication with
+opened jobs, disabled history, unconfirmed/rejected/uncertain requests, and a
+history-write failure after acceptance. Activating the saved entry opens its job
+page and issues no additional RunNow request. QML tests cover immediate Recent
+Links updates without changing search focus and rejection of stale job responses.
+All job requests in these tests use synthetic transport; no real job was run.
+
 ## Unreleased Defined Types search
 
 On 2026-09-08, Defined Types became the ninth development search category.
