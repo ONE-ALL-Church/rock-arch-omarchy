@@ -78,6 +78,8 @@ there. There is no timed hint rotation. The accessible input name remains
   QtTest sends real key events across fields, tab buttons, toolbars, lists,
   detail, preview text, drafts, Settings and confirmations. Fixtures contain no
   user data, and the broker performs no operations.
+- `scripts/check-socket`: a delayed local server exercises the actual Quickshell
+  Socket error/recovery path, without starting an authenticated broker.
 - `python -B -m unittest discover -s tests`: broker and distribution regression
   coverage plus the existing QML source contracts.
 

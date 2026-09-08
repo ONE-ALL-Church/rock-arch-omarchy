@@ -9,7 +9,7 @@ QtObject {
   signal interrupted()
 
   function request(payload) {
-    if (payload.op === "job_run" && !transport.connected) { interrupted(); return }
+    if (payload.op === "job_run" && (!transport || !transport.connected)) { interrupted(); return }
     var next = []
     var coalesce = payload.op === "search" || payload.op === "knowledge_search" ||
       payload.op === "search_capabilities" || payload.op === "status" || payload.op === "navigation_status"
@@ -19,7 +19,7 @@ QtObject {
       if (!coalesce || queued.op !== payload.op || !sameNavigationSection) next.push(queued)
     }
     requestQueue = next.concat([payload])
-    if (transport.connected) flushRequests()
+    if (transport && transport.connected) flushRequests()
     else retry()
   }
 
@@ -39,8 +39,8 @@ QtObject {
   }
 
   function flushRequests() {
-    if (!transport.connected || !requestQueue.length) return
-    while (transport.connected && requestQueue.length) {
+    if ((!transport || !transport.connected) || !requestQueue.length) return
+    while (transport && transport.connected && requestQueue.length) {
       var payload = requestQueue[0]
       requestQueue = requestQueue.slice(1)
       transport.write(JSON.stringify(payload) + "\n")
@@ -53,7 +53,7 @@ QtObject {
   }
 
   function retry() {
-    if (requestQueue.length) reconnectTimer.restart()
+    if (requestQueue.length && !reconnectTimer.running) reconnectTimer.start()
   }
 
   function failed() {
@@ -65,7 +65,7 @@ QtObject {
   property Connections transportSignals: Connections {
     target: connection.transport
     function onConnectedChanged() {
-      if (connection.transport.connected) connection.flushRequests()
+      if (connection.transport && connection.transport.connected) connection.flushRequests()
       else connection.retry()
     }
   }
@@ -74,8 +74,8 @@ QtObject {
     interval: connection.retryInterval
     onTriggered: {
       if (!connection.requestQueue.length) return
-      if (connection.transport.connected) connection.flushRequests()
-      else {
+      if (connection.transport && connection.transport.connected) connection.flushRequests()
+      else if (connection.transport) {
         connection.transport.connected = false
         connection.transport.connected = true
       }

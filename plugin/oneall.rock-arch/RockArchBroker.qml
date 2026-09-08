@@ -15,7 +15,7 @@ QtObject {
   function dropJobRequests() { connection.dropJobRequests() }
 
   property RockArchConnection connection: RockArchConnection {
-    transport: brokerSocket
+    transport: broker.socket
     onInterrupted: broker.interrupted()
   }
 
@@ -26,14 +26,31 @@ QtObject {
     onStarted: broker.connection.retry()
   }
 
-  property Socket socket: Socket {
-    id: brokerSocket
-    path: broker.socketPath
-    connected: false
-    onError: {
-      connected = false
-      broker.connection.failed()
+  // Quickshell 0.3 retains a failed pre-connect QLocalSocket. Toggling its
+  // connected flag cannot revive it; replace that socket after an error.
+  property Socket socket: null
+  function replaceSocket() {
+    var previous = socket
+    socket = socketFactory.createObject(broker)
+    if (previous) { previous.connected = false; previous.destroy() }
+  }
+  Component.onCompleted: replaceSocket()
+
+  property Component socketFactory: Component {
+    Socket {
+      id: socket
+      path: broker.socketPath
+      connected: false
+      onConnectionStateChanged: {
+        if (connected) broker.connection.flushRequests()
+        else broker.connection.retry()
+      }
+      onError: Qt.callLater(function() {
+        if (broker.socket !== socket) return
+        broker.replaceSocket()
+        broker.connection.failed()
+      })
+      parser: SplitParser { onRead: function(line) { broker.received(line) } }
     }
-    parser: SplitParser { onRead: function(line) { broker.received(line) } }
   }
 }

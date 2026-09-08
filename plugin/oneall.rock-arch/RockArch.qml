@@ -24,6 +24,7 @@ Panel {
   property string viewMode: "search"
   property var pendingMagnusReturn: null
   property var knowledgeReturnFocus: null
+  readonly property Item activeFocusItem: keyCatcher.Window.activeFocusItem
   readonly property bool tabBarFocused: navigationBar.activeFocus
   property var workspaceFocus: ({})
   property string settingsReturnView: "search"
@@ -704,7 +705,7 @@ Panel {
     if (!knowledgeDetail || !Array.isArray(knowledgeDetail.links) ||
         index < 0 || index >= knowledgeDetail.links.length || knowledgeBusy) return
     knowledgeLinkCursor = index
-    knowledgeHistory = knowledgeHistory.concat([{detail: knowledgeDetail, scroll: panelFlick.contentY, item: panel.activeFocusItem}])
+    knowledgeHistory = knowledgeHistory.concat([{detail: knowledgeDetail, scroll: panelFlick.contentY, item: root.activeFocusItem}])
     pendingKnowledgeNavigation = true
     knowledgeBusy = true
     feedbackText = "Opening related knowledge…"
@@ -1073,7 +1074,7 @@ Panel {
     return Focus.stops(content)
   }
   function moveTab(direction) {
-    var target = Focus.next(focusStops(), panel.activeFocusItem, direction)
+    var target = Focus.next(focusStops(), root.activeFocusItem, direction)
     if (!target) return
     if (target === navigationBar) focusTabBar()
     else target.forceActiveFocus(direction < 0 ? Qt.BacktabFocusReason : Qt.TabFocusReason)
@@ -1081,7 +1082,7 @@ Panel {
   }
   function rememberWorkspace() {
     var next = Object.assign({}, workspaceFocus)
-    var item = panel.activeFocusItem
+    var item = root.activeFocusItem
     if (Focus.contains(navigationBar, item) || Focus.contains(hero, item))
       item = next[viewMode] ? next[viewMode].item : null
     next[viewMode] = {item: item, scroll: panelFlick.contentY}
@@ -1139,14 +1140,11 @@ Panel {
   function openAdjacentTab(direction) {
     openTab(Navigation.adjacent(navigationTabs, viewMode === "settings" ? settingsReturnView : viewMode, direction))
   }
-  Connections {
-    target: panel
-    function onActiveFocusItemChanged() {
-      var item = panel.activeFocusItem
-      if (!root.opened || !item || !item.visible || root.keyboardHelpVisible ||
-          !Focus.contains(content, item) || Focus.contains(navigationBar, item) || Focus.contains(hero, item)) return
-      root.rememberWorkspace()
-    }
+  onActiveFocusItemChanged: {
+    var item = root.activeFocusItem
+    if (!root.opened || !item || !item.visible || root.keyboardHelpVisible ||
+        !Focus.contains(content, item) || Focus.contains(navigationBar, item) || Focus.contains(hero, item)) return
+    root.rememberWorkspace()
   }
   function openKeyboardHelp() {
     if (!workspaceNavigationEnabled) return
@@ -1624,8 +1622,8 @@ Panel {
   Shortcut { sequence: "Alt+0"; context: Qt.ApplicationShortcut; enabled: root.scopeShortcutsEnabled; onActivated: root.clearScope() }
   Shortcut { sequence: "Ctrl+Tab"; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openAdjacentTab(1) }
   Shortcut { sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab"]; context: Qt.ApplicationShortcut; enabled: root.opened; onActivated: root.openAdjacentTab(-1) }
-  Shortcut { sequence: "Tab"; context: Qt.ApplicationShortcut; enabled: root.opened && Focus.contains(content, panel.activeFocusItem) && !personalLinkEditor.popupOpen; onActivated: root.moveTab(1) }
-  Shortcut { sequences: ["Shift+Tab", "Backtab"]; context: Qt.ApplicationShortcut; enabled: root.opened && Focus.contains(content, panel.activeFocusItem) && !personalLinkEditor.popupOpen; onActivated: root.moveTab(-1) }
+  Shortcut { sequence: "Tab"; context: Qt.ApplicationShortcut; enabled: root.opened && Focus.contains(content, root.activeFocusItem) && !personalLinkEditor.popupOpen; onActivated: root.moveTab(1) }
+  Shortcut { sequences: ["Shift+Tab", "Backtab"]; context: Qt.ApplicationShortcut; enabled: root.opened && Focus.contains(content, root.activeFocusItem) && !personalLinkEditor.popupOpen; onActivated: root.moveTab(-1) }
   Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled; onActivated: root.openKeyboardHelp() }
   Shortcut { sequence: "Ctrl+F"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled && (root.viewMode === "search" || (root.viewMode === "knowledge" && root.knowledgeDetail === null)); onActivated: root.focusWorkspace(false) }
   Shortcut { sequence: "Alt+Left"; context: Qt.ApplicationShortcut; enabled: root.workspaceNavigationEnabled && ((root.viewMode === "knowledge" && root.knowledgeDetail !== null) || (root.viewMode === "magnus" && (root.magnusPreview !== null || root.magnusHistory.length > 0))); onActivated: root.escapePanel() }

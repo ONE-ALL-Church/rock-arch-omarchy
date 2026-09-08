@@ -7,6 +7,10 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ### Fixed
 
+- Recover when the panel connects before its broker is ready by replacing failed
+  Quickshell sockets. Read keyboard focus from Qt's attached Window so navigation
+  works in the native layer-shell panel as well as ordinary Qt windows.
+
 - Disable Python bytecode cache writes from the panel, CLI launcher, and update
   worker to avoid triggering Omarchy's plugin file watcher during startup.
   Wait for profile/status loading before showing the empty-profile prompt.

@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Reproduce a late broker startup using Quickshell's real Unix Socket type."""
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[1]
+with tempfile.TemporaryDirectory(prefix="rock-arch-socket-") as temporary:
+    stage = Path(temporary)
+    source = root / "plugin/oneall.rock-arch"
+    shutil.copy2(source / "RockArchConnection.qml", stage)
+    # No real broker process, credentials or Rock endpoint participates.
+    broker = (source / "RockArchBroker.qml").read_text()
+    assert broker.count("running: true") == 1
+    (stage / "RockArchBroker.qml").write_text(broker.replace("running: true", "running: false"))
+    endpoint = stage / "late.sock"
+    (stage / "shell.qml").write_text('''import QtQuick
+import Quickshell
+ShellRoot {
+ RockArchBroker {
+   id: broker
+   packageRoot: @PACKAGE@
+   socketPath: @SOCKET@
+   Component.onCompleted: request({op: "status"})
+   onReceived: function(line) {
+     if (JSON.parse(line).ok) console.log("SOCKET_RECOVERY_PASS")
+     Qt.quit()
+   }
+ }
+ Timer { interval: 6000; running: true; onTriggered: Qt.quit() }
+}
+'''.replace('@PACKAGE@', json.dumps(str(stage))).replace('@SOCKET@', json.dumps(str(endpoint))))
+    received = []
+    errors = []
+
+    def serve():
+        time.sleep(1.5)  # Force the first connection to fail before listening.
+        try:
+            with socket.socket(socket.AF_UNIX) as server:
+                server.bind(str(endpoint))
+                server.listen()
+                server.settimeout(6)
+                client, _ = server.accept()
+                with client:
+                    client.settimeout(3)
+                    received.append(json.loads(client.recv(1024)))
+                    client.sendall(b'{"ok":true}\n')
+                    time.sleep(0.1)
+        except (OSError, ValueError) as error:
+            errors.append(str(error))
+
+    worker = threading.Thread(target=serve)
+    worker.start()
+    result = subprocess.run(["quickshell", "-p", str(stage), "--no-color"],
+                            env=dict(os.environ, QT_QPA_PLATFORM="offscreen"),
+                            capture_output=True, text=True, timeout=9, check=False)
+    worker.join()
+    output = result.stdout + result.stderr
+    if (result.returncode or errors or received != [{"op": "status"}] or
+            "SOCKET_RECOVERY_PASS" not in output or "Socket error" not in output or "ERROR:" in output or
+            " WARN scene:" in output or " WARN qml:" in output):
+        print(output, errors)
+        sys.exit(1)
+    print("Real Socket recovery passed: late server, one queued status, successful response.")
