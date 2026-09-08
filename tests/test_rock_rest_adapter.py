@@ -240,7 +240,7 @@ class RockRestAdapterTests(unittest.TestCase):
             "Groups": ("Group", "/Group/4"),
             "Group Types": (
                 "Group Type",
-                "/admin/general/group-types?GroupTypeId=5",
+                "/admin/general/group-types/5",
             ),
             "Workflows": (
                 "Workflow Type",

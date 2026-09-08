@@ -438,7 +438,7 @@ Rock route:
 |---|---|
 | Person | `/Person/{id}` |
 | Group | `/Group/{id}` |
-| Group Type | `/admin/general/group-types?GroupTypeId={id}` |
+| Group Type | `/admin/general/group-types/{id}` |
 | Workflow Type | `/admin/general/workflows?WorkflowTypeId={id}` |
 | Scheduled Job | `/admin/system/jobs/{id}` |
 | Page | `/page/{id}` |

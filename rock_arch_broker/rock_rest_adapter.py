@@ -224,7 +224,7 @@ SEARCH_SPECS = (
         ("Name",),
         "Group type",
         25,
-        "/admin/general/group-types?GroupTypeId={id}",
+        "/admin/general/group-types/{id}",
     ),
     _SearchSpec(
         "Workflows",

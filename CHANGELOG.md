@@ -5,6 +5,11 @@ repository's default branch is the source used by Omarchy plugin updates.
 
 ## [Unreleased]
 
+### Fixed
+
+- Open Group Type search results at `/admin/general/group-types/{id}` on the
+  selected Rock instance.
+
 ### Changed
 
 - Replace Search's Save label with an accessible outline bookmark icon and use
